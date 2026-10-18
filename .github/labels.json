@@ -1,0 +1,5 @@
+[
+  {"name": "mvp", "color": "2446D8", "description": "Required first complete version; QA closes only after PASS"},
+  {"name": "post-mvp", "color": "667788", "description": "Explicitly deferred work outside the assessment MVP"},
+  {"name": "user-test-bug", "color": "B42318", "description": "Actually observed test defect; PM grooming and QA regression required"}
+]
