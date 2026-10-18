@@ -1,6 +1,6 @@
 # Architecture and iteration decisions
 
-Status: proposed architecture, no implementation yet.
+Status: architecture decisions retained; iteration 0 implements only the React/TypeScript startup screen and FastAPI health endpoint. Independent QA is pending on #1.
 
 ## Stack options considered before code
 
@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The application folders, Makefile and OpenAPI file do not exist yet. This tree describes the target, not completed work.
+The application folders now contain the iteration-0 startup screen, API entry point and health test, with dependency locks. All product/service/repository paths shown above remain the target. A Makefile and versioned OpenAPI file do not exist yet.
 
 ## Required stages and concrete verification gates
 

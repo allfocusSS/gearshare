@@ -1,6 +1,6 @@
 # Testing and verification plan
 
-Status: planned cases, **not executed**. Add actual test names, commands and results in `evidence.md` while implementing. Do not report the number of rows below as a count of passing tests.
+Status: the product cases below remain planned and **not executed**. The iteration-0 health test and frontend build have a separate record in `evidence.md`. Add actual test names, commands and results there while implementing. Do not report the number of rows below as a count of passing tests.
 
 ## Strategy
 

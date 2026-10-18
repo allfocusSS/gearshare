@@ -1,6 +1,6 @@
 # Issue and agent workflow
 
-Status: repository access verified at https://github.com/allfocusSS/gearshare; starting backlog publication before application code.
+Status: repository/backlog published at https://github.com/allfocusSS/gearshare before application code. The iteration-0 bootstrap candidate for #1 is ready for independent QA; no later stage gate is claimed.
 
 ## Combining the two articles
 

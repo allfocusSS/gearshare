@@ -8,9 +8,42 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-This is the **specification and development-process kit**, prepared before application code. The application has not been implemented, run or tested yet. MVP issues #1–20 and post-MVP #21–23 have been published; implementation/QA has not started. This kit alone is not a finished submission.
+Iteration 0 now contains a minimal React/TypeScript startup screen and a FastAPI `GET /health` endpoint. The engineer's bootstrap checks are recorded in [`_docs/evidence.md`](_docs/evidence.md); independent QA for [#1](https://github.com/allfocusSS/gearshare/issues/1) is still required before iteration 1. Product workflows are not implemented. This is not a finished submission.
 
-Repository: https://github.com/allfocusSS/gearshare. Access verified; specification and backlog publication are starting. StudyTrack remains the separate Part I project.
+Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
+
+## Run the bootstrap
+
+Prerequisites: **Python 3.12.x**, **uv 0.12.23**, **Node.js 24.x** and **npm 11.x**. The verified environment uses Python 3.12.14, Node 24.19.0 and npm 11.9.0. Application dependencies are locked in `backend/uv.lock` and `frontend/package-lock.json`; no globally installed FastAPI, pytest, TypeScript or Vite is needed. Package installation needs access to public PyPI and npm registries.
+
+From a fresh checkout, open a terminal at the repository root:
+
+```sh
+cd backend
+uv sync --locked
+uv run --locked pytest
+uv run --locked uvicorn app.main:app --reload
+```
+
+The API listens at http://127.0.0.1:8000. In a second terminal, this returns HTTP 200 with `{"status":"ok"}`:
+
+```sh
+curl --fail http://127.0.0.1:8000/health
+```
+
+In another terminal at the repository root:
+
+```sh
+cd frontend
+npm ci
+npm run typecheck
+npm run build
+npm run dev
+```
+
+Open http://127.0.0.1:5173 to see the GearShare startup screen. The frontend starts independently of the backend. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
+
+No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. There are no secrets, accounts, database, seed or migration commands at this stage.
 
 ## Start here
 
@@ -21,7 +54,7 @@ Repository: https://github.com/allfocusSS/gearshare. Access verified; specificat
 5. Build in the assignment's exact order: mock frontend → `openapi.yml` → in-memory API → SQLite through ORM → integrated frontend.
 6. Record actual commands, results, commits and bugs in [`_docs/evidence.md`](_docs/evidence.md). Do not replace planned checks with claims of passing tests.
 
-## MVP
+## Planned MVP
 
 - Student registration and sign-in; coordinator role controlled by the server.
 - Searchable equipment catalogue with date/category filters and per-item availability.
@@ -46,4 +79,4 @@ Repository: https://github.com/allfocusSS/gearshare. Access verified; specificat
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-`openapi.yml`, application source, dependency locks, CI configuration, screenshots and test results are future deliverables. They are deliberately not fabricated in this planning kit.
+`openapi.yml`, the product workflows, persistence, CI and final browser/demo evidence remain future deliverables. The health test and startup build verify only the iteration-0 skeleton.

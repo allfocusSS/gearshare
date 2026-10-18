@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. Initial scope/design documentation is prepared; application development begins only after the separate GitHub repository and issues exist.
+Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. The separate repository and issues now exist. Iteration 0 has a minimal frontend/API bootstrap; #1 remains open for independent QA. Do not begin iteration 1 before that gate passes.
 
 ## Read before working
 
@@ -36,4 +36,21 @@ Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was Stu
 
 ## Commands
 
-No application commands are available yet. MVP-01 must add and verify the real setup/test commands here and in README. Do not report an unimplemented command as a working one.
+Prerequisites: Python 3.12.x, uv 0.12.23, Node 24.x and npm 11.x. See README for server URLs and optional configuration. Run each group from the repository root in separate terminals:
+
+```sh
+cd backend
+uv sync --locked
+uv run --locked pytest
+uv run --locked uvicorn app.main:app --reload
+```
+
+```sh
+cd frontend
+npm ci
+npm run typecheck
+npm run build
+npm run dev
+```
+
+The current frontend is a static React startup screen and makes no API calls. The backend implements only `GET /health`. Product service types/mock adapters belong to #2; OpenAPI, business APIs and persistence follow their separate stage gates. Exact engineer results are in `_docs/evidence.md`; these commands do not establish a product or independent-QA PASS.
