@@ -1,28 +1,28 @@
 # Submission requirement matrix
 
-Current state: iteration-0 bootstrap checked by the engineer; independent QA pending on #1. **Not ready for submission**.
+Current state: iteration-0 independent QA passed and closed #1. #2 mock shell/auth and #24 focus correction have passing engineer checks and await independent QA. **Not ready for submission**.
 
 | Assignment requirement | Planned evidence | Current status |
 | --- | --- | --- |
-| Different nontrivial project from Part I | plan.md; working resource allocation/lending demo | Idea/spec prepared; not implemented |
-| Follow specifications/agent workflow article | AGENTS.md, process, team roles and actual issue handoffs | PM/engineer handoff for #1; independent QA pending |
-| Follow full-stack article | Staged commits and runnable iteration gates | Iteration-0 skeleton candidate; later stages remain planned |
+| Different nontrivial project from Part I | plan.md; working resource allocation/lending demo | Idea/spec prepared; mock identity shell only, resource allocation/lending unimplemented |
+| Follow specifications/agent workflow article | AGENTS.md, process, team roles and actual issue handoffs | #1 QA PASS/closed; #2 handoff and real #24 PM/QA-failure/correction loop recorded |
+| Follow full-stack article | Staged commits and runnable iteration gates | Iteration-0 verified; iteration-1 mock identity candidate; later gates remain planned |
 | Use GitHub Issues | Canonical groomed issues with acceptance/QA evidence | MVP #1–20 and post-MVP #21–23 published |
-| Distinct design agent or good references | design-system.md, exact references, resulting screens | References/brief prepared; minimal startup only, product shell in #2 |
-| Close MVP issues | QA PASS and QA closure for each mvp issue | #1 open for QA; no closure claimed |
+| Distinct design agent or good references | design-system.md, exact references, resulting screens | References translated into #2 responsive shell/auth; lending screens remain pending |
+| Close MVP issues | QA PASS and QA closure for each mvp issue | #1 closed by independent QA; #2/#24 open; remaining MVP work pending |
 | Persistent SQLite | ORM models, migration and restart evidence | Planned |
 | DBMS-agnostic ORM | SQLAlchemy repository/domain separation and standard constraints | Planned; no alternate DBMS testing claimed |
-| Mock frontend first | mockService and a runnable stage commit | Not implemented |
+| Mock frontend first | mockService and a runnable stage commit | #2 identity/mock shell candidate with no backend; full mock lending stage incomplete |
 | openapi.yml second | Valid contract derived from mock service | Not authored; deliberate stage dependency |
 | In-memory backend third | True Python memory adapter and tests | Not implemented |
 | SQLite backend fourth | File-backed ORM adapter, migration and tests | Not implemented |
 | Final frontend/backend integration | HTTP adapter + actual two-role browser checks | Not implemented |
-| All Markdown in GitHub and improved during work | Committed docs and subsequent revision history | Planning baseline committed; bootstrap status/evidence updated with #1 |
+| All Markdown in GitHub and improved during work | Committed docs and subsequent revision history | Planning baseline, bootstrap and #2/#24 behavior/status/evidence updates committed |
 | Brainstorming chat before app creation | brainstorming.md with actual text/provenance | Included; user review still pending |
-| Actually run and thoroughly test | evidence.md with real commands, logs, commit and browser steps | Bootstrap install/health/typecheck/build/dev HTTP checks only; full product checks outstanding |
-| Real bugs labeled user-test-bug | Observed reproduction, PM grooming, QA regression and retest | No real product/browser defect observed during bootstrap; no bugs fabricated |
-| All required issue tags | mvp / post-mvp / user-test-bug labels and meaningful issue use | Published backlog uses mvp/post-mvp; user-test-bug reserved for observed defects |
-| QA closes all required issues | QA comments and final issue queries/counts | Not done |
+| Actually run and thoroughly test | evidence.md with real commands, logs, commit and browser steps | Bootstrap independent PASS; #2 engineer 11 service tests/typecheck/build and 26 browser checks passed; lending/integration checks outstanding |
+| Real bugs labeled user-test-bug | Observed reproduction, PM grooming, QA regression and retest | Actual #24 focus defect filed before fix; PM groomed, QA reproduced FAIL/cases, engineer correction awaits independent retest |
+| All required issue tags | mvp / post-mvp / user-test-bug labels and meaningful issue use | Published backlog uses mvp/post-mvp; real #24 also has user-test-bug |
+| QA closes all required issues | QA comments and final issue queries/counts | #1 closed after PASS; #2/#24 remain open; final #20 zero/zero closure postcondition documented |
 | Final submission | Correct GitHub URL, source, run guide and complete evidence | Repository and bootstrap guide exist; remaining implementation and QA outstanding |
 
 ## Final demo script after implementation

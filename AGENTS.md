@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. The separate repository and issues now exist. Iteration 0 has a minimal frontend/API bootstrap; #1 remains open for independent QA. Do not begin iteration 1 before that gate passes.
+Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. The separate repository and issues now exist. Independent QA passed and closed #1. Iteration 1 now has the #2 mock identity/navigation candidate and the #24 observed-focus correction; both await independent QA. Catalogue and lending stories remain gated by #2.
 
 ## Read before working
 
@@ -48,9 +48,10 @@ uv run --locked uvicorn app.main:app --reload
 ```sh
 cd frontend
 npm ci
+npm test
 npm run typecheck
 npm run build
 npm run dev
 ```
 
-The current frontend is a static React startup screen and makes no API calls. The backend implements only `GET /health`. Product service types/mock adapters belong to #2; OpenAPI, business APIs and persistence follow their separate stage gates. Exact engineer results are in `_docs/evidence.md`; these commands do not establish a product or independent-QA PASS.
+The frontend uses the async `GearShareService` and memory-only mock auth adapter; it makes no API calls. The backend still implements only `GET /health`. Catalogue/lending mock stories, OpenAPI, business APIs and persistence follow their separate stage gates. The scoped running-browser check is `cd frontend` then `npm run test:browser`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.

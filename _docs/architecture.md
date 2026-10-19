@@ -1,6 +1,6 @@
 # Architecture and iteration decisions
 
-Status: architecture decisions retained; iteration 0 implements only the React/TypeScript startup screen and FastAPI health endpoint. Independent QA is pending on #1.
+Status: architecture decisions retained; iteration-0 QA passed on #1. The #2 mock identity/navigation boundary and #24 focus correction are awaiting independent QA. FastAPI still exposes only health; no contract, domain API or persistence stage is implemented.
 
 ## Stack options considered before code
 
@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The application folders now contain the iteration-0 startup screen, API entry point and health test, with dependency locks. All product/service/repository paths shown above remain the target. A Makefile and versioned OpenAPI file do not exist yet.
+The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface currently covers current user, login, registration and logout only. Later mock stories extend this same boundary. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
 
 ## Required stages and concrete verification gates
 
@@ -64,7 +64,9 @@ Operations needed before OpenAPI authoring: register, login, logout, current use
 
 ## Authentication
 
-Use salted password hashes with a maintained password-hashing library. Successful login creates an opaque random bearer token; persist only its hash, user reference and expiry. Sessions expire after 24 hours and logout revokes the stored session. The HTTP adapter holds the token in sessionStorage and clears it on 401/logout. Do not expose token hashes or passwords in logs/API responses. Do not use client role flags for authorization. Production account recovery, external SSO and distributed rate limiting are post-MVP and must be documented as deployment limitations.
+The real backend stage must use salted password hashes with a maintained password-hashing library. Successful backend login creates an opaque random bearer token; persist only its hash, user reference and expiry. Sessions expire after 24 hours and logout revokes the stored session. The future HTTP adapter holds the token in sessionStorage and clears it on 401/logout. Do not expose token hashes or passwords in logs/API responses. Do not use client role flags for authorization. Production account recovery, external SSO and distributed rate limiting are post-MVP and must be documented as deployment limitations.
+
+The #2 mock is deliberately different infrastructure: public fictional fixture credentials and registered demo values stay only in JavaScript memory, as does the current user. It issues no real token and uses no localStorage/sessionStorage/cookies/API. It returns public user fields only; registration fixes the role to student and ignores extra role/ID input. The demo banner/README state that this browser adapter provides no real authentication security. Do not reuse its credential handling for #7 real authentication.
 
 ## Domain and persistence
 

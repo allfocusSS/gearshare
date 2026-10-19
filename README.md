@@ -8,11 +8,11 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Iteration 0 now contains a minimal React/TypeScript startup screen and a FastAPI `GET /health` endpoint. The engineer's bootstrap checks are recorded in [`_docs/evidence.md`](_docs/evidence.md); independent QA for [#1](https://github.com/allfocusSS/gearshare/issues/1) is still required before iteration 1. Product workflows are not implemented. This is not a finished submission.
+Independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1). The [#2](https://github.com/allfocusSS/gearshare/issues/2) candidate adds a responsive React/TypeScript design shell, role navigation and memory-only mock registration/sign-in. The real keyboard-focus defect found during browser testing is recorded in [#24](https://github.com/allfocusSS/gearshare/issues/24), with its correction awaiting independent QA. Both #2 and #24 remain open. Equipment, lending, contract and persistence stages remain ahead; this is not a finished submission. Actual checks are recorded in [`_docs/evidence.md`](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
-## Run the bootstrap
+## Run locally
 
 Prerequisites: **Python 3.12.x**, **uv 0.12.23**, **Node.js 24.x** and **npm 11.x**. The verified environment uses Python 3.12.14, Node 24.19.0 and npm 11.9.0. Application dependencies are locked in `backend/uv.lock` and `frontend/package-lock.json`; no globally installed FastAPI, pytest, TypeScript or Vite is needed. Package installation needs access to public PyPI and npm registries.
 
@@ -36,14 +36,37 @@ In another terminal at the repository root:
 ```sh
 cd frontend
 npm ci
+npm test
 npm run typecheck
 npm run build
 npm run dev
 ```
 
-Open http://127.0.0.1:5173 to see the GearShare startup screen. The frontend starts independently of the backend. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
+Open http://127.0.0.1:5173 to try the GearShare mock shell. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/date service tests using Node's built-in test runner. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
 
-No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. There are no secrets, accounts, database, seed or migration commands at this stage.
+No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. There are no secrets, database, seed or migration commands at this stage.
+
+## Mock demo and browser checks
+
+These credentials are fictional, public test fixtures:
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Student | `maya_student` | `StudentDemo42!` |
+| Coordinator | `alex_coordinator` | `CoordinatorDemo42!` |
+
+The sign-in screen can fill either fixture for you. Registration trims and lowercases a username of 3–30 ASCII letters, digits or underscores (`^[A-Za-z0-9_]{3,30}$` before lowercase normalization), requires a 10–128 character password and always creates a student. Account/session data exists only in this tab's JavaScript memory: reload resets it, logout clears the current session and changing a fixture resets all demo state. Browser storage and a backend are not used. This public client-side mock provides no real authentication security; use fictional details only.
+
+Open **Demo controls** to select Normal, Loading (1.6-second async responses), Empty (no seeded accounts, registration available) or Error (typed failures for all service calls). Error feedback includes session retry; selecting Normal recovers. The current club date is computed in `Asia/Almaty`; tests inject fixed timestamps. Explore, reservations and staff destinations are explicitly previews; equipment and lending functionality follow #3–5.
+
+From `frontend/`, install the test browser once and run the scoped auth/shell regression suite:
+
+```sh
+npx playwright install chromium
+npm run test:browser
+```
+
+The test starts its own Vite server on `127.0.0.1:5178`, exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px, saves ignored results/screenshots under `frontend/test-results/mock-auth/`, then stops the server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
 
 ## Start here
 
@@ -79,4 +102,4 @@ No environment file is required. [`.env.example`](.env.example) documents the op
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-`openapi.yml`, the product workflows, persistence, CI and final browser/demo evidence remain future deliverables. The health test and startup build verify only the iteration-0 skeleton.
+`openapi.yml`, equipment/lending workflows, persistence, CI and final integrated demo evidence remain future deliverables. The current frontend checks establish only mock shell/auth behavior; independent QA owns each issue's acceptance and closure.

@@ -12,6 +12,7 @@
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/auth.browser.mjs",
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "playwright": "1.62.1",
     "typescript": "7.0.2",
     "vite": "8.3.4"
   }

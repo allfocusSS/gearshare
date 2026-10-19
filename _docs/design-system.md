@@ -1,6 +1,6 @@
 # GearShare design direction and references
 
-Status: design brief, before UI. Use the assignment's **good references for the coding agent** option. No Lovable, v0 or Claude Design session is claimed.
+Status: the referenced shell/auth candidate is implemented for #2 and awaits independent QA with the #24 focus correction. Equipment/lending screens below remain the implementation brief for later mock stories. Use the assignment's **good references for the coding agent** option. No Lovable, v0 or Claude Design session is claimed.
 
 ## Reference board
 
@@ -58,6 +58,8 @@ At the top, compact counts for pending, due today and overdue, computed from act
 Searchable table on desktop and labeled cards on mobile. Show code, asset, category, location and inventory state. Add/edit uses an accessible dialog or dedicated page. Maintenance conflicts show which staff action is required without exposing private data to students.
 
 ## Interaction and accessibility acceptance
+
+The current auth form shows labels, requirement hints, associated field errors and a live form alert. During submission controls are disabled. After an async field failure settles, focus moves once to the first invalid enabled control; typing and ordinary rerenders must not steal it again. Form-level errors do not mark an arbitrary field invalid. This behavior was refined through the real #24 browser defect/QA regression loop; see evidence.md for FAIL and retest records.
 
 - At 390 px and 1,440 px, no horizontal page overflow and all primary actions remain reachable.
 - Form controls have visible labels; inline errors are associated with their controls.

@@ -1,6 +1,6 @@
 # GearShare product specification
 
-Status: proposed scope, before code. Date: 2026-10-19, Asia/Almaty.
+Status: product scope with #2 PM refinement applied. The mock identity/navigation candidate exists; equipment/lending and later stages remain gated. Date: 2026-10-19, Asia/Almaty.
 
 ## Problem and target users
 
@@ -70,7 +70,7 @@ An overdue indicator is derived when a booking is checked out and its end date i
 
 ### Data quality and feedback
 
-- Username: normalized/case-insensitive uniqueness; 3–30 allowed characters. Specify the exact character set in OpenAPI and use it in both adapters.
+- Username: trim outer whitespace; require 3–30 ASCII letters, digits or underscore (`^[A-Za-z0-9_]{3,30}$`), then normalize to lowercase for storage/display and case-insensitive uniqueness. This #2 PM refinement must be used in the mock, eventual OpenAPI and HTTP/backend adapters.
 - Password: 10–128 characters, stored only as a salted password hash. No password or hash in user API responses.
 - Booking purpose: trim whitespace, require 5–500 characters.
 - Condition/rejection notes: trim whitespace, require 3–500 characters.

@@ -1,6 +1,6 @@
 # Issue and agent workflow
 
-Status: repository/backlog published at https://github.com/allfocusSS/gearshare before application code. The iteration-0 bootstrap candidate for #1 is ready for independent QA; no later stage gate is claimed.
+Status: repository/backlog published at https://github.com/allfocusSS/gearshare before application code. Independent QA passed/closed #1. #2 mock shell/auth and the observed #24 focus correction await independent QA; no later stage gate is claimed.
 
 ## Combining the two articles
 
@@ -48,4 +48,6 @@ Update specification, design, API notes, testing rules and evidence when their c
 
 ## Completion condition
 
-Submission is ready only when the final code is pushed; the app has been run; required automated/browser/manual checks have actual passing results; every `mvp` and `user-test-bug` issue is closed by QA after PASS; and the reproducible demo/requirement matrix matches the final commit. An unavailable browser, missing repo, failing test or unrun restart check is an open limitation, never a PASS.
+Submission is ready only when the final code is pushed; the app has been run; required automated/browser/manual checks have actual passing results; every `mvp` and `user-test-bug` issue is closed by QA after PASS; and the reproducible demo/requirement matrix matches the final commit. An unavailable browser, missing repo, failing test or unrun restart check is an open limitation, never a PASS. `post-mvp` issues may remain open.
+
+For the final audit issue #20, the zero-open-issues check is a closure postcondition. QA first verifies all substantive acceptance criteria against the final pushed commit and confirms the real open-issue queries return only #20 for `mvp` and zero for `user-test-bug`. QA then closes #20 and immediately reruns both queries. Only after observing zero/zero does QA post the final PASS with the real queries/counts and final pushed commit. If either result is nonzero or cannot be verified, QA reopens #20 and posts FAIL. This ordering does not permit an unverified final completion claim.

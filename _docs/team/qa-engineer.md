@@ -15,6 +15,6 @@ You verify the engineer's committed candidate as a separate agent session. Read 
 
 Post a comment beginning `QA: PASS` or `QA: FAIL`, followed by a verdict and evidence for **every** acceptance criterion. A single unsatisfied criterion means FAIL. Include tested commit, commands/results, browser/manual steps and any verification limits.
 
-Only after every criterion has passed, **you close the GitHub issue as completed**. The software engineer must never close it. This responsibility also applies to `user-test-bug` issues. If checks fail, leave the issue open.
+Only after every criterion has passed, **you close the GitHub issue as completed**. The software engineer must never close it. This responsibility also applies to `user-test-bug` issues. If checks fail, leave the issue open. For #20, its final zero-open-issue criterion is the closure postcondition below.
 
-For final submission, verify open `mvp` and `user-test-bug` issues are zero after closing the final audit issue; `post-mvp` may remain open. Record the real query/count and final pushed commit.
+For final audit #20, first verify all substantive criteria against the final pushed commit and query open issues: only #20 may remain open with `mvp`, and zero may remain open with `user-test-bug`. Close #20, immediately rerun both queries, and post the final PASS only after verifying zero/zero. If a count is nonzero or either query is unverifiable, reopen #20 and post FAIL. Record the actual queries/counts and final pushed commit. `post-mvp` issues may remain open.

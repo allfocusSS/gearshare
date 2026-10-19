@@ -1,6 +1,8 @@
 # Testing and verification plan
 
-Status: the product cases below remain planned and **not executed**. The iteration-0 health test and frontend build have a separate record in `evidence.md`. Add actual test names, commands and results there while implementing. Do not report the number of rows below as a count of passing tests.
+Status: most product cases below remain planned. Iteration-0 independent QA passed; #2 mock identity/shell engineer checks and #24 FAIL→correction evidence are recorded in `evidence.md`, with independent corrected-candidate QA pending. Do not report the number of rows below as a count of passing tests or apply mock-auth results to real API security.
+
+Current scoped frontend commands: `npm test` runs 11 service/date tests; `npm run test:browser` runs the actual mock app's auth/shell checks and the seven independently specified #24 regression groups. Browser setup and the executable override are documented in README. The committed browser script covers first-invalid enabled focus, repeated/delayed validation, error association, stable keyboard use, form-level failures, valid recovery, roles, fixtures and both required widths. Equipment/lending/API/storage matrix cases remain for their stage gates.
 
 ## Strategy
 

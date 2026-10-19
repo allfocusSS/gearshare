@@ -78,6 +78,6 @@ This resolves the repository dependency. It authorizes continuing the already re
 
 ### Actual access follow-up
 
-User: `done` (after selecting the new repository). The first issue creation returned a GitHub integration 403. The assistant provided the installation settings link.
+After the URL and GitHub plugin selection above, the first issue creation returned a GitHub integration 403. The assistant provided the installation settings link and instructions to add the repository to the app's access.
 
-User: `done` (after adding repository access). The connection then listed `allfocusSS/gearshare`, and real issue publication began before application code.
+User: `done` (the single access-confirmation message, after those instructions). The connection then listed `allfocusSS/gearshare`, and real issue publication began before application code.

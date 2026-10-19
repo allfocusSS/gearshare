@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Credentials, GearShareService, ServiceError, User } from '../services/types.ts'
 import { DEMO_ACCOUNTS } from '../services/mockService.ts'
 import { Icon } from '../components/Icon.tsx'
@@ -17,6 +17,13 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
   const usernameRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    if (pending) return
+    // React has committed disabled=false before effects run. Only a new result moves focus.
+    const target = error?.fields?.username ? usernameRef.current : error?.fields?.password ? passwordRef.current : null
+    if (target && !target.disabled) target.focus()
+  }, [pending, error])
+
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting.current) return
@@ -29,8 +36,6 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
       if (result.ok) onSuccess(result.data, register ? 'Demo account created. You are signed in as a student.' : `Signed in as ${result.data.username}.`)
       else {
         setError(result.error)
-        if (result.error.fields?.username) usernameRef.current?.focus()
-        else if (result.error.fields?.password) passwordRef.current?.focus()
       }
     } catch {
       setError({ code: 'SERVICE_UNAVAILABLE', message: 'The demo service is unavailable. Please try again.' })
