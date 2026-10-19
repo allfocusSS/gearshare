@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. The separate repository and issues now exist. Independent QA passed and closed #1. Iteration 1 now has the #2 mock identity/navigation candidate and the #24 observed-focus correction; both await independent QA. Catalogue and lending stories remain gated by #2.
+Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. The separate repository and issues now exist. Independent QA passed and closed #1, #2 and the real focus bug #24. Iteration 1 now has the #3 mock catalogue/detail/anonymous-availability candidate awaiting independent QA. Request/history and staff mutations remain gated by #3 and their own issues.
 
 ## Read before working
 
@@ -54,4 +54,4 @@ npm run build
 npm run dev
 ```
 
-The frontend uses the async `GearShareService` and memory-only mock auth adapter; it makes no API calls. The backend still implements only `GET /health`. Catalogue/lending mock stories, OpenAPI, business APIs and persistence follow their separate stage gates. The scoped running-browser check is `cd frontend` then `npm run test:browser`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.
+The frontend uses the async `GearShareService` and memory-only auth/catalogue adapter; it makes no API calls. The backend still implements only `GET /health`. Remaining lending/staff mock stories, OpenAPI, business APIs and persistence follow their separate stage gates. The scoped running-browser checks are `cd frontend` then `npm run test:browser` and `npm run test:browser:catalogue`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.

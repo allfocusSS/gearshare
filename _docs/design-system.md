@@ -1,6 +1,6 @@
 # GearShare design direction and references
 
-Status: the referenced shell/auth candidate is implemented for #2 and awaits independent QA with the #24 focus correction. Equipment/lending screens below remain the implementation brief for later mock stories. Use the assignment's **good references for the coding agent** option. No Lovable, v0 or Claude Design session is claimed.
+Status: the referenced shell/auth and #24 focus correction passed independent QA. The #3 catalogue/detail/anonymous-calendar candidate is implemented and awaits QA; request/staff lending screens remain the brief for later mock stories. Use the assignment's **good references for the coding agent** option. No Lovable, v0 or Claude Design session is claimed.
 
 ## Reference board
 
@@ -44,6 +44,8 @@ Three columns at 1,100 px+, two at 720–1,099 px and one below 720 px. A card h
 At desktop width, show identity/specifications on the left and a bordered booking panel on the right. Include a month calendar and labeled start/end fields. Unavailable dates use a hatch or icon plus accessible text; selected dates use a cobalt outline and range fill. Show the exact inclusive duration and `Asia/Almaty` before submission.
 
 On mobile, use a normal single-column flow. Booking errors appear next to the fields and in an accessible alert. On a race/conflict, preserve purpose and dates and update availability. A request confirmation shows the true server status, which begins as “Pending approval.”
+
+Current #3 scope implements the asset identity/specifications, anonymous month calendar, labeled date alternatives, selected inclusive duration and scheduled-availability feedback. It contains no request submission/purpose controls yet; those follow #4. Occupied days use a hatch plus × and accessible date/status text; maintenance is explicitly unavailable.
 
 ### My reservations
 

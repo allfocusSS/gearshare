@@ -1,6 +1,6 @@
 # Verification evidence
 
-Current application status: **independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1); the [#2](https://github.com/allfocusSS/gearshare/issues/2) mock shell/auth candidate and observed [#24](https://github.com/allfocusSS/gearshare/issues/24) focus correction await independent QA**. Equipment/lending and later stages remain unimplemented. Engineer verification below is not a QA verdict.
+Current application status: **independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1), [#2](https://github.com/allfocusSS/gearshare/issues/2) and [#24](https://github.com/allfocusSS/gearshare/issues/24). The [#3](https://github.com/allfocusSS/gearshare/issues/3) public mock catalogue/detail/calendar candidate awaits independent QA.** Request/staff lending and later stages remain unimplemented. Historical engineer records below retain the actual FAIL and pending states at the time; current QA gates are linked explicitly.
 
 ## Work actually completed
 
@@ -9,7 +9,8 @@ Current application status: **independent QA passed and closed [#1](https://gith
 - Prepared product, architecture, design, role/process, draft backlog and test-plan Markdown.
 - Initially checked connected GitHub repository access: only `allfocusSS/studytrack` was returned. The user subsequently supplied `allfocusSS/gearshare`, and MVP #1–20 plus post-MVP #21–23 were published before application code.
 - Implemented the groomed #1 bootstrap: React/TypeScript startup screen, FastAPI health endpoint, real endpoint test, public dependency locks and verified setup/run/check commands.
-- Implemented the groomed #2 shell/auth boundary after #1 QA PASS; recorded the real #24 browser defect, stopped for PM grooming and independent QA reproduction/cases, then corrected its focus lifecycle and ran the scoped regression suite.
+- Implemented the groomed #2 shell/auth boundary after #1 QA PASS; recorded the real #24 browser defect, stopped for PM grooming and independent QA reproduction/cases, then corrected its focus lifecycle and ran the scoped regression suite. QA subsequently passed and closed both.
+- After those QA gates, implemented #3 public catalogue/filter/detail/anonymous-calendar scope and ran its dedicated tests plus the preserved auth/focus regression.
 
 Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 unique MVP draft IDs, 3 unique post-MVP draft IDs; all relative Markdown links resolve; every MVP draft contains Goal, Description, Acceptance criteria, Out of scope and Constraints. These checks verify documents only; they are not application tests.
 
@@ -18,7 +19,7 @@ Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 uniq
 | Check | Result | Command / commit / observation |
 | --- | --- | --- |
 | Bootstrap health test/build | Independent QA PASS, #1 closed | Published `a8ec9b7469b9d1e2f091bc0fdf0369be7e9ba6ad`; [actual QA evidence](https://github.com/allfocusSS/gearshare/issues/1#issuecomment-6261432589); historical engineer details below |
-| Mock frontend browser flows | Shell/auth engineer checks passed; #2/#24 QA pending | 11 service tests, typecheck/build and 26 scoped browser checks passed after the recorded focus failure/correction. Equipment/lending journeys remain unrun/unimplemented |
+| Mock frontend browser flows | #2/#24 independent QA PASS; #3 engineer checks passed, independent QA pending | Current 22 service tests, typecheck/build, 28 catalogue browser checks and 26 preserved auth/focus checks pass. Request/staff lending journeys remain unimplemented |
 | OpenAPI validation | Not run | Contract must be derived in iteration 2 |
 | In-memory API tests | Not run | Backend currently exposes only health; domain/memory stage follows mock/contract gates |
 | ORM/SQLite tests | Not run | Storage implementation does not exist |
@@ -92,6 +93,30 @@ Screenshots of desktop Explore/sign-in, mobile sign-in/coordinator and both vali
 
 Limits: these are engineer checks of mock shell/auth only. No independent PASS/closure, equipment/booking behavior, actual API security, storage, restart or integrated lending check is claimed. #2 and #24 stay open for independent QA; no #3+ implementation is authorized by this record.
 
+## Iteration 1 — #3 public catalogue, detail and anonymous availability
+
+Prerequisite gate: independent QA passed and closed [#24](https://github.com/allfocusSS/gearshare/issues/24#issuecomment-6261813373) and [#2](https://github.com/allfocusSS/gearshare/issues/2#issuecomment-6261825132) at published `13721cf559812c6337cee8c43bb6890d236139ba`, tree `2facd11b590f45c698dc58f2f08cb40c6e6a78ba`. This supersedes the historical pending notes above without erasing the actual failure trail.
+
+Engineer date/environment: 2026-10-19 UTC, Linux x86_64, Node 24.19.0, npm 11.9.0, Chromium 153.0.8010.0 / locked Playwright 1.62.1. Baseline: that published prerequisite commit. Candidate: the commit containing this record; exact local/published SHA/tree mapping is recorded in the #3 engineer/orchestrator handoff. All commands below ran from `frontend/` and exited 0; no dependency reinstallation or backend process was needed.
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | 22 passed, 0 failed: 11 new catalogue/date/filter/privacy tests plus 11 preserved auth/date tests |
+| `npm run typecheck` | Exit 0 |
+| `npm run build` | Exit 0; Vite 8.3.4 built 30 modules |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm run test:browser:catalogue` | Exit 0; 28 dedicated running-browser checks passed, including 390 px/1440 px layouts |
+| `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium npm run test:browser` | Exit 0; all 26 preserved auth/focus/role/fixture checks passed; its empty-view assertion now targets the actual empty catalogue |
+
+The new service suite verifies ten unique physical-unit IDs/codes across all four categories; intersecting search/category/paired dates; inclusive occupied endpoints and next-day adjacency; today/exact 14 days/T+90 acceptance; partial/malformed/past/reversed/15-day/out-of-horizon rejection without result data; maintenance exclusion; missing/empty/error/recovery; immutable public copies; relative date fixtures at a UTC/club-local date boundary; and exact public output fields. Anonymous and coordinator public responses match. Availability contains only asset identity, timezone/window and date/state pairs, with no borrower, purpose, private notes or booking IDs.
+
+The catalogue browser fixes Date to `2026-10-19T06:00:00Z` (club date 2026-10-19) while real async timers continue. Actual observations: ten public units with no availability claim before both dates; combined filters selecting only CAM-001 for 2026-10-20; occupied inclusive 2026-10-21..23 yielding no matching camera; each invalid-range case showing field errors and hiding stale results; T+90 on 2027-01-17 accepted; same-day duration one; calendar selection/duration, occupied/selected hatch+× states and 2026-10-24 adjacency correct; month navigation bounded at January and 2027-01-18 disabled. Maintenance cannot appear requestable. Missing equipment returns to Explore. Empty/error/loading modes and catalogue/detail retry/recovery work. Existing sign-in returns to the concrete equipment detail.
+
+Measured root `scrollWidth <= innerWidth` on catalogue/detail/invalid/error screens at 390 px and 1440 px; grid has three columns at 1440 and one at 390. Inspected desktop catalogue/detail and mobile detail screenshots, including readable date fields, range summary and occupied/selected states. A targeted DOM/screenshot probe confirmed the unfocused skip link remains above the viewport (`top=-100`, `bottom=-53`) while the end-date input is active; mobile full-page capture was normalized to the page top. No UI change or product bug was needed for that capture artifact.
+
+No console/page/request errors, cross-origin/API requests or newly observed product defect occurred in these checks. Test servers (5178/5179; targeted screenshot probe 5180) and browser ran within each command's process namespace and were stopped afterward. Committed reproducible tests are `catalogue.test.mjs` and `catalogue.browser.mjs`; generated results/screenshots are ignored. npm's host `http-proxy` warning did not affect exit status.
+
+Limits: engineer mock-only verification, not independent QA or real API security. No request creation/cancellation/history, staff mutation, OpenAPI/backend, persistence/restart, CI or integrated lending PASS is claimed. #3 remains open for independent QA; the full mock-stage gate remains after #5.
+
 ## Per-check record template
 
 Date/time:
@@ -114,6 +139,6 @@ Bug issue, correction commit and retest, when applicable:
 
 Remote: https://github.com/allfocusSS/gearshare.
 
-MVP issues: #1–20 published and PM-groomed; #1 is closed after independent QA PASS. #2 and the observed blocking focus bug #24 remain open for independent QA. Post-MVP: #21–23 published. No final completion count is claimed; full product exploration remains outstanding.
+MVP issues: #1–20 published and PM-groomed; #1, #2 and the observed focus bug #24 are closed after independent QA PASS. #3 remains open for independent QA. Post-MVP: #21–23 published. No final completion count is claimed; full product exploration remains outstanding.
 
 Do not report “0 open issues” as completion before the backlog exists. On final submission, record the actual issue counts and links for queries `is:issue is:open label:mvp` and `is:issue is:open label:user-test-bug` in the correct repository.

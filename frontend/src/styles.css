@@ -204,3 +204,143 @@ h1 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
   .service-notice .button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Iteration 1 catalogue and anonymous availability. */
+.catalogue-intro { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
+.catalogue-intro .eyebrow { color: var(--muted); font-size: 9px; margin-bottom: 12px; }
+.catalogue-intro h2 { font-size: clamp(24px, 2.7vw, 36px); font-weight: 600; letter-spacing: -.05em; line-height: 1.2; }
+.catalogue-intro h2 span { color: #697682; }
+.catalogue-intro p:not(.eyebrow) { margin-top: 12px; color: var(--muted); font-size: 14px; }
+.catalogue-stamp { text-align: right; font-size: 8px; color: var(--muted); line-height: 1.8; letter-spacing: .12em; }
+.catalogue-filters { border: 1px solid var(--line); border-radius: 12px; padding: 24px; background: #fff; margin-bottom: 24px; }
+.catalogue-filters .field { margin-bottom: 0; }
+.search-field > div { position: relative; }
+.search-field > div > .icon { position: absolute; top: 13px; left: 12px; width: 20px; height: 20px; color: var(--muted); }
+.search-field input { padding-left: 42px; background: #fafbf9; }
+.category-filter { margin: 20px 0; padding: 0; border: 0; min-width: 0; }
+.category-filter legend { font-size: 12px; font-weight: 600; margin-bottom: 10px; padding: 0; }
+.category-filter > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.category-filter button { min-height: 42px; border: 1px solid var(--line); border-radius: 7px; background: white; padding: 9px 13px; font-size: 12px; color: var(--muted); }
+.category-filter button[aria-pressed=true] { background: #eff1fd; color: var(--accent); border-color: #b9c4f5; font-weight: 650; }
+.catalogue-date-filter { display: flex; align-items: flex-start; gap: 18px; border-top: 1px solid var(--line); padding-top: 20px; }
+.range-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 16px; min-width: 0; }
+.range-fields .field { margin: 0; min-width: 0; }
+.range-fields input { min-width: 0; width: 100%; min-height: 46px; }
+.date-hint { grid-column: 1 / -1; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.catalogue-date-filter .range-fields { flex: 1; }
+.catalogue-date-filter > .button { margin-top: 23px; font-size: 12px; white-space: nowrap; }
+.catalogue-results-label { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; color: var(--muted); font-size: 12px; margin: 26px 0 16px; line-height: 1.6; }
+.catalogue-results-label strong { color: var(--ink); }
+.catalogue-results-label > span:last-child { text-align: right; max-width: 55%; font-size: 11px; }
+.equipment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.equipment-card { display: block; min-width: 0; color: var(--ink); border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+.equipment-card:hover { border-color: #9aa9dc; box-shadow: 0 4px 16px #17202a09; }
+.equipment-illustration { height: 170px; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; background: #edf0fa; color: #3f55a3; }
+.equipment-illustration svg { width: 150px; height: 115px; position: relative; z-index: 1; transform: rotate(-7deg); }
+.illustration-orbit { position: absolute; width: 132px; height: 132px; border: 1px solid currentColor; opacity: .12; border-radius: 50%; }
+.illustration-orbit::after { position: absolute; content: ''; inset: 12px; border: 1px dashed currentColor; border-radius: 50%; }
+.illustration-cross { position: absolute; right: 24px; top: 22px; font-size: 19px; opacity: .5; font-weight: 300; }
+.art-audio { background: #f3eae0; color: #8b6436; }
+.art-presentation { background: #e6eee8; color: #436b55; }
+.art-accessories { background: #eee6ee; color: #805576; }
+.equipment-card-body { padding: 18px; }
+.equipment-card-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; color: var(--muted); letter-spacing: .03em; }
+.equipment-card-meta > span:first-child { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.equipment-card h3 { font-size: 16px; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; margin: 12px 0 9px; }
+.pickup-location { color: var(--muted); font-size: 12px; min-height: 38px; }
+.equipment-card-bottom { display: flex; align-items: center; gap: 8px; justify-content: space-between; border-top: 1px solid #edf0f2; padding-top: 14px; margin-top: 14px; }
+.equipment-card-bottom > .icon { width: 17px; height: 17px; color: #6c7884; }
+.availability-badge { display: inline-block; font-size: 10px; font-weight: 550; line-height: 1.5; padding: 5px 8px; border-radius: 5px; }
+.availability-badge.unspecified { color: #52606d; background: #f0f2f4; }
+.availability-badge.available { color: #14633c; background: #e8f5ed; }
+.availability-badge.maintenance { color: #805016; background: #fff3d6; }
+.schedule-note { margin-top: 22px; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.catalogue-feedback { margin: 0; }
+.catalogue-feedback p { margin-top: 6px; }
+.catalogue-loading { min-height: 260px; }
+.catalogue-empty { min-height: 310px; padding: 40px 24px; }
+.catalogue-empty h2 { margin-top: 20px; }
+.back-link { display: inline-flex; font-size: 12px; margin: 0 0 24px; text-decoration: none; font-weight: 550; }
+.asset-detail-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.asset-identity { min-width: 0; }
+.equipment-illustration.large { height: 280px; border-radius: 12px; border: 1px solid #e0e5ef; }
+.equipment-illustration.large svg { width: 240px; height: 190px; stroke-width: 1.5; }
+.equipment-illustration.large .illustration-orbit { width: 220px; height: 220px; }
+.asset-heading { padding-top: 28px; }
+.asset-heading .eyebrow { color: var(--muted); font-size: 10px; }
+.asset-heading .eyebrow span { margin: 0 10px; color: #929ba3; }
+.asset-heading h2 { margin: 14px 0 16px; font-weight: 600; letter-spacing: -.045em; font-size: 30px; line-height: 1.2; }
+.asset-description { color: var(--muted); font-size: 15px; margin-top: 22px; }
+.asset-specs { margin: 26px 0 0; font-size: 13px; }
+.asset-specs > div { display: grid; grid-template-columns: minmax(110px, .7fr) minmax(0, 1fr); padding: 16px 0; gap: 16px; border-top: 1px solid var(--line); }
+.asset-specs dt { color: var(--muted); }
+.asset-specs dd { margin: 0; font-weight: 550; overflow-wrap: anywhere; }
+.availability-panel { padding: 26px; background: #fff; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.availability-panel > .eyebrow { color: var(--accent); font-size: 9px; }
+.availability-panel > h2 { font-size: 24px; letter-spacing: -.04em; font-weight: 600; margin-top: 10px; }
+.availability-intro { font-size: 12px; color: var(--muted); margin-top: 10px; }
+.availability-calendar { margin: 24px 0; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
+.calendar-header h3 { font-size: 15px; font-weight: 600; }
+.calendar-header > div { display: flex; gap: 6px; }
+.calendar-arrow { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--ink); }
+.calendar-arrow:disabled { cursor: default; opacity: .35; }
+.calendar-week, .calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calendar-week { font-size: 10px; color: var(--muted); text-align: center; padding: 0 0 10px; }
+.calendar-day { position: relative; height: 36px; min-width: 0; width: 100%; border: 1px solid transparent; border-radius: 5px; padding: 0; font-size: 12px; color: var(--ink); background: #f6f7f6; }
+.calendar-day:hover:not(:disabled) { border-color: #7787cf; }
+.calendar-day.outside { background: #fff; color: #a2a9af; cursor: default; opacity: .7; }
+.calendar-day.occupied, .calendar-day.maintenance { background: repeating-linear-gradient(135deg, #f1eeeb, #f1eeeb 4px, #e5e0da 4px, #e5e0da 5px); color: #685949; }
+.calendar-day.today:not(.selected) { border-color: #7a8490; font-weight: 700; }
+.calendar-day.selected { border: 2px solid var(--accent); background-color: #e6ebff; color: #1d36a1; font-weight: 700; }
+.calendar-day.selected.occupied, .calendar-day.selected.maintenance { background-image: repeating-linear-gradient(135deg, #e9edff, #e9edff 4px, #cdd7ff 4px, #cdd7ff 5px); }
+.day-unavailable-icon { position: absolute; right: 2px; top: -2px; font-size: 10px; font-weight: 600; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 18px; font-size: 9px; color: var(--muted); }
+.calendar-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.calendar-legend i { display: inline-flex; align-items: center; justify-content: center; height: 12px; width: 12px; border: 1px solid #d4d9df; border-radius: 3px; font-size: 11px; font-style: normal; line-height: 1; }
+.legend-available { background: #f6f7f6; }
+.legend-occupied { background: #e5e0da; color: #685949; }
+.calendar-legend .legend-selected { border: 2px solid var(--accent); background: #e6ebff; }
+.calendar-help { margin-top: 12px; font-size: 10px; color: var(--muted); }
+.availability-panel .form-alert { margin: 18px 0; }
+.range-summary { padding: 16px; border: 1px solid var(--line); border-radius: 8px; margin: 18px 0 14px; font-size: 12px; line-height: 1.5; }
+.range-summary strong { display: block; margin-bottom: 8px; }
+.range-summary p { margin-top: 4px; }
+.range-available { background: #e8f5ed; color: #14633c; border-color: #c5e3d1; }
+.range-unavailable { background: #fff3d6; color: #805016; border-color: #e7d6a8; }
+.range-summary.neutral { background: #f6f7f5; color: var(--muted); }
+@media (max-width: 1099px) { .equipment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .asset-detail-grid { grid-template-columns: minmax(0, 1fr); max-width: 700px; margin: 0 auto; } .catalogue-stamp { display: none; } }
+@media (max-width: 719px) {
+  .catalogue-intro { margin-bottom: 24px; }
+  .catalogue-intro h2 { font-size: 29px; }
+  .catalogue-intro h2 span { display: block; }
+  .catalogue-intro p:not(.eyebrow) { font-size: 13px; }
+  .catalogue-filters { padding: 20px 16px; }
+  .category-filter > div { gap: 6px; }
+  .category-filter button { font-size: 11px; padding: 9px 11px; min-height: 44px; }
+  .catalogue-date-filter { flex-direction: column; gap: 10px; }
+  .catalogue-date-filter > .button { margin-top: 0; }
+  .catalogue-date-filter .range-fields { width: 100%; }
+  .range-fields { column-gap: 10px; }
+  .range-fields input { padding-left: 7px; padding-right: 7px; font-size: 12px; }
+  .date-hint { font-size: 10px; }
+  .catalogue-results-label { flex-direction: column; gap: 6px; margin-top: 22px; }
+  .catalogue-results-label > span:last-child { max-width: 100%; text-align: left; }
+  .equipment-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .equipment-illustration { height: 180px; }
+  .equipment-card-body { padding: 20px; }
+  .equipment-card h3 { font-size: 18px; }
+  .pickup-location { min-height: 0; font-size: 13px; }
+  .availability-badge { font-size: 10px; }
+  .equipment-card-bottom { margin-top: 18px; padding-top: 16px; }
+  .asset-detail-grid { gap: 26px; }
+  .equipment-illustration.large { height: 230px; }
+  .asset-heading h2 { font-size: 28px; }
+  .asset-description { font-size: 15px; }
+  .asset-specs { font-size: 12px; }
+  .availability-panel { padding: 22px 18px; }
+  .calendar-day { height: 35px; }
+  .calendar-days { gap: 3px; }
+  .calendar-legend { gap: 10px; }
+  .catalogue-loading { font-size: 13px; }
+}

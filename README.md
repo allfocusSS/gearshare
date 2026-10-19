@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1). The [#2](https://github.com/allfocusSS/gearshare/issues/2) candidate adds a responsive React/TypeScript design shell, role navigation and memory-only mock registration/sign-in. The real keyboard-focus defect found during browser testing is recorded in [#24](https://github.com/allfocusSS/gearshare/issues/24), with its correction awaiting independent QA. Both #2 and #24 remain open. Equipment, lending, contract and persistence stages remain ahead; this is not a finished submission. Actual checks are recorded in [`_docs/evidence.md`](_docs/evidence.md).
+Independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1), [#2](https://github.com/allfocusSS/gearshare/issues/2) and the observed focus bug [#24](https://github.com/allfocusSS/gearshare/issues/24). The [#3](https://github.com/allfocusSS/gearshare/issues/3) candidate adds searchable fictional equipment, date/category filters, public details and an anonymous availability calendar. #3 awaits independent QA. Requests/history, staff mutation, contract and persistence remain ahead; this is not a finished submission. Actual checks and the real #24 FAIL→fix→QA PASS trail are in [`_docs/evidence.md`](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -42,7 +42,7 @@ npm run build
 npm run dev
 ```
 
-Open http://127.0.0.1:5173 to try the GearShare mock shell. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/date service tests using Node's built-in test runner. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
+Open http://127.0.0.1:5173 to try the GearShare mock catalogue. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/catalogue/date/privacy service tests using Node's built-in test runner. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
 
 No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. There are no secrets, database, seed or migration commands at this stage.
 
@@ -57,16 +57,17 @@ These credentials are fictional, public test fixtures:
 
 The sign-in screen can fill either fixture for you. Registration trims and lowercases a username of 3–30 ASCII letters, digits or underscores (`^[A-Za-z0-9_]{3,30}$` before lowercase normalization), requires a 10–128 character password and always creates a student. Account/session data exists only in this tab's JavaScript memory: reload resets it, logout clears the current session and changing a fixture resets all demo state. Browser storage and a backend are not used. This public client-side mock provides no real authentication security; use fictional details only.
 
-Open **Demo controls** to select Normal, Loading (1.6-second async responses), Empty (no seeded accounts, registration available) or Error (typed failures for all service calls). Error feedback includes session retry; selecting Normal recovers. The current club date is computed in `Asia/Almaty`; tests inject fixed timestamps. Explore, reservations and staff destinations are explicitly previews; equipment and lending functionality follow #3–5.
+Open **Demo controls** to select Normal, Loading (1.6-second async responses), Empty (no seeded accounts or equipment, registration available) or Error (typed failures for all service calls). Error feedback includes session retry; selecting Normal recovers. The current club date is computed in `Asia/Almaty`; tests inject fixed timestamps. Explore now has ten fictional physical units across Cameras, Audio, Presentation and Accessories. Search/category filters intersect; optional paired dates show only units available for every selected inclusive day. With no dates, no availability is claimed. Detail calendars distinguish occupied, selected and maintenance dates; they reveal no borrower/purpose/booking metadata. Reservations and staff destinations remain previews for #4–5.
 
 From `frontend/`, install the test browser once and run the scoped auth/shell regression suite:
 
 ```sh
 npx playwright install chromium
 npm run test:browser
+npm run test:browser:catalogue
 ```
 
-The test starts its own Vite server on `127.0.0.1:5178`, exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px, saves ignored results/screenshots under `frontend/test-results/mock-auth/`, then stops the server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
+The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px. The catalogue test uses port 5179 and a fixed browser date of 2026-10-19 to exercise filter/date boundaries, anonymous calendars, maintenance, empty/missing/error states and both layouts. Ignored results/screenshots are saved under `frontend/test-results/mock-auth/` and `frontend/test-results/catalogue/`; each test stops its server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
 
 ## Start here
 
@@ -102,4 +103,4 @@ The test starts its own Vite server on `127.0.0.1:5178`, exercises sign-in/regis
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-`openapi.yml`, equipment/lending workflows, persistence, CI and final integrated demo evidence remain future deliverables. The current frontend checks establish only mock shell/auth behavior; independent QA owns each issue's acceptance and closure.
+`openapi.yml`, request/staff lending workflows, persistence, CI and final integrated demo evidence remain future deliverables. The current frontend checks establish only mock shell/auth/catalogue/availability behavior; independent QA owns each issue's acceptance and closure.

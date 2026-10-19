@@ -1,6 +1,6 @@
 # GearShare product specification
 
-Status: product scope with #2 PM refinement applied. The mock identity/navigation candidate exists; equipment/lending and later stages remain gated. Date: 2026-10-19, Asia/Almaty.
+Status: product scope with #2 PM refinement applied. Mock identity/navigation passed QA; the catalogue/detail/anonymous-calendar candidate awaits QA. Request/staff lending and later stages remain gated. Date: 2026-10-19, Asia/Almaty.
 
 ## Problem and target users
 

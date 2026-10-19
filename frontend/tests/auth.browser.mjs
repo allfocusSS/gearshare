@@ -194,7 +194,7 @@ try {
   await noOverflow('mobile sign-in 390')
   await page.screenshot({ path: `${output}/mobile-signin.png`, fullPage: true })
   await switchFixture('empty')
-  await go('explore'); await heading('A fresh start, with no demo accounts.')
+  await go('explore'); await heading('No equipment to show.')
   await auth()
   await page.getByRole('button', { name: 'Fill student credentials' }).click(); await submit().click()
   await page.locator('.form-alert').filter({ hasText: 'Username or password is incorrect.' }).waitFor()

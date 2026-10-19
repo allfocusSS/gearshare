@@ -1,6 +1,6 @@
 # Architecture and iteration decisions
 
-Status: architecture decisions retained; iteration-0 QA passed on #1. The #2 mock identity/navigation boundary and #24 focus correction are awaiting independent QA. FastAPI still exposes only health; no contract, domain API or persistence stage is implemented.
+Status: architecture decisions retained; independent QA passed #1, #2 and the #24 focus correction. The #3 catalogue/detail/anonymous-availability candidate awaits independent QA. FastAPI still exposes only health; no contract, domain API or persistence stage is implemented.
 
 ## Stack options considered before code
 
@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface currently covers current user, login, registration and logout only. Later mock stories extend this same boundary. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
+The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface covers current user, login, registration, logout, listAssets(filters), getAsset(id) and getAssetAvailability(id). Later mock lending/staff stories extend this same boundary. Public asset types contain identity/specification/state fields only; anonymous availability contains asset ID, club-local window/timezone and date/state pairs, with no private booking records. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
 
 ## Required stages and concrete verification gates
 
@@ -58,9 +58,16 @@ This combines the issue/agent workflow from the specifications article with the 
 
 ## Frontend boundary
 
-All pages depend on a single `GearShareService` async interface. UI components never call `fetch` directly. The mock implements the same data shapes, validation and error codes as the eventual HTTP adapter. Mock data lives only in memory and is clearly marked as demo mode. A documented environment selector switches adapters; HTTP becomes the default in iteration 5.
+All pages depend on a single `GearShareService` async interface. UI components never call `fetch` directly. The mock implements the same data shapes, validation and error codes as the eventual HTTP adapter. Mock data lives only in memory and is clearly marked as demo mode. An environment selector will switch adapters when the HTTP adapter exists; HTTP becomes the default in iteration 5. Current Demo controls select deterministic Normal/Loading/Empty/Error memory fixtures only.
 
 Operations needed before OpenAPI authoring: register, login, logout, current user, list/get assets, get asset availability, create/list/get booking and events, cancel booking, staff list bookings, staff transition booking, staff create/update asset and staff inventory-state update. The final route names and schemas are fixed in iteration 2 after inspecting the actual mock service; this document intentionally does not pretend an API was already derived from nonexistent code.
+
+### Current public catalogue service shape (#3)
+
+- `listAssets({search?, category?, startDate?, endDate?})` intersects search, category and optional paired dates; paired dates enforce the product range rules and omit occupied/maintenance units. Without dates, `range` is null and the UI makes no range availability claim.
+- `getAsset(id)` returns one fictional physical unit or typed NOT_FOUND.
+- `getAssetAvailability(id)` returns the 91 calendar days from club-local today through today+90 inclusive, with only available/occupied/maintenance states. This window is independent of the maximum 14-day selectable request range, so a full month can be displayed.
+- Runtime fixtures are relative to club-local today; the mock factory accepts an injected clock, and browser tests fix Date without freezing async timers. These are frontend service names, not prematurely authored HTTP routes/OpenAPI.
 
 ## Authentication
 

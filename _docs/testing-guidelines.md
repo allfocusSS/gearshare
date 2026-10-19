@@ -1,8 +1,8 @@
 # Testing and verification plan
 
-Status: most product cases below remain planned. Iteration-0 independent QA passed; #2 mock identity/shell engineer checks and #24 FAIL→correction evidence are recorded in `evidence.md`, with independent corrected-candidate QA pending. Do not report the number of rows below as a count of passing tests or apply mock-auth results to real API security.
+Status: most product cases below remain planned. Independent QA passed #1, #2 and #24. The #3 catalogue/availability engineer checks await independent QA; all actual results and the #24 FAIL→correction→QA PASS trail are in `evidence.md`. Do not report the number of rows below as a count of passing tests or apply mock-auth results to real API security.
 
-Current scoped frontend commands: `npm test` runs 11 service/date tests; `npm run test:browser` runs the actual mock app's auth/shell checks and the seven independently specified #24 regression groups. Browser setup and the executable override are documented in README. The committed browser script covers first-invalid enabled focus, repeated/delayed validation, error association, stable keyboard use, form-level failures, valid recovery, roles, fixtures and both required widths. Equipment/lending/API/storage matrix cases remain for their stage gates.
+Current scoped frontend commands: `npm test` runs 22 auth/catalogue/date/privacy tests; `npm run test:browser` runs the actual mock app's auth/shell checks and the seven independently specified #24 regression groups. Browser setup and the executable override are documented in README. The committed browser script covers first-invalid enabled focus, repeated/delayed validation, error association, stable keyboard use, form-level failures, valid recovery, roles, fixtures and both required widths. `npm run test:browser:catalogue` adds filter intersections, inclusive dates/invalid boundaries, anonymous privacy, maintenance, missing/empty/failure/loading states, concrete detail auth return and 390/1440 layouts, using a fixed browser Date. Request/staff lending/API/storage matrix cases remain for their stage gates.
 
 ## Strategy
 

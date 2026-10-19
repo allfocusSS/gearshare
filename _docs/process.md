@@ -1,6 +1,6 @@
 # Issue and agent workflow
 
-Status: repository/backlog published at https://github.com/allfocusSS/gearshare before application code. Independent QA passed/closed #1. #2 mock shell/auth and the observed #24 focus correction await independent QA; no later stage gate is claimed.
+Status: repository/backlog published at https://github.com/allfocusSS/gearshare before application code. Independent QA passed/closed #1, #2 and the observed #24 focus correction. #3 mock catalogue/detail/anonymous availability awaits independent QA; no later stage gate is claimed.
 
 ## Combining the two articles
 

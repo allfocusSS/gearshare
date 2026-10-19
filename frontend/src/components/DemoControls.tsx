@@ -10,10 +10,10 @@ export function DemoControls({ scenario, onChange, disabled, today }: { scenario
         <select id="demo-scenario" value={scenario} disabled={disabled} onChange={(event) => onChange(event.target.value as DemoScenario)}>
           <option value="normal">Normal — successful responses</option>
           <option value="loading">Loading — 1.6 second responses</option>
-          <option value="empty">Empty — no seeded accounts</option>
+          <option value="empty">Empty — no accounts or equipment</option>
           <option value="error">Error — service unavailable</option>
         </select>
-        <p>Changing a fixture clears demo accounts and signs you out. Empty starts without seeded accounts; registration still works. Error makes all requests fail.</p>
+        <p>Changing a fixture clears demo accounts and signs you out. Empty starts without accounts or equipment; registration still works. Error makes all requests fail.</p>
         <p className="club-date">Club date: <time dateTime={today}>{today}</time> · Asia/Almaty</p>
       </div>
     </details>

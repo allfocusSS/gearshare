@@ -1,4 +1,7 @@
-import type { Credentials, GearShareService, ServiceError, ServiceResult, User } from './types.ts'
+import { CATEGORIES } from './types.ts'
+import type { Asset, Credentials, GearShareService, ServiceError, ServiceResult, User } from './types.ts'
+import { addDays, clubToday, validateDateRange } from './dates.ts'
+import { catalogueFixtures } from './fixtures.ts'
 
 export type DemoScenario = 'normal' | 'loading' | 'empty' | 'error'
 
@@ -16,6 +19,7 @@ interface MockAccount {
 interface MockOptions {
   scenario?: DemoScenario
   sleep?: (milliseconds: number) => Promise<void>
+  now?: () => Date
 }
 
 export const normalizeUsername = (username: string) => username.trim().toLowerCase()
@@ -38,17 +42,23 @@ const success = <T>(data: T): ServiceResult<T> => ({ ok: true, data })
 
 export function createMockService(options: MockOptions = {}) {
   const sleep = options.sleep ?? ((milliseconds) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)))
+  const today = () => clubToday(options.now?.() ?? new Date())
   let scenario: DemoScenario = options.scenario ?? 'normal'
   let accounts: MockAccount[] = []
   let signedIn: User | null = null
   let nextId = 1
   let generation = 0
+  let assets: Asset[] = []
+  let occupied = new Map<string, Set<string>>()
 
   function reset(next: DemoScenario) {
     scenario = next
     signedIn = null
     nextId = 1
     generation += 1
+    const fixture = catalogueFixtures(today())
+    assets = next === 'empty' ? [] : fixture.assets
+    occupied = next === 'empty' ? new Map() : fixture.occupied
     accounts = next === 'empty' ? [] : [
       { user: { id: 'student-demo', username: DEMO_ACCOUNTS.student.username, role: 'student' }, demoPassword: DEMO_ACCOUNTS.student.password },
       { user: { id: 'coordinator-demo', username: DEMO_ACCOUNTS.coordinator.username, role: 'coordinator' }, demoPassword: DEMO_ACCOUNTS.coordinator.password },
@@ -66,6 +76,8 @@ export function createMockService(options: MockOptions = {}) {
   }
 
   const publicUser = (user: User): User => ({ ...user })
+  const publicAsset = (asset: Asset): Asset => ({ ...asset })
+  const missing = { code: 'NOT_FOUND', message: 'This equipment could not be found. Return to Explore to choose another physical unit.' } as const
   const service: GearShareService = {
     async currentUser() {
       const error = await ready()
@@ -97,6 +109,37 @@ export function createMockService(options: MockOptions = {}) {
       if (error) return failure(error)
       signedIn = null
       return success(null)
+    },
+    async listAssets(filters = {}) {
+      const error = await ready() ?? validateDateRange(filters.startDate ?? '', filters.endDate ?? '', today())
+      if (error) return failure(error)
+      if (filters.category && !CATEGORIES.includes(filters.category)) return failure({ code: 'VALIDATION_ERROR', message: 'Choose a listed category.', fields: { category: 'Choose a listed category.' } })
+      const search = (filters.search ?? '').trim().toLowerCase()
+      const range = filters.startDate && filters.endDate ? { startDate: filters.startDate, endDate: filters.endDate } : null
+      const items = assets.filter((asset) => {
+        if (filters.category && asset.category !== filters.category) return false
+        if (search && ![asset.name, asset.inventoryCode, asset.category, asset.description, asset.location].join(' ').toLowerCase().includes(search)) return false
+        if (range && (asset.state === 'maintenance' || [...(occupied.get(asset.id) ?? [])].some((day) => day >= range.startDate && day <= range.endDate))) return false
+        return true
+      }).map(publicAsset)
+      return success({ items, range, today: today(), horizonEnd: addDays(today(), 90) })
+    },
+    async getAsset(id) {
+      const error = await ready()
+      if (error) return failure(error)
+      const asset = assets.find((item) => item.id === id)
+      return asset ? success(publicAsset(asset)) : failure(missing)
+    },
+    async getAssetAvailability(id) {
+      const error = await ready()
+      if (error) return failure(error)
+      const asset = assets.find((item) => item.id === id)
+      if (!asset) return failure(missing)
+      const current = today()
+      return success({ assetId: id, today: current, horizonEnd: addDays(current, 90), timeZone: 'Asia/Almaty', days: Array.from({ length: 91 }, (_, offset) => {
+        const date = addDays(current, offset)
+        return { date, state: asset.state === 'maintenance' ? 'maintenance' : occupied.get(id)?.has(date) ? 'occupied' : 'available' }
+      }) })
     },
   }
 
