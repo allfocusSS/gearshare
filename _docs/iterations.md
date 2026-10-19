@@ -54,3 +54,7 @@ For each implemented iteration: date, real issue URLs, start/end commits, delive
 - PM authorized #4 after independently closed #3: [handoff](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6267394270).
 - Implemented mock-only requests, private list/detail/event timeline, inclusive allocation/conflict/date/purpose checks, cancellation/rebooking and active/overdue/terminal views. Added deterministic conflict and failed-request controls. No staff mutation or later-stage implementation.
 - Engineer verification is recorded in evidence.md. Candidate is the commit containing this entry; exact published SHA belongs in the handoff. #4 stays open for independent QA.
+
+### #25 corrective engineer candidate (2026-10-19)
+
+Addressed the groomed stale-success calendar defect within mock frontend presentation/state only. Authoritative availability refresh follows success/conflict, hides obsolete calendar claims while loading/failed, supports retry without booking resubmission, and discards previous-asset responses. Added original desktop/mobile browser reproduction, controlled refresh/error/navigation tests and inclusive/isolation/privacy unit regressions. Unit 28/28, typecheck, build and booking browser passed; auth/catalogue browser final console assertions failed on a resource 404 despite completed functional journeys. See evidence for exact environment and coverage limitations. Await independent QA; #25/#4 remain open and #5/later gates unchanged.

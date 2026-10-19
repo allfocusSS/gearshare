@@ -73,3 +73,21 @@ test('deterministic stale-calendar conflict refreshes anonymous days, fails with
   demo.setScenario('error')
   for (const call of [()=>service.requestBooking(input()),()=>service.listBookings(),()=>service.getBooking('fixture-pending'),()=>service.cancelBooking('fixture-pending')]) fail(await call(),'SERVICE_UNAVAILABLE')
 })
+
+test('#25 inclusive cross-month and 14-day refresh, isolation and anonymous public shape', async () => {
+  for (const [startDate,endDate] of [['2026-10-20','2026-10-22'],['2026-10-31','2026-11-02'],['2026-10-20','2026-11-02']]) {
+    const {service} = make(); await login(service)
+    const before = ok(await service.listBookings())
+    const booking = ok(await service.requestBooking(input({assetId:'accessory-03',startDate,endDate})))
+    const availability = ok(await service.getAssetAvailability('accessory-03'))
+    for (const day of availability.days) {
+      assert.equal(day.state,day.date >= startDate && day.date <= endDate ? 'occupied' : 'available')
+      assert.deepEqual(Object.keys(day).sort(),['date','state'])
+    }
+    assert.ok(ok(await service.getAssetAvailability('accessory-01')).days.every(d=>d.state==='available'))
+    assert.equal(ok(await service.listBookings()).length,before.length+1)
+    assert.equal(booking.events.length,1)
+    ok(await service.logout())
+    assert.deepEqual(ok(await service.getAssetAvailability('accessory-03')),availability)
+  }
+})

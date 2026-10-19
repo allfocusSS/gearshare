@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
+Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate and #25 stale-calendar correction await independent QA; #25 engineer booking checks pass, with auth/catalogue console-404 failures recorded in evidence. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
 
 ## Read before working
 
