@@ -86,3 +86,6 @@ Only create observed bug issues. A planned case is not evidence that the app has
 ## Evidence rules
 
 Record exact command, commit, environment, date and exit/result. Keep concise raw logs where practical and distinguish automated from manual checks. An API test client alone cannot establish that a browser screen works; reopening an ORM engine alone cannot establish a real process-restart test. State infrastructure limits instead of inventing a pass.
+
+
+For #26, run `npm run build` then `npm run test:browser:resources` (same Chromium executable override as other suites if needed). It starts fresh strict servers at 5173/5196 and preview 5197, checks explore/signin/register at 390/1440 in isolated contexts, validates and decodes the declared local icon, and rejects all console/page/network errors without filtering. Results are written to ignored `frontend/test-results/resources/results.json`.
