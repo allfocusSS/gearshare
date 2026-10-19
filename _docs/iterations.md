@@ -48,3 +48,9 @@ For each implemented iteration: date, real issue URLs, start/end commits, delive
 - Service tests use an injected clock; browser catalogue tests fix Date to `2026-10-19T06:00:00Z` while async timers run normally. Engineer checks: `npm test` (22 passed: 11 catalogue/date/privacy plus 11 existing auth), typecheck/build (exit 0; 30 modules), catalogue browser (28 checks) and preserved auth/focus browser (26 checks), all exit 0. Desktop/mobile screenshots inspected; no page/console/request/API errors or new observed product defect.
 - Updated living product/design/architecture/process/testing/README/evidence/submission status. Catalogue/privacy and inclusive-date shape now reflect actual source; no HTTP routes/OpenAPI were invented. Requests/history/cancellation and staff mutation remain for #4/#5; no backend/persistence work was added.
 - Start: `13721cf559812c6337cee8c43bb6890d236139ba`. Candidate: the commit containing this entry, with exact local/published SHA/tree in the #3 handoffs. #3 stays open for independent QA; the complete mock-stage gate remains after #5.
+
+## 2026-10-19 — Iteration 1 student requests/history, #4
+
+- PM authorized #4 after independently closed #3: [handoff](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6267394270).
+- Implemented mock-only requests, private list/detail/event timeline, inclusive allocation/conflict/date/purpose checks, cancellation/rebooking and active/overdue/terminal views. Added deterministic conflict and failed-request controls. No staff mutation or later-stage implementation.
+- Engineer verification is recorded in evidence.md. Candidate is the commit containing this entry; exact published SHA belongs in the handoff. #4 stays open for independent QA.

@@ -43,18 +43,29 @@ export interface AssetAvailability {
   days: { date: string; state: 'available' | 'occupied' | 'maintenance' }[]
 }
 
-export type ServiceErrorCode = 'VALIDATION_ERROR' | 'INVALID_CREDENTIALS' | 'USERNAME_TAKEN' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND'
+export type BookingState = 'pending' | 'approved' | 'checked_out' | 'rejected' | 'cancelled' | 'returned'
+export interface BookingEvent { id: string; actorId: string; action: string; priorState: BookingState | null; newState: BookingState; timestamp: string; note: string }
+export interface Booking extends DateRange { id: string; assetId: string; assetName: string; userId: string; purpose: string; state: BookingState; events: BookingEvent[] }
+export interface BookingRequest extends DateRange { assetId: string; purpose: string }
+
+export type ServiceErrorCode = 'VALIDATION_ERROR' | 'INVALID_CREDENTIALS' | 'USERNAME_TAKEN' | 'SERVICE_UNAVAILABLE' | 'NOT_FOUND' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'CONFLICT'
 
 export interface ServiceError {
   code: ServiceErrorCode
   message: string
-  fields?: Partial<Record<keyof Credentials | 'startDate' | 'endDate' | 'category', string>>
+  status?: number
+  unavailableDates?: string[]
+  fields?: Partial<Record<keyof Credentials | 'startDate' | 'endDate' | 'category' | 'purpose', string>>
 }
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; error: ServiceError }
 
 /** The only frontend boundary for backend operations. Extended by later mock stories. */
 export interface GearShareService {
+  requestBooking(input: BookingRequest): Promise<ServiceResult<Booking>>
+  listBookings(): Promise<ServiceResult<Booking[]>>
+  getBooking(id: string): Promise<ServiceResult<Booking>>
+  cancelBooking(id: string): Promise<ServiceResult<Booking>>
   currentUser(): Promise<ServiceResult<User | null>>
   login(credentials: Credentials): Promise<ServiceResult<User>>
   register(credentials: Credentials): Promise<ServiceResult<User>>

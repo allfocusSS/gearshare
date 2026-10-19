@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Build GearShare as specified in `_docs/plan.md`. This is Part II; Part I was StudyTrack. The separate repository and issues now exist. Independent QA passed and closed #1, #2 and the real focus bug #24. Iteration 1 now has the #3 mock catalogue/detail/anonymous-availability candidate awaiting independent QA. Request/history and staff mutations remain gated by #3 and their own issues.
+Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
 
 ## Read before working
 

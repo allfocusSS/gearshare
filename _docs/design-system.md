@@ -1,6 +1,6 @@
 # GearShare design direction and references
 
-Status: the referenced shell/auth and #24 focus correction passed independent QA. The #3 catalogue/detail/anonymous-calendar candidate is implemented and awaits QA; request/staff lending screens remain the brief for later mock stories. Use the assignment's **good references for the coding agent** option. No Lovable, v0 or Claude Design session is claimed.
+Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
 
 ## Reference board
 
@@ -45,7 +45,7 @@ At desktop width, show identity/specifications on the left and a bordered bookin
 
 On mobile, use a normal single-column flow. Booking errors appear next to the fields and in an accessible alert. On a race/conflict, preserve purpose and dates and update availability. A request confirmation shows the true server status, which begins as “Pending approval.”
 
-Current #3 scope implements the asset identity/specifications, anonymous month calendar, labeled date alternatives, selected inclusive duration and scheduled-availability feedback. It contains no request submission/purpose controls yet; those follow #4. Occupied days use a hatch plus × and accessible date/status text; maintenance is explicitly unavailable.
+The independently verified #3 scope implements asset identity/specifications, anonymous month calendar, labeled date alternatives, selected inclusive duration and scheduled-availability feedback. The #4 candidate adds request/purpose controls, retained-form conflict/error feedback and private reservations/history/cancellation. Occupied days use a hatch plus × and accessible date/status text; maintenance is explicitly unavailable.
 
 ### My reservations
 

@@ -1,6 +1,6 @@
 # GearShare product specification
 
-Status: product scope with #2 PM refinement applied. Mock identity/navigation passed QA; the catalogue/detail/anonymous-calendar candidate awaits QA. Request/staff lending and later stages remain gated. Date: 2026-10-19, Asia/Almaty.
+Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
 
 ## Problem and target users
 

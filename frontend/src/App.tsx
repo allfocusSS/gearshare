@@ -4,6 +4,7 @@ import { DemoControls } from './components/DemoControls.tsx'
 import { AuthPage } from './pages/AuthPage.tsx'
 import { ShellPage } from './pages/ShellPage.tsx'
 import { CataloguePage } from './pages/CataloguePage.tsx'
+import { ReservationsPage } from './pages/ReservationsPage.tsx'
 import { AssetDetailPage } from './pages/AssetDetailPage.tsx'
 import type { WorkspaceRoute } from './pages/ShellPage.tsx'
 import { clubToday } from './services/dates.ts'
@@ -108,7 +109,7 @@ export function App() {
         <DemoControls scenario={scenario} onChange={changeScenario} disabled={loading || pending} today={clubToday()} />
         {message && <div className="success-notice" role="status"><Icon name="check" />{message}</div>}
         {error && <div className="service-notice" role="alert"><span>{error}</span><button className="button secondary" type="button" disabled={loading || pending} onClick={() => void refreshSession()}>Retry session</button></div>}
-        {loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" /><span>Loading your demo workspace…</span></div> : restricted ? <section className="workspace-placeholder"><span className="placeholder-icon"><Icon name="desk" /></span><p className="eyebrow">Coordinator access</p><h2>Sign in as a coordinator.</h2><p>This workspace is available to the fictional coordinator account.</p><a className="button primary" href={`#/signin?returnTo=${route}`}>Go to sign in<Icon name="arrow" /></a></section> : route === 'signin' || route === 'register' ? <AuthPage key={`${route}-${scenario}`} register={route === 'register'} service={gearShareService} onPending={(value) => { setPending(value); if (value) setMessage('') }} onSuccess={signedIn} returnTo={returnTo} /> : route === 'explore' ? <CataloguePage service={gearShareService} /> : route === 'asset' ? <AssetDetailPage key={assetId} assetId={assetId} service={gearShareService} /> : <ShellPage route={route} user={user} />}
+        {loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" /><span>Loading your demo workspace…</span></div> : restricted ? <section className="workspace-placeholder"><span className="placeholder-icon"><Icon name="desk" /></span><p className="eyebrow">Coordinator access</p><h2>Sign in as a coordinator.</h2><p>This workspace is available to the fictional coordinator account.</p><a className="button primary" href={`#/signin?returnTo=${route}`}>Go to sign in<Icon name="arrow" /></a></section> : route === 'signin' || route === 'register' ? <AuthPage key={`${route}-${scenario}`} register={route === 'register'} service={gearShareService} onPending={(value) => { setPending(value); if (value) setMessage('') }} onSuccess={signedIn} returnTo={returnTo} /> : route === 'explore' ? <CataloguePage service={gearShareService} /> : route === 'asset' ? <AssetDetailPage key={assetId} assetId={assetId} service={gearShareService} user={user} /> : route === 'reservations' ? <ReservationsPage service={gearShareService} user={user} /> : <ShellPage route={route} user={user} />}
         <footer className="page-footer"><span>GEARSHARE <span>·</span> CAMPUS EQUIPMENT LENDING</span><span>Made for shared possibilities.</span></footer>
       </main>
     </div>

@@ -175,7 +175,8 @@ try {
   await heading('Field Camera · Unit 01')
   assert.ok(page.url().endsWith('#/assets/camera-01'))
   passed('Existing auth preserves the concrete equipment-detail return destination')
-  const publicText = await page.locator('.asset-detail-grid').innerText()
+  // #4 adds the signed-in student's own request purpose; public asset/calendar metadata remains anonymous.
+  const publicText = await page.locator('.asset-identity, .availability-calendar').allTextContents().then(parts => parts.join(' '))
   assert.equal(/maya_student|alex_coordinator|borrower|purpose|booking id|private note/i.test(publicText), false)
   assert.deepEqual(consoleErrors, []); assert.deepEqual(pageErrors, []); assert.deepEqual(failedRequests, []); assert.deepEqual(apiRequests, [])
   passed('Public catalogue/detail/calendar show no borrower/private metadata; no backend/network/console failures')

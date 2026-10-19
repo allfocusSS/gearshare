@@ -344,3 +344,17 @@ h1 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
   .calendar-legend { gap: 10px; }
   .catalogue-loading { font-size: 13px; }
 }
+
+.request-date-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.booking-form { display: grid; gap: 12px; margin-top: 24px; }
+.booking-form label { font-weight: 650; }
+.booking-form textarea { min-height: 110px; resize: vertical; width: 100%; border: 1px solid var(--divider, #DCE0E3); border-radius: 8px; padding: 12px; font: inherit; }
+.booking-form p { margin: 0; }
+.reservation-tabs { display: flex; gap: 8px; margin: 24px 0; }
+.reservation-list { display: grid; gap: 12px; }
+.reservation-row, .reservation-detail { background: white; border: 1px solid #DCE0E3; border-radius: 12px; padding: 24px; }
+.reservation-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.reservation-row h3 { margin-top: 0; }
+.reservation-detail { margin-top: 24px; overflow-wrap: anywhere; }
+.event-timeline li { border-left: 2px solid #DCE0E3; padding: 12px; margin: 12px 0; }
+@media(max-width: 600px) { .reservation-row { align-items: flex-start; flex-direction: column; padding: 16px; } }

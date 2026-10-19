@@ -1,6 +1,6 @@
 # Architecture and iteration decisions
 
-Status: architecture decisions retained; independent QA passed #1, #2 and the #24 focus correction. The #3 catalogue/detail/anonymous-availability candidate awaits independent QA. FastAPI still exposes only health; no contract, domain API or persistence stage is implemented.
+Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
 
 ## Stack options considered before code
 
@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface covers current user, login, registration, logout, listAssets(filters), getAsset(id) and getAssetAvailability(id). Later mock lending/staff stories extend this same boundary. Public asset types contain identity/specification/state fields only; anonymous availability contains asset ID, club-local window/timezone and date/state pairs, with no private booking records. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
+The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface covers current user, login, registration, logout, listAssets(filters), getAsset(id), getAssetAvailability(id), requestBooking, listBookings, getBooking and cancelBooking. The staff mock story extends this same boundary. Public asset types contain identity/specification/state fields only; anonymous availability contains asset ID, club-local window/timezone and date/state pairs, with no private booking records. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
 
 ## Required stages and concrete verification gates
 
@@ -98,3 +98,7 @@ Store availability as discrete dates because the product intentionally books who
 ## Reproducibility
 
 Add dependency locks, `.env.example` without real secrets, documented seed/migrate/run/test commands and CI in their issues. Seed dates relative to the configured club-local date so the demo does not become unusable after a hardcoded week passes. Demo seeding must be idempotent and must not overwrite a real account or reset its password. Never commit databases, session tokens, local environment files, browser profiles or unrelated chat history.
+
+## #4 mock boundary additions
+
+`requestBooking`, `listBookings`, `getBooking` and `cancelBooking` extend the same async `GearShareService`. Booking results are copied; owners see only their own list, while detail/cancellation allow the owner or coordinator. Active states reserve each inclusive date; terminal states release them. A deterministic next-request conflict adds an anonymous competing allocation and returns only unavailable dates. A next-request failure provides a retryable no-mutation path. This browser memory model is not server authorization or database concurrency evidence.

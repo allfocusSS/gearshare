@@ -1,0 +1,71 @@
+import { chromium } from 'playwright'
+import { spawn } from 'node:child_process'
+import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
+const cwd = fileURLToPath(new URL('../', import.meta.url))
+const base = 'http://127.0.0.1:5181'
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5181','--strictPort'], {cwd,stdio:'ignore'})
+let browser
+try {
+  for(let i=0;i<80;i++) { try { if((await fetch(base)).ok) break } catch{}; await new Promise(r=>setTimeout(r,100)) }
+  browser = await chromium.launch({headless:true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? {executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--disable-dev-shm-usage']})
+  const page = await browser.newPage({viewport:{width:1440,height:1000}})
+  await page.clock.setFixedTime(new Date('2026-10-19T06:00:00Z'))
+  const errors=[]; page.on('pageerror', e=>errors.push(e.message))
+  const go=async path=>{await page.evaluate(p=>location.hash=p,`/${path}`)}
+  const fill=async(from,to,purpose)=>{await page.getByLabel('Start date',{exact:true}).fill(from);await page.getByLabel('End date',{exact:true}).fill(to);await page.getByLabel('Project purpose').fill(purpose)}
+  const login=async(user='maya_student', password='StudentDemo42!')=>{await page.getByLabel('Username',{exact:true}).fill(user);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByRole('button',{name:'Sign in',exact:true}).click()}
+  await page.goto(`${base}/#/assets/accessory-01`)
+  await page.getByRole('link',{name:'Sign in to request equipment'}).click()
+  await login()
+  await page.getByLabel('Project purpose').waitFor()
+  assert.equal(await page.evaluate(()=>location.hash),'#/assets/accessory-01')
+  await page.getByRole('button',{name:'Request equipment',exact:true}).click()
+  await page.getByText('Check the highlighted request fields.').waitFor()
+  assert.equal(await page.getByLabel('Project purpose').getAttribute('aria-invalid'),'true')
+  await fill('2026-10-19','2026-10-19','Club interview recording')
+  await page.getByRole('button',{name:'Simulate next-request failure'}).click()
+  await page.getByRole('button',{name:'Request equipment',exact:true}).click()
+  await page.getByRole('button',{name:'Submitting request…',exact:true}).waitFor()
+  assert.equal(await page.getByLabel('Project purpose').isDisabled(),true)
+  await page.getByText('The request could not be sent.',{exact:false}).waitFor()
+  assert.equal(await page.getByLabel('Project purpose').inputValue(),'Club interview recording')
+  await page.getByRole('button',{name:'Request equipment',exact:true}).dblclick()
+  await page.getByText('Pending approval. Your request is now in My reservations.').waitFor()
+  await page.getByRole('link',{name:'View my reservations'}).click()
+  await page.locator('.reservation-row').filter({hasText:'Travel Tripod'}).waitFor()
+  assert.equal(await page.locator('.reservation-row').filter({hasText:'Travel Tripod'}).count(),1)
+  await page.getByRole('button',{name:'View details for Travel Tripod'}).click()
+  await page.getByRole('button',{name:'Cancel reservation',exact:true}).click()
+  await page.getByText('Reservation cancelled. The dates have been released.').waitFor()
+  await page.getByRole('button',{name:'History',exact:true}).click()
+  await page.getByRole('button',{name:'View details for Travel Tripod'}).click()
+  await page.waitForFunction(()=>document.querySelectorAll('.event-timeline li').length===2)
+  assert.equal(await page.getByRole('button',{name:'Cancel reservation',exact:true}).count(),0)
+  await page.getByRole('button',{name:'Upcoming',exact:true}).click()
+  assert.equal(await page.getByText('checked out · Overdue',{exact:true}).count(),1)
+  await page.getByRole('button',{name:'View details for Directional Microphone'}).click()
+  await page.getByRole('heading',{name:'Event history',exact:true}).waitFor()
+  assert.equal(await page.getByRole('button',{name:'Cancel reservation',exact:true}).count(),0)
+  await go('assets/accessory-01');await page.getByLabel('Project purpose').waitFor()
+  await fill('2026-10-19','2026-10-19','Rebooking after cancellation')
+  await page.getByRole('button',{name:'Request equipment',exact:true}).click()
+  await page.getByText('Pending approval. Your request is now in My reservations.').waitFor()
+  await fill('2026-10-20','2026-10-20','Keep these project details')
+  await page.getByRole('button',{name:'Simulate next-request conflict'}).click()
+  await page.getByRole('button',{name:'Request equipment',exact:true}).click()
+  await page.getByText('These dates were reserved.',{exact:false}).waitFor()
+  assert.equal(await page.getByLabel('Start date',{exact:true}).inputValue(),'2026-10-20')
+  assert.equal(await page.getByLabel('End date',{exact:true}).inputValue(),'2026-10-20')
+  assert.equal(await page.getByLabel('Project purpose').inputValue(),'Keep these project details')
+  assert.equal(await page.getByText('Pending approval. Your request is now in My reservations.').count(),0)
+  await page.getByText('Unavailable for selected dates',{exact:true}).waitFor()
+  for(const width of [390,1440]) {await page.setViewportSize({width,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await go('reservations');await page.getByRole('button',{name:'Upcoming',exact:true}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await go('assets/accessory-01');await page.getByLabel('Project purpose').waitFor()}
+  await page.getByRole('button',{name:'Sign out',exact:true}).click()
+  await go('register?returnTo=reservations')
+  await page.getByLabel('Username',{exact:true}).fill('second_student');await page.getByLabel('Password',{exact:true}).fill('SecondStudent42!');await page.getByRole('button',{name:'Create student account',exact:true}).click()
+  await page.getByText('No upcoming reservations yet.').waitFor()
+  await page.getByRole('button',{name:'History',exact:true}).click();await page.getByText('No history reservations yet.').waitFor()
+  assert.deepEqual(errors,[])
+  console.log('PASS #4 browser: auth return, invalid request, single pending request, cancellation/history/events, rebook, stale conflict preservation/refreshed calendar, overdue/forbidden action, second-user privacy and 390/1440 layouts')
+} finally {await browser?.close();server.kill()}
