@@ -139,6 +139,7 @@ try {
   assert.equal(await page.locator('.equipment-grid').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 1)
   await page.screenshot({ path: `${output}/mobile-catalogue.png`, fullPage: true })
   await cards.filter({ hasText: 'CAM-001' }).click(); await heading('Field Camera · Unit 01')
+  await page.getByRole('heading', { name: 'Check availability', exact: true }).waitFor()
   await dateRange('2026-10-21', '2026-10-23')
   await page.getByText('3 selected days are unavailable.', { exact: true }).waitFor()
   await noOverflow('390 detail calendar')
