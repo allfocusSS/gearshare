@@ -96,7 +96,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/Credentials'}
             examples:
-              newStudent: {value: {username: '  New_Member9  ', password: ExamplePass42!}}
+              newStudent: {value: {username: New_Member9, password: ExamplePass42!}}
       responses:
         '201':
           description: Account created and signed in. The user's `role` is always `student` and `username` is the normalized value.
@@ -1180,7 +1180,9 @@ components:
       required: [code, message]
       properties:
         code: {$ref: '#/components/schemas/ErrorCode'}
-        message: {type: string, description: Human-readable, safe to show to the user.}
+        message:
+          type: string
+          description: 'Human-readable, safe to show to the user.'
         unavailableDates:
           type: array
           items: {$ref: '#/components/schemas/CalendarDate'}

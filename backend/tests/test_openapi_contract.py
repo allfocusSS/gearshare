@@ -650,11 +650,10 @@ def test_every_documented_example_validates_against_its_schema(spec: dict[str, A
     examples = media_examples(spec)
     assert len(examples) >= 40
     for example in examples:
-        value = trimmed(spec, example["schema"], example["value"]) if example["kind"] == "request" else example["value"]
-        errors = schema_errors(registry, example["schema"], value)
+        # Examples are literal wire values: valid exactly as written, with no implicit `x-trimmed` normalisation.
+        errors = schema_errors(registry, example["schema"], example["value"])
         assert not errors, f"{example['where']}: {errors}"
-        if example["kind"] != "request":
-            assert_exact(spec, example["value"], example["schema"], example["where"])
+        assert_exact(spec, example["value"], example["schema"], example["where"])
     # No orphaned reusable example: each one is used by some operation.
     used = {e["ref"] for e in examples if e["ref"]}
     assert used == set(spec["components"]["examples"]), set(spec["components"]["examples"]) ^ used
