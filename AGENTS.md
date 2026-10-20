@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate and the [#27](https://github.com/allfocusSS/gearshare/issues/27) visually-hidden-label correction are implemented. Standard engineer checks pass on `f89c963b8b0193d159f74742e126a966a0053bd3`; focused label regression results are recorded in evidence.md. Both issues remain open for complete independent verification. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
+Current stage update (2026-10-20): independent QA passed and closed #1–5 and the observed bugs #24–28, including the [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800), [#27](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6287900059), [#28](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6294272406) and [#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984) PASS verdicts; the standalone mock stage gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) is an engineer candidate: root `openapi.yml` (OpenAPI 3.1) is derived from the completed `GearShareService`, adds private `Booking.version` with a required `expectedVersion` precondition on the five booking mutations, and is checked by `backend/tests/test_openapi_contract.py` (see `_docs/api.md` and evidence.md). #6 stays open for independent QA. #7 and later stages (backend business APIs, persistence, HTTP adapter) remain gated. Historical entries below retain their recorded point-in-time results.
 
 ## Read before working
 
@@ -10,7 +10,7 @@ Current stage update (2026-10-20): independent QA passed and closed [#4](https:/
 - Product rules: `_docs/plan.md`.
 - Architecture/service boundary: `_docs/architecture.md`.
 - UI work: `_docs/design-system.md`.
-- API work: the versioned `openapi.yml`, once created from the mock service in iteration 2.
+- API work: the versioned root `openapi.yml` (OpenAPI 3.1, derived from the mock service) and `_docs/api.md` (method-to-HTTP map, error, auth, date, concurrency and privacy policy). Change both together with `GearShareService`; the contract tests fail on drift.
 - Tests: `_docs/testing-guidelines.md`.
 - Evidence/status: `_docs/evidence.md` and `_docs/iterations.md`.
 
@@ -54,4 +54,4 @@ npm run build
 npm run dev
 ```
 
-The frontend uses the async `GearShareService` and memory-only identity/catalogue/booking/staff adapter; it makes no API calls. The backend still implements only `GET /health`. The #5 staff candidate still needs independent full mock-stage QA. OpenAPI, business APIs and persistence follow their separate stage gates. The scoped running-browser checks are `cd frontend` then `npm run test:browser` and `npm run test:browser:catalogue`, `npm run test:browser:bookings` and `npm run test:browser:staff`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.
+The frontend uses the async `GearShareService` and memory-only identity/catalogue/booking/staff adapter; it makes no API calls. The backend still implements only `GET /health`; `uv run --locked pytest` also runs `backend/tests/test_openapi_contract.py`, which validates `openapi.yml` with a real OpenAPI validator and checks it against `frontend/src/services/types.ts` and committed mock-generated samples. Private bookings carry a `version` and the five booking mutations require `expectedVersion`. The #6 contract candidate needs independent QA; business APIs, the HTTP adapter and persistence follow their separate stage gates. The scoped running-browser checks are `cd frontend` then `npm run test:browser` and `npm run test:browser:catalogue`, `npm run test:browser:bookings`, `npm run test:browser:staff`, `npm run test:browser:labels` and `npm run test:browser:resources`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.

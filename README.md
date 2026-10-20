@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed #1–4 and the observed bugs #24–26. The [#5](https://github.com/allfocusSS/gearshare/issues/5) mock candidate adds the complete coordinator desk and inventory workflows and awaits independent full mock-stage verification. The #27 shared label correction is implemented and awaits its full independent verdict as well. Contract/API/persistence work remains gated; this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
+Independent QA passed and closed #1–5 and the observed bugs #24–28, so the standalone mock frontend gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) adds the versioned root [`openapi.yml`](openapi.yml) (OpenAPI 3.1) and [`_docs/api.md`](_docs/api.md), derived from the completed service, with backend tests that validate and cross-check it; it is an engineer candidate awaiting independent QA. Backend business APIs, the HTTP adapter and persistence remain gated (#7 onward); this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -31,6 +31,8 @@ The API listens at http://127.0.0.1:8000. In a second terminal, this returns HTT
 curl --fail http://127.0.0.1:8000/health
 ```
 
+`uv run --locked pytest` also runs the API contract tests (`backend/tests/test_openapi_contract.py`). They validate [`openapi.yml`](openapi.yml) with `openapi-spec-validator`, check that every `GearShareService` method maps to exactly one operation, and check the schemas against `frontend/src/services/types.ts` and mock-generated samples in `frontend/tests/fixtures/contract-samples.json`. To validate the file alone: `cd backend && uv run --locked openapi-spec-validator ../openapi.yml`. The contract describes the future `/api/v1` server; the backend still serves only `GET /health`.
+
 In another terminal at the repository root:
 
 ```sh
@@ -42,7 +44,7 @@ npm run build
 npm run dev
 ```
 
-Open http://127.0.0.1:5173 to try the GearShare mock catalogue. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/catalogue/booking/date/privacy service tests using Node's built-in test runner. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
+Open http://127.0.0.1:5173 to try the GearShare mock catalogue. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/catalogue/booking/date/privacy/staff/version service tests and the contract-file checks using Node's built-in test runner. After an intentional mock change, `node tests/contract-samples.mjs --write` regenerates the committed contract samples; the backend tests then re-validate them. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
 
 No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. There are no secrets, database, seed or migration commands at this stage.
 
@@ -68,6 +70,7 @@ npm run test:browser:catalogue
 npm run test:browser:bookings
 npm run test:browser:staff
 npm run test:browser:labels
+npm run test:browser:resources
 ```
 
 The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px. The bookings test uses port 5181. The staff test uses 5182 (`GEARSHARE_STAFF_PORT` overrides) and exercises the full two-role mock lifecycle, custody, inventory and async failures at both widths; screenshots/results are in `frontend/test-results/staff/`. The focused labels regression uses port 5191 (`GEARSHARE_LABELS_QA_PORT` overrides), checks accessible names/clipping/keyboard at both widths and saves results/screenshots under `frontend/test-results/qa27-after/`. The catalogue test uses port 5179 and a fixed browser date of 2026-10-19 to exercise filter/date boundaries, anonymous calendars, maintenance, empty/missing/error states and both layouts. Ignored results/screenshots are saved under `frontend/test-results/mock-auth/` and `frontend/test-results/catalogue/`; each test stops its server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
@@ -96,6 +99,8 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | File | Purpose |
 | --- | --- |
 | `AGENTS.md` | Entry point and agent instructions |
+| `openapi.yml` | Versioned OpenAPI 3.1 contract for the future `/api/v1` server, one operation per `GearShareService` method |
+| `_docs/api.md` | Method-to-HTTP map, error, authentication, date, concurrency and privacy policy behind the contract |
 | `_docs/plan.md` | Product scope and business rules |
 | `_docs/brainstorming.md` | Actual pre-code conversation and decision record |
 | `_docs/architecture.md` | Options, decisions, entities and stages |
@@ -106,16 +111,16 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-`openapi.yml`, persistence, CI and final integrated demo evidence remain future deliverables. Staff lending is a mock candidate pending independent QA. The current frontend checks establish only mock shell/auth/catalogue/booking/availability/staff/inventory behavior; independent QA owns each issue's acceptance and closure.
+Persistence, CI and final integrated demo evidence remain future deliverables, and the contract in `openapi.yml` is not yet implemented by a server. The current frontend checks establish only mock shell/auth/catalogue/booking/availability/staff/inventory behavior; independent QA owns each issue's acceptance and closure.
 
 ### Mock student reservations (#4 verified)
 
 Sign in as the fictional student, open equipment, select inclusive dates and enter a 5–500 character purpose. Request equipment creates pending approval. My reservations provides Upcoming (including active/overdue loans), History, private details/events and cancellation for pending/approved records. The six student fixture records show all states. Cancellation releases reserved dates. The request panel offers deterministic next-request conflict and failure controls; errors preserve entered values, and a conflict refreshes the anonymous calendar. All state remains memory-only and resets on reload or fixture reset.
 
-Run `npm run test:browser:bookings` from `frontend/` for the scoped student browser journey; use the same Playwright browser setup/executable override as the other browser checks. The #5 candidate provides the staff mutation UI.
+Run `npm run test:browser:bookings` from `frontend/` for the scoped student browser journey; use the same Playwright browser setup/executable override as the other browser checks. The coordinator desk below provides the staff mutation UI.
 
-### Mock coordinator desk and inventory (#5 candidate)
+### Mock coordinator desk and inventory (#5 verified)
 
 Without reloading, sign out the student and sign in as the coordinator to retain the same memory-only records. Coordinator desk shows Pending requests, Pickups, Active loans and History, with counts for pending, returns due today and overdue. Review a request, approve it, check it out within its inclusive booked dates with outgoing condition, then record its return with incoming condition. Sign back in as the student to inspect the retained history. An overdue microphone fixture demonstrates why its next pickup stays blocked until the previous return is recorded.
 
-Inventory supports search, add/edit and active/maintenance state. Codes are trimmed and stored uppercase; every physical unit needs a unique code. Maintenance errors explain that active returns and unresolved pending/approved commitments must be resolved at the desk first. Existing reservation snapshots and histories stay intact after equipment edits. Reload or changing a demo fixture resets every record. The mock provides no real server authorization or persistence.
+Inventory supports search, add/edit and active/maintenance state. Codes are trimmed and stored uppercase; every physical unit needs a unique code. Maintenance errors explain that active returns and unresolved pending/approved commitments must be resolved at the desk first. Existing reservation snapshots and histories stay intact after equipment edits. Each private reservation carries a version (1 when created, +1 per successful approve, reject, cancel, checkout or return); the desk and My reservations send the version they last read, and a stale version is rejected with a conflict and no change (see [`_docs/api.md`](_docs/api.md)). Reload or changing a demo fixture resets every record. The mock provides no real server authorization or persistence.
