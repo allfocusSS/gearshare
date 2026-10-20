@@ -82,3 +82,9 @@ The fresh independent check at `3613944f2d76ce2234ff2d0efa11e53fbe472f73` subseq
 - Independent QA passed/closed #27, then found the actual #28 async recovery defect and failed #5 on published `e4b4593f5d3235bf0f87a9ff8158fe77097d3a33`. Read the actual issue, PM chosen unavailable-until-read recovery and pre-fix R01–R08 before implementing the correction.
 - Retained command-confirmed Booking/history separately from the untrusted staff desk, withheld queues/counts/derived custody-overdue and dependent actions, and kept a persistent accessible saved-command/read-failure alert with guarded read-only retry and meaningful Back/refresh focus.
 - Standard engineer checks pass (41 tests, typecheck, build). Focused and surrounding browser checks remain pending at this checkpoint; see evidence.md for actual outcomes and limits. Source scope is CoordinatorPage only. #28/#5 stay open for independent QA; no #6/OpenAPI, backend, persistence or version work started.
+
+## 2026-10-20 — #28 completed engineer verification
+
+- The combined source/test checkpoint local `e7cab7c10c436e39983535588b6a63d5c00fe519` was published as canonical `2947e1232e1d619005ebcc6c0838c8ac8a0bb549`, identical tree `1bd5406797ccb816dada68fd0e15148426fbeda5`, before final verification. QA's handed-off focused runner is included unchanged.
+- On that unchanged canonical commit, engineer checks completed: 41 unit tests, typecheck/build, #28 focused 635/635, full staff 8/8, auth 26/26, catalogue 28/28, bookings suite and #27 labels 448/448, all exit 0. Both-width recovery/desk screenshots were inspected. Exact commands, environment, result paths and limits are in evidence.md.
+- No additional source/harness correction or new runtime defect was needed. This handoff changes evidence/iterations only. #28 and #5 remain open for fresh independent QA; #27 is already independently closed, and #6/OpenAPI plus all backend/storage/version stages remain gated.

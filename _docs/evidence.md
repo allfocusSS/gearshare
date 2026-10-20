@@ -249,4 +249,30 @@ This working checkpoint changes CoordinatorPage only: a command result confirms 
 
 Engineer environment: Node 24.19.0, npm 11.9.0. Actually executed from `frontend/`: `npm run typecheck`, `npm test` (41 passed, 0 failed) and `npm run build` (33 modules); all exited 0. This record is the source checkpoint, before focused/surrounding browser verification. Browser results and the exact tested SHA will be recorded in the final handoff. #28 and #5 remain open; #6 remains gated.
 
-The source/docs checkpoint is local `b9e6b1f1401c9fadbb6a162d0af87dfb74202add`, tree `45ea1e1f3a56aa9666782f966d7b827ba497fdf1`. Independent QA then handed off `frontend/tests/qa28.browser.mjs` unchanged (SHA-256 `af02b7f4b0702af98d988852f1933ea15b5db83e5aa5f2f5c4e98f9b926ddd9a`). QA's [isolated old-candidate baseline](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6288011243) exercised all six commands at both widths: 635 assertions, 505 successful and 130 expected recovery failures, with no console/page/request/API errors. This baseline belongs to QA and predates correction verification; the engineer has not claimed it as a corrected result.
+The combined source/test checkpoint is local `e7cab7c10c436e39983535588b6a63d5c00fe519`, published as `2947e1232e1d619005ebcc6c0838c8ac8a0bb549`, identical tree `1bd5406797ccb816dada68fd0e15148426fbeda5`. It includes the independently handed-off `frontend/tests/qa28.browser.mjs` unchanged (SHA-256 `af02b7f4b0702af98d988852f1933ea15b5db83e5aa5f2f5c4e98f9b926ddd9a`). QA's [isolated old-candidate baseline](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6288011243) exercised all six commands at both widths: 635 assertions, 505 successful and 130 expected recovery failures, with no console/page/request/API errors. This baseline belongs to QA and predates correction verification; the engineer has not claimed it as a corrected result.
+
+## #28 completed engineer checks and independent-QA handoff (2026-10-20 UTC)
+
+All commands below actually ran against clean canonical `2947e1232e1d619005ebcc6c0838c8ac8a0bb549`, tree `1bd5406797ccb816dada68fd0e15148426fbeda5`. HEAD and tracked source remained unchanged throughout every check. The final handoff commit changes only this evidence and the iteration log, preserving that exact tested application and regression source.
+
+Environment: Linux x86_64, Node 24.19.0, npm 11.9.0, locked Playwright 1.62.1, Chromium 153.0.8010.0. Commands ran from `frontend/`. Every browser command used `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/workspace/scratch/e3fbdcf9622e/browser-tools/extracted/chromium`; fixed browser Date was `2026-10-19T06:00:00Z` with real async timers. Each runner started/stopped its own Vite/browser in one process; no more than two distinct-port browser suites ran concurrently. No backend ran.
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | Exit 0; 41 passed, 0 failed |
+| `npm run typecheck` | Exit 0 |
+| `npm run build` | Exit 0; 33 modules |
+| `node tests/qa28.browser.mjs` | Exit 0; 635/635 assertions, 0 failures; port 5194 |
+| `npm run test:browser:staff` | Exit 0; all 8 full staff/inventory groups; port 5182 |
+| `npm run test:browser` | Exit 0; all 26 auth/focus/role checks; port 5178 |
+| `npm run test:browser:catalogue` | Exit 0; all 28 catalogue/date/privacy checks; port 5179 |
+| `npm run test:browser:bookings` | Exit 0; request/history/cancellation/conflict/privacy and 390/1440 checks; port 5181 |
+| `npm run test:browser:labels` | Exit 0; 448/448 naming/clipping/keyboard assertions, 0 failures; port 5191 |
+
+The focused #28 run exercises approve, reject, pending cancellation, approved cancellation, same-day checkout and overdue return at both 1440 and 390 px. Each scenario first rejects the command without committing, retains entered notes and unchanged history, then explicitly resubmits once. After the real successful command, held/failed desk reads keep truthful pending/saved feedback, withhold untrusted queues/counts/custody and prevent another command. Keyboard Back preserves the unresolved alert and focuses the surviving Refresh control. Rapid delayed read-only retry, repeated failure and final successful read preserve the exact committed Booking/events/trimmed note and restore all queue rows, counts and related bookings' custody/overdue indicators from one snapshot. Full staff checks retain the normal lending/inventory/maintenance/permissions flows and condition-field validation/focus.
+
+Focused #28 `test-results/qa28-after/results.json` records the tested canonical SHA and timestamp `2026-10-20T15:06:46.264Z`; staff and #27 label result files record the same SHA. Their console/page errors and failed-request arrays are empty, and the #28/staff/auth/catalogue checks report no backend/API calls. No source or harness edits were required, and no additional actual runtime defect was observed. Raw stdout logs are in ignored `test-results/engineer28/`; generated screenshots/results remain transient diagnostics rather than published attachments.
+
+Engineer visually inspected `qa28-after/approve-{1440,390}-unavailable.png` and `staff/desk-{1440,390}.png`. The saved-action/read-failure explanation and focused Refresh button remain readable at both widths; unavailable data is withheld and the trusted queue views retain concise action labels. All six #28 transition variants have generated both-width unavailable-state screenshots; automated checks also verify overflow and meaningful focus.
+
+These are engineer checks of the memory-only frontend, not an independent QA verdict, backend security/concurrency/persistence proof or mock-stage PASS. Request fresh independent QA of #28 and the still-open #5 on the published handoff. Only QA may close them after all criteria pass. #27 is already independently closed; #6/OpenAPI and later stages remain gated.
