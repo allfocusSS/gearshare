@@ -1,8 +1,8 @@
 # Verification evidence
 
-Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate has passing engineer functional checks; the observed visual defect [#27](https://github.com/allfocusSS/gearshare/issues/27) is open before correction. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
+Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate and the [#27](https://github.com/allfocusSS/gearshare/issues/27) visually-hidden-label correction are implemented. Standard engineer checks pass on `f89c963b8b0193d159f74742e126a966a0053bd3`; focused label regression results are recorded in evidence.md. Both issues remain open for complete independent verification. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
 
-Current application status: **independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1), [#2](https://github.com/allfocusSS/gearshare/issues/2) and [#24](https://github.com/allfocusSS/gearshare/issues/24). The [#3](https://github.com/allfocusSS/gearshare/issues/3) public mock catalogue/detail/calendar candidate awaits independent QA.** Request/staff lending and later stages remain unimplemented. Historical engineer records below retain the actual FAIL and pending states at the time; current QA gates are linked explicitly.
+Current application status: #1–4/#24–26 are independently verified and closed. The complete mock frontend now includes student and coordinator lending plus inventory. #5 and the #27 label correction await their full independent verdicts; no mock-stage gate, API/storage implementation or final submission PASS is claimed. Historical records below preserve the actual failures and pending states from their original checkpoints.
 
 ## Work actually completed
 
@@ -13,6 +13,7 @@ Current application status: **independent QA passed and closed [#1](https://gith
 - Implemented the groomed #1 bootstrap: React/TypeScript startup screen, FastAPI health endpoint, real endpoint test, public dependency locks and verified setup/run/check commands.
 - Implemented the groomed #2 shell/auth boundary after #1 QA PASS; recorded the real #24 browser defect, stopped for PM grooming and independent QA reproduction/cases, then corrected its focus lifecycle and ran the scoped regression suite. QA subsequently passed and closed both.
 - After those QA gates, implemented #3 public catalogue/filter/detail/anonymous-calendar scope and ran its dedicated tests plus the preserved auth/focus regression.
+- Implemented independently verified #4 private requests/history/cancellation and the #25 availability correction. Added #5 mock staff transitions, custody/counts/queues and inventory; observed #27 through real screenshot inspection, waited for PM/QA cases and applied its narrow visually-hidden utility correction.
 
 Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 unique MVP draft IDs, 3 unique post-MVP draft IDs; all relative Markdown links resolve; every MVP draft contains Goal, Description, Acceptance criteria, Out of scope and Constraints. These checks verify documents only; they are not application tests.
 
@@ -21,14 +22,14 @@ Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 uniq
 | Check | Result | Command / commit / observation |
 | --- | --- | --- |
 | Bootstrap health test/build | Independent QA PASS, #1 closed | Published `a8ec9b7469b9d1e2f091bc0fdf0369be7e9ba6ad`; [actual QA evidence](https://github.com/allfocusSS/gearshare/issues/1#issuecomment-6261432589); historical engineer details below |
-| Mock frontend browser flows | #2/#24 independent QA PASS; #3 engineer checks passed, independent QA pending | Current 22 service tests, typecheck/build, 28 catalogue browser checks and 26 preserved auth/focus checks pass. Request/staff lending journeys remain unimplemented |
+| Mock frontend browser flows | #1–4/#24–26 independently verified; #5/#27 open | Pre-fix #5 app: auth 26, catalogue 28, student booking and staff 8 functional browser groups passed. Corrected f89c963: 41 unit tests/typecheck/build passed; saved focused label result has 448/448 successful assertions. Full surrounding post-fix browser verification remains for the fresh independent QA handoff |
 | OpenAPI validation | Not run | Contract must be derived in iteration 2 |
 | In-memory API tests | Not run | Backend currently exposes only health; domain/memory stage follows mock/contract gates |
 | ORM/SQLite tests | Not run | Storage implementation does not exist |
 | Concurrent requests/rollback | Not run | Deferred to actual database stage |
 | Process-restart persistence | Not run | Requires actual runnable backend |
 | Two-role browser integration | Not run | Requires implemented frontend/backend |
-| Exploratory user testing | Scoped auth testing performed | Actual validation-focus bug filed as #24 before correction; broader lending exploration remains outstanding |
+| Exploratory user testing | Mock auth/catalogue/student/staff screens exercised | Real #24/#25/#26 defects were independently verified and closed. Actual #27 screenshot defect was filed before correction; its full independent verdict and final integrated exploration remain outstanding |
 | Final CI / clean checkout | Not run | Bootstrap locks were installed into a clean source copy; independent committed-checkout QA and final CI remain separate checks |
 
 ## Iteration 0 — engineer verification for #1
@@ -141,7 +142,7 @@ Bug issue, correction commit and retest, when applicable:
 
 Remote: https://github.com/allfocusSS/gearshare.
 
-MVP issues #1–20 are published and PM-groomed. #1–4 and observed bugs #24–26 are independently verified and closed. #5 is a functional engineer candidate; observed #27 is open before correction. Post-MVP #21–23 remain deferred. No final completion count is claimed; full product/integration verification remains outstanding.
+MVP issues #1–20 are published and PM-groomed. #1–4 and observed bugs #24–26 are independently verified and closed. #5 and the implemented #27 correction remain open pending their full independent verdicts. Post-MVP #21–23 remain deferred. No final completion count is claimed; full product/integration verification remains outstanding.
 
 Do not report “0 open issues” as completion before the backlog exists. On final submission, record the actual issue counts and links for queries `is:issue is:open label:mvp` and `is:issue is:open label:user-test-bug` in the correct repository.
 
@@ -209,3 +210,33 @@ Inspecting the actual desktop screenshots found that `.sr-only` is used by row-a
 Pre-fix screenshots were generated under ignored `frontend/test-results/staff/`: `desk-1440-prefix.png`, `inventory-1440-prefix.png`, `desk-390.png` and `inventory-390.png`. These local images are transient diagnostics, not published attachments. The durable deliverables are committed test source and the precise reproduction/command evidence here and on #27. The planned correction must preserve accessible action names, table captions, focus and existing student regressions.
 
 Limits: memory-only frontend candidate, not independent QA, server authorization, backend transactions, OpenAPI, persistent storage/restart, final integration or project completion. #5 and #27 remain open; #6 cannot start before the full independent mock-stage PASS.
+
+## #27 corrected implementation and final engineer handoff (2026-10-20 UTC)
+
+The actual defect above remains preserved. Correction began after the [PM handoff](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6283355421), [independent pre-fix regression cases](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6283360947) and [adjacent-case addendum](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6283379577). The #5 functional/docs checkpoint local `b6f9f1dcaf4b3f71dadbff45617abdea00165854` was published as `d60e3225e19ff7539226d60f0266b6c6610dd3eb`, identical tree `63e06f4920f75fbdbe70ccb4ddfc1b5fac3ee3b5`, before the correction.
+
+The application change is one shared `.sr-only` CSS utility: absolute positioning, a one-pixel box, clipping/overflow containment and no normal layout contribution. Existing naming markup, visible actions, service methods and business behavior are unchanged. Captions and asset/code suffixes remain available to the accessibility tree. The QA-authored `staff-labels.qa.browser.mjs` was included unmodified after its final handoff; `staff.browser.mjs` also checks the student's hidden asset suffix geometry while retaining its descriptive accessible button name.
+
+Corrected implementation local `2bd9b263ec5dc718f0611d6636244c0ff54b4428` was published as `f89c963b8b0193d159f74742e126a966a0053bd3`, identical tree `87b7f39c81c9814d21dd5b4dc3ba66f98618cb53`. The final handoff commit containing this record changes Markdown only, so it retains the exact corrected application/test source. No issue was closed by engineering.
+
+### Checks actually rerun by the engineer on f89c963
+
+Environment: Node 24.19.0/npm 11.9.0. From repository root:
+
+| Command | Actual result |
+| --- | --- |
+| `npm test --prefix frontend` | Exit 0; 41 passed, 0 failed |
+| `npm run typecheck --prefix frontend` | Exit 0 |
+| `npm run build --prefix frontend` | Exit 0; Vite 8.3.4, 33 modules |
+
+The same pre-fix application source had also passed `node tests/qa4.browser.mjs` (four private-history/async cancellation groups) and `node tests/qa25.browser.mjs` (four controlled availability/race groups) with the Chromium override. Those runs, like the pre-fix auth/catalogue/bookings/staff runs above, do not establish a post-fix full-suite result.
+
+### Recorded focused browser result and visual inspection
+
+Reviewed the preserved focused runner output `frontend/test-results/qa27-after/results.json`: tested commit `f89c963b8b0193d159f74742e126a966a0053bd3`, timestamp `2026-10-20T04:28:52.078Z`, Chromium 153.0.8010.0, Node 24.19.0; 448 of 448 assertions successful, zero failures, console/page errors or failed requests. This is the focused execution already performed by the QA role, not a claim that the engineer repeated it or that either issue has an overall independent PASS verdict. Reproduce it from frontend with the Chromium override and `npm run test:browser:labels`; port 5191 can be changed using `GEARSHARE_LABELS_QA_PORT`.
+
+The preserved pre-fix focused record `frontend/test-results/qa27-before/results.json` tested `b6f9f1dcaf4b3f71dadbff45617abdea00165854`, whose application source matched the original reproduction: 276 of 346 assertions successful and 70 expected clipping/layout failures. The final expanded runner adds the My reservations/Space/keyboard adjacent cases. Naming/focus/overflow checks on the baseline passed; the missing clipping utility was the observed failure.
+
+Engineer visually inspected the corrected `qa27-after/desk-pending-requests-{1440,390}.png` and `inventory-{1440,390}.png` screenshots. The duplicated captions and suffixes no longer paint or crowd actions; desktop rows and mobile cards retain visible identity/status and concise labels. The focused result also records all four queue variants, inventory active/maintenance action names, computed clipping/geometry, browser accessibility snapshots, Tab/Shift+Tab/Enter/Space, visible focus/return focus and the student's Upcoming/History details at both widths. Screenshots/results remain ignored local diagnostics; committed runner source and this exact record provide reproducibility.
+
+Remaining verification is explicit: the engineer did not rerun the full staff/auth/catalogue/bookings browser suites after the CSS correction. Fresh independent QA must run the required surrounding suites and verify all #5/#27 criteria on the final published candidate before posting a full verdict and closing either issue. The complete mock-stage gate remains blocked until that succeeds; #6/OpenAPI and later stages are not started.

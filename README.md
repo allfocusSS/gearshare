@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed #1–4 and the observed bugs #24–26. The [#5](https://github.com/allfocusSS/gearshare/issues/5) mock candidate adds the complete coordinator desk and inventory workflows and awaits independent full mock-stage verification. Contract/API/persistence work remains gated; this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
+Independent QA passed and closed #1–4 and the observed bugs #24–26. The [#5](https://github.com/allfocusSS/gearshare/issues/5) mock candidate adds the complete coordinator desk and inventory workflows and awaits independent full mock-stage verification. The #27 shared label correction is implemented and awaits its full independent verdict as well. Contract/API/persistence work remains gated; this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -67,9 +67,10 @@ npm run test:browser
 npm run test:browser:catalogue
 npm run test:browser:bookings
 npm run test:browser:staff
+npm run test:browser:labels
 ```
 
-The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px. The bookings test uses port 5181. The staff test uses 5182 (`GEARSHARE_STAFF_PORT` overrides) and exercises the full two-role mock lifecycle, custody, inventory and async failures at both widths; screenshots/results are in `frontend/test-results/staff/`. The catalogue test uses port 5179 and a fixed browser date of 2026-10-19 to exercise filter/date boundaries, anonymous calendars, maintenance, empty/missing/error states and both layouts. Ignored results/screenshots are saved under `frontend/test-results/mock-auth/` and `frontend/test-results/catalogue/`; each test stops its server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
+The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px. The bookings test uses port 5181. The staff test uses 5182 (`GEARSHARE_STAFF_PORT` overrides) and exercises the full two-role mock lifecycle, custody, inventory and async failures at both widths; screenshots/results are in `frontend/test-results/staff/`. The focused labels regression uses port 5191 (`GEARSHARE_LABELS_QA_PORT` overrides), checks accessible names/clipping/keyboard at both widths and saves results/screenshots under `frontend/test-results/qa27-after/`. The catalogue test uses port 5179 and a fixed browser date of 2026-10-19 to exercise filter/date boundaries, anonymous calendars, maintenance, empty/missing/error states and both layouts. Ignored results/screenshots are saved under `frontend/test-results/mock-auth/` and `frontend/test-results/catalogue/`; each test stops its server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
 
 ## Start here
 
@@ -105,7 +106,7 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-`openapi.yml`, persistence, CI and final integrated demo evidence remain future deliverables. Staff lending is a mock candidate pending independent QA. The current frontend checks establish only mock shell/auth/catalogue/booking/availability behavior; independent QA owns each issue's acceptance and closure.
+`openapi.yml`, persistence, CI and final integrated demo evidence remain future deliverables. Staff lending is a mock candidate pending independent QA. The current frontend checks establish only mock shell/auth/catalogue/booking/availability/staff/inventory behavior; independent QA owns each issue's acceptance and closure.
 
 ### Mock student reservations (#4 verified)
 
