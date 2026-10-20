@@ -29,18 +29,30 @@ info:
       1-14 days. A one-day booking has `startDate == endDate`. The day after an inclusive end never conflicts.
     * **Timestamps** (booking events, session expiry) are timezone-aware UTC ISO-8601 instants ending in `Z`.
       They are never used as calendar dates.
-    * **Text fields marked `x-trimmed: true`** are trimmed of outer whitespace by the server first; the stated
-      pattern/length limits apply to the trimmed value, and the trimmed value is what is stored and returned.
+    * **Text fields marked `x-trimmed: true`**: the server first strips leading and trailing whitespace (the
+      ECMAScript `String.prototype.trim` set, which is what the mock does) and only then applies the stated
+      pattern/length limits; the trimmed value is what is stored and returned. So `  New_Member9  ` is a valid
+      username that registers `new_member9`. The schemas describe the **trimmed** value, which is why every
+      `example` in this file is written already trimmed and is valid exactly as written. `password` is never trimmed.
     * **Authentication**: opaque bearer token from `login`/`register`, absolute 24-hour expiry, revoked by `logout`.
       See `bearerAuth` and `_docs/api.md`.
     * **Concurrency**: private Booking snapshots carry `version`; the five booking mutations require
-      `expectedVersion`. Stale -> 409, missing/invalid -> 422, and nothing changes on any failure.
+      `expectedVersion`, a strict JSON integer. Stale -> 409, missing/invalid -> 422, and nothing changes on any failure.
     * **Evaluation order** when several rules apply (first match wins): 401 unauthenticated, 403 wrong role,
-      404 unknown or not-visible resource, 422 `expectedVersion` missing/invalid, 409 stale `expectedVersion`,
-      409 transition not allowed from the current state, 422 invalid `note`, 409 time/custody rule. Operations
+      404 unknown or not-visible resource (a non-owner student's private booking included), 422 `expectedVersion`
+      missing or not a strict integer, 409 stale `expectedVersion`, 409 transition not allowed from the current state,
+      422 invalid `note`, 409 time/custody rule. Authentication and authorization always come first, even for a
+      malformed body. A declarative body-model limit on `note` (for example a framework `min_length`) must not run
+      before the 409 checks: the note is validated by hand after the state check, as the mock does. Operations
       without a precondition validate their body (422) before looking up the asset (404) where noted.
-    * **Errors** always use the shared `Error` schema. The `code` values equal the frontend `ServiceErrorCode`
-      union; the HTTP status is the status line and is not repeated in the body.
+    * **Ids** are opaque server-generated strings of 1-100 characters. A path id the server does not know - however
+      malformed or long - is 404 `NOT_FOUND`, never 422. A body `assetId` that is missing, not a string, empty or
+      longer than 100 characters is 422 with `fields.assetId`; a well-formed `assetId` that matches no unit is 404.
+    * **Errors** always use the shared `Error` schema, for every non-2xx status including those the web framework
+      generates itself (unparseable body, unknown route, unsupported method, unexpected failure): the backend must
+      install exception handlers so that no framework default such as `{"detail": ...}` reaches a client. The `code`
+      values equal the frontend `ServiceErrorCode` union; the HTTP status is the status line and is not repeated in
+      the body. See the `default` response and `_docs/api.md`.
 servers:
   - url: http://127.0.0.1:8000
     description: Local development server (uvicorn default, see README)
@@ -74,6 +86,7 @@ paths:
               schema: {$ref: '#/components/schemas/HealthStatus'}
               examples:
                 up: {value: {status: ok}}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/auth/register:
     post:
       operationId: register
@@ -85,8 +98,9 @@ paths:
         Always creates a **student**; a coordinator can only be created by trusted server configuration, never by this
         route. Any `role`, `id` or other server-owned property in the body is ignored. The username is trimmed,
         must match `^[A-Za-z0-9_]{3,30}$`, is stored and returned **lowercase**, and is unique case-insensitively
-        (`Alice`, `ALICE` and `  alice ` are the same account). The password is 10-128 characters and is stored only
-        as a salted hash. Creation and the uniqueness check are one atomic step: two concurrent registrations of the
+        (`Alice`, `ALICE` and `  alice ` are the same account); the request example below is the already-trimmed
+        form, because every example in this file is valid exactly as written. The password is 10-128 characters and is
+        stored only as a salted hash. Creation and the uniqueness check are one atomic step: two concurrent registrations of the
         same normalized name produce exactly one account and one 409. On success a session is created and returned
         (the user is signed in). Nothing is created on any failure.
       security: []
@@ -114,6 +128,7 @@ paths:
                 taken: {$ref: '#/components/examples/UsernameTaken'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/auth/login:
     post:
       operationId: login
@@ -154,6 +169,7 @@ paths:
                 wrong: {$ref: '#/components/examples/InvalidCredentials'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/auth/logout:
     post:
       operationId: logout
@@ -171,6 +187,7 @@ paths:
         '204': {description: Session revoked. No body.}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/auth/me:
     get:
       operationId: currentUser
@@ -194,6 +211,7 @@ paths:
                 student: {value: {id: student-demo, username: maya_student, role: student}}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/assets:
     get:
       operationId: listAssets
@@ -238,6 +256,7 @@ paths:
               schema: {$ref: '#/components/schemas/CatalogueResult'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/assets/{assetId}:
     get:
       operationId: getAsset
@@ -257,6 +276,7 @@ paths:
               schema: {$ref: '#/components/schemas/Asset'}
         '404': {$ref: '#/components/responses/AssetNotFound'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/assets/{assetId}/availability:
     get:
       operationId: getAssetAvailability
@@ -281,6 +301,7 @@ paths:
               schema: {$ref: '#/components/schemas/AssetAvailability'}
         '404': {$ref: '#/components/responses/AssetNotFound'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/bookings:
     post:
       operationId: requestBooking
@@ -290,10 +311,11 @@ paths:
       summary: Request a unit for an inclusive date range
       description: |
         The owner is always the authenticated user and the new booking is always `pending` with `version` 1 and one
-        `create` event; any `userId`, `state`, `version` or `events` in the body is ignored. Validation: the date rules
-        from the API description and a trimmed `purpose` of 5-500 characters -> 422 with `fields.startDate`,
-        `fields.endDate` and/or `fields.purpose` (nothing allocated). Then the asset must exist (404) and be
-        `active` (a maintenance unit is 409 with an empty `unavailableDates`).
+        `create` event; any `userId`, `state`, `version` or `events` in the body is ignored. Validation: `assetId` must be
+        a string of 1-100 characters, then the date rules from the API description, and a trimmed `purpose` of 5-500
+        characters -> 422 with `fields.assetId`, `fields.startDate`, `fields.endDate` and/or `fields.purpose` (nothing
+        allocated). Then the asset must exist (404 for a well-formed `assetId` that matches no unit) and be `active`
+        (a maintenance unit is 409 with an empty `unavailableDates`).
 
         **Atomic allocation.** The booking, its `create` event and one reservation slot for every requested day are
         written in one transaction, rejecting the whole request if any day is already held by a pending, approved
@@ -327,8 +349,9 @@ paths:
               schema: {$ref: '#/components/schemas/Error'}
               examples:
                 datesTaken: {$ref: '#/components/examples/DatesUnavailable'}
-        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '422': {$ref: '#/components/responses/BookingRequestInvalid'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
     get:
       operationId: listBookings
       x-service-method: listBookings
@@ -351,6 +374,7 @@ paths:
                 items: {$ref: '#/components/schemas/Booking'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/bookings/{bookingId}:
     get:
       operationId: getBooking
@@ -377,6 +401,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '404': {$ref: '#/components/responses/BookingNotFound'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/bookings/{bookingId}/cancel:
     post:
       operationId: cancelBooking
@@ -413,6 +438,7 @@ paths:
         '409': {$ref: '#/components/responses/TransitionConflict'}
         '422': {$ref: '#/components/responses/VersionInvalid'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/bookings:
     get:
       operationId: listStaffBookings
@@ -438,6 +464,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/bookings/{bookingId}/approve:
     post:
       operationId: approveBooking
@@ -474,6 +501,7 @@ paths:
         '409': {$ref: '#/components/responses/TransitionConflict'}
         '422': {$ref: '#/components/responses/VersionInvalid'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/bookings/{bookingId}/reject:
     post:
       operationId: rejectBooking
@@ -510,6 +538,7 @@ paths:
         '409': {$ref: '#/components/responses/TransitionConflict'}
         '422': {$ref: '#/components/responses/NoteOrVersionInvalid'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/bookings/{bookingId}/checkout:
     post:
       operationId: checkoutBooking
@@ -549,6 +578,7 @@ paths:
         '409': {$ref: '#/components/responses/TransitionConflict'}
         '422': {$ref: '#/components/responses/NoteOrVersionInvalid'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/bookings/{bookingId}/return:
     post:
       operationId: returnBooking
@@ -585,6 +615,7 @@ paths:
         '409': {$ref: '#/components/responses/TransitionConflict'}
         '422': {$ref: '#/components/responses/NoteOrVersionInvalid'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/assets:
     get:
       operationId: listInventory
@@ -606,6 +637,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
     post:
       operationId: addAsset
       x-service-method: addAsset
@@ -639,6 +671,7 @@ paths:
         '409': {$ref: '#/components/responses/DuplicateInventoryCode'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/assets/{assetId}:
     put:
       operationId: editAsset
@@ -672,6 +705,7 @@ paths:
         '409': {$ref: '#/components/responses/DuplicateInventoryCode'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
   /api/v1/staff/assets/{assetId}/state:
     put:
       operationId: setAssetState
@@ -720,6 +754,7 @@ paths:
                 blocked: {$ref: '#/components/examples/MaintenanceBlocked'}
         '422': {$ref: '#/components/responses/ValidationFailed'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        default: {$ref: '#/components/responses/UnexpectedError'}
 components:
   securitySchemes:
     bearerAuth:
@@ -738,18 +773,21 @@ components:
     WWWAuthenticate:
       description: Challenge accompanying a 401.
       schema: {type: string, examples: ['Bearer']}
+    Allow:
+      description: Methods the route supports, sent with a 405.
+      schema: {type: string, examples: ['GET, HEAD']}
   parameters:
     AssetId:
       name: assetId
       in: path
       required: true
-      description: Opaque identifier of one physical unit.
+      description: Opaque identifier of one physical unit. An id the server does not know - including an over-long (more than 100 characters) or otherwise malformed one - is 404 `NOT_FOUND`, never 422.
       schema: {$ref: '#/components/schemas/Id'}
     BookingId:
       name: bookingId
       in: path
       required: true
-      description: Opaque identifier of one booking.
+      description: Opaque identifier of one booking. An id the server does not know - including an over-long (more than 100 characters) or otherwise malformed one - is the same 404 `NOT_FOUND` as a booking the caller may not see, never 422.
       schema: {$ref: '#/components/schemas/Id'}
   responses:
     Unauthenticated:
@@ -769,7 +807,10 @@ components:
           examples:
             student: {$ref: '#/components/examples/Forbidden'}
     AssetNotFound:
-      description: No asset has this id, or (for `requestBooking`) the requested `assetId` is unknown (`NOT_FOUND`).
+      description: |
+        `NOT_FOUND`: a path id that no unit has, however malformed or long, or - for `requestBooking` - a well-formed
+        `assetId` in the body that matches no unit. A body `assetId` that is missing, not a string, empty or longer than
+        100 characters is 422 `fields.assetId` instead.
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
@@ -777,8 +818,9 @@ components:
             missing: {$ref: '#/components/examples/AssetNotFound'}
     BookingNotFound:
       description: |
-        No such booking **or** the booking belongs to someone else and the caller is a student (`NOT_FOUND`). The two
-        cases are indistinguishable (same status, code and message) so private records are never confirmed to exist.
+        No such booking (a malformed or over-long id included) **or** the booking belongs to someone else and the
+        caller is a student (`NOT_FOUND`). The cases are indistinguishable (same status, code and message) so private
+        records are never confirmed to exist.
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
@@ -797,14 +839,14 @@ components:
             stale: {$ref: '#/components/examples/StaleVersion'}
             illegal: {$ref: '#/components/examples/IllegalTransition'}
     VersionInvalid:
-      description: '`VALIDATION_ERROR`: `expectedVersion` is missing or is not an integer from 1 to 2147483647 (`fields.expectedVersion`). Nothing changed.'
+      description: '`VALIDATION_ERROR`: `expectedVersion` is missing or is not a strict JSON integer from 1 to 2147483647 (`fields.expectedVersion`); booleans, strings, `null`, arrays, objects and fractional or exponent numbers are all invalid. Nothing changed.'
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
           examples:
             missing: {$ref: '#/components/examples/VersionMissing'}
     NoteOrVersionInvalid:
-      description: '`VALIDATION_ERROR`: `expectedVersion` missing/invalid (`fields.expectedVersion`) or the trimmed `note` is not 3-500 characters (`fields.note`). Nothing changed.'
+      description: '`VALIDATION_ERROR`: `expectedVersion` missing/invalid (`fields.expectedVersion`, checked first) or, only when the version and the state allow the action, the trimmed `note` is missing, not a string or not 3-500 characters (`fields.note`). Nothing changed.'
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
@@ -812,12 +854,20 @@ components:
             note: {$ref: '#/components/examples/NoteInvalid'}
             version: {$ref: '#/components/examples/VersionMissing'}
     ValidationFailed:
-      description: '`VALIDATION_ERROR`: the request is syntactically valid JSON but breaks a documented rule; `fields` names each offending field. Nothing was created or changed.'
+      description: '`VALIDATION_ERROR`: the request breaks a documented rule; `fields` names each offending query parameter or body property. A body that is not parseable JSON, not a JSON object or not sent as `application/json` is the same 422 without `fields`. Nothing was created or changed.'
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
           examples:
             dates: {$ref: '#/components/examples/ValidationDates'}
+    BookingRequestInvalid:
+      description: '`VALIDATION_ERROR` for `requestBooking`: `fields.assetId` (missing, not a string, empty or over 100 characters), `fields.startDate`, `fields.endDate` and `fields.purpose` are all reported in one answer; a body that is not a JSON object is the same 422 without `fields`. Nothing was allocated.'
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            dates: {$ref: '#/components/examples/ValidationDates'}
+            assetId: {$ref: '#/components/examples/ValidationAssetId'}
     DuplicateInventoryCode:
       description: '`CONFLICT` with `fields.inventoryCode`: another unit already uses this code (case-insensitive, after trimming and uppercasing). No unit was created or changed.'
       content:
@@ -832,6 +882,26 @@ components:
           schema: {$ref: '#/components/schemas/Error'}
           examples:
             down: {$ref: '#/components/examples/Unavailable'}
+    UnexpectedError:
+      description: |
+        Any other non-2xx answer - generated by the web framework or by an unexpected failure instead of by a documented
+        rule - still has the `Error` shape. The backend registers exception handlers for framework validation errors,
+        HTTP errors and unhandled exceptions, so no framework default body (`{"detail": ...}`) ever leaves the service:
+        an unknown route is 404 `NOT_FOUND`; a known route with an unsupported method is 405 `NOT_FOUND` with an `Allow`
+        header; a body that is not parseable JSON, not a JSON object or not `application/json` is 422 `VALIDATION_ERROR`
+        without `fields` (after the 401/403 checks); a query parameter or body property the framework rejects is 422
+        `VALIDATION_ERROR` whose `fields` are keyed by the contract property name; an unhandled exception is 500
+        `SERVICE_UNAVAILABLE` with a generic message - never a stack trace, SQL, file path or other internals - and a
+        rolled-back transaction, so nothing changed.
+      headers:
+        Allow: {$ref: '#/components/headers/Allow'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            unknownRoute: {$ref: '#/components/examples/RouteNotFound'}
+            malformedBody: {$ref: '#/components/examples/MalformedBody'}
+            unexpected: {$ref: '#/components/examples/UnexpectedFailure'}
   schemas:
     HealthStatus:
       type: object
@@ -896,8 +966,9 @@ components:
         - CONFLICT
       description: |
         Equals the frontend `ServiceErrorCode`. Status mapping: 422 `VALIDATION_ERROR`; 401 `UNAUTHENTICATED` or
-        `INVALID_CREDENTIALS`; 403 `FORBIDDEN`; 404 `NOT_FOUND`; 409 `CONFLICT` or `USERNAME_TAKEN`; 503
-        `SERVICE_UNAVAILABLE`.
+        `INVALID_CREDENTIALS`; 403 `FORBIDDEN`; 404 `NOT_FOUND` (405 `NOT_FOUND` only for an unsupported method);
+        409 `CONFLICT` or `USERNAME_TAKEN`; 503 `SERVICE_UNAVAILABLE` (500 `SERVICE_UNAVAILABLE` only for an unhandled
+        exception).
     User:
       type: object
       description: Public user. Never carries a password, password hash or token material.
@@ -1024,7 +1095,42 @@ components:
           items: {$ref: '#/components/schemas/AvailabilityDay'}
     BookingEvent:
       type: object
-      description: Immutable audit record. One is written by the creation and by every successful transition.
+      description: |
+        Immutable audit record. One is written by the creation and by every successful transition, in the same
+        transaction as the state change. `id` is opaque and unique (the mock happens to use `<bookingId>-<action>`,
+        which is not contractual); `actorId` is the authenticated caller; `timestamp` is the server's UTC commit time.
+        The per-action actor, states and note are pinned in `x-events`.
+      x-events:
+        - action: create
+          actor: owner
+          priorState: null
+          newState: pending
+          note: the trimmed purpose
+        - action: approve
+          actor: coordinator
+          priorState: pending
+          newState: approved
+          note: Reservation approved.
+        - action: reject
+          actor: coordinator
+          priorState: pending
+          newState: rejected
+          note: the trimmed rejection reason
+        - action: cancel
+          actor: owner-or-coordinator
+          priorState: the state before cancelling (pending or approved)
+          newState: cancelled
+          note: Reservation cancelled; reserved dates released.
+        - action: checkout
+          actor: coordinator
+          priorState: approved
+          newState: checked_out
+          note: the trimmed outgoing condition
+        - action: return
+          actor: coordinator
+          priorState: checked_out
+          newState: returned
+          note: the trimmed incoming condition
       required: [id, bookingId, actorId, action, priorState, newState, timestamp, note]
       properties:
         id: {$ref: '#/components/schemas/Id'}
@@ -1042,7 +1148,7 @@ components:
           type: string
           minLength: 3
           maxLength: 500
-          description: Purpose (create), the trimmed condition/reason (reject, checkout, return) or a fixed system sentence (approve, cancel).
+          description: 'Purpose (create), the trimmed condition or reason (reject, checkout, return) or a fixed system sentence: exactly `Reservation approved.` (approve) or `Reservation cancelled; reserved dates released.` (cancel).'
     Booking:
       type: object
       description: |
@@ -1076,7 +1182,9 @@ components:
       description: Create-booking body. The owner is the authenticated user; the state is always `pending`.
       required: [assetId, startDate, endDate, purpose]
       properties:
-        assetId: {$ref: '#/components/schemas/Id'}
+        assetId:
+          $ref: '#/components/schemas/Id'
+          description: 'The unit to reserve. Missing, not a string, empty or longer than 100 characters is 422 `fields.assetId`; a well-formed id that matches no unit is 404.'
         startDate: {$ref: '#/components/schemas/CalendarDate'}
         endDate: {$ref: '#/components/schemas/CalendarDate'}
         purpose: {type: string, minLength: 5, maxLength: 500, x-trimmed: true}
@@ -1091,12 +1199,18 @@ components:
           minimum: 1
           maximum: 2147483647
           description: |
-            The `version` of the exact Booking snapshot the user acted on. Missing or outside 1-2147483647 (or not
-            an integer) is 422; any other value that differs from the stored version is 409. The server never
-            substitutes the current version and the client never retries a stale request on its own.
+            The `version` of the exact Booking snapshot the user acted on. It must be a strict JSON integer literal
+            from 1 to 2147483647. Missing, outside that range, `null`, a boolean (`true`), a string (even `"2"`), an
+            array, an object or a number written with a fraction or exponent (`2.5`, `2.0`, `2e0`) is 422
+            `fields.expectedVersion` - a server must not coerce these (a lax integer field would accept `true` and
+            `"2"`). Any valid integer that differs from the stored version is 409. The server never substitutes the
+            current version and the client never retries a stale request on its own.
     BookingTransitionInput:
       type: object
-      description: Body of reject, checkout and return.
+      description: |
+        Body of reject, checkout and return. The `note` limits must not be enforced declaratively by the body model:
+        `expectedVersion` shape (422), the stale-version and state checks (409) all come first, and the trimmed note
+        (3-500 characters; a missing or non-string `note` counts as invalid) is checked by hand after them.
       required: [expectedVersion, note]
       properties:
         expectedVersion:
@@ -1110,7 +1224,7 @@ components:
           minLength: 3
           maxLength: 500
           x-trimmed: true
-          description: Rejection reason (reject), outgoing condition (checkout) or incoming condition (return).
+          description: Rejection reason (reject), outgoing condition (checkout) or incoming condition (return). Validated after the version and state checks, so a stale or impossible request is 409 even when the note is also invalid.
     StaffBooking:
       type: object
       description: A private booking plus coordinator-only desk context. The borrower's username is never exposed outside staff routes.
@@ -1149,15 +1263,26 @@ components:
         timeZone: {type: string, const: Asia/Almaty}
         counts:
           type: object
+          description: Desk totals computed from the same snapshot and the same `today` as `bookings`.
           required: [pending, dueToday, overdue]
           properties:
-            pending: {type: integer, minimum: 0}
-            dueToday: {type: integer, minimum: 0}
-            overdue: {type: integer, minimum: 0}
+            pending:
+              type: integer
+              minimum: 0
+              description: Number of bookings whose state is `pending`, from every user and regardless of their dates (a pending request whose end date has passed still counts until it is rejected or cancelled).
+            dueToday:
+              type: integer
+              minimum: 0
+              description: Number of `checked_out` bookings whose `endDate` equals today in `Asia/Almaty`.
+            overdue:
+              type: integer
+              minimum: 0
+              description: Number of `checked_out` bookings whose `endDate` is before today in `Asia/Almaty`; equals the number of bookings with `overdue` true.
     FieldErrors:
       type: object
-      description: Per-field messages. Keys equal the offending request properties (the union of the frontend `ServiceError.fields` keys).
+      description: Per-field messages. Keys equal the offending query parameter or body property names (the union of the frontend `ServiceError.fields` keys).
       properties:
+        assetId: {type: string}
         username: {type: string}
         password: {type: string}
         startDate: {type: string}
@@ -1175,8 +1300,9 @@ components:
     Error:
       type: object
       description: |
-        The only error body. It never contains borrower names, purposes, booking ids or other private data of other
-        users. The HTTP status line carries the status; the frontend adapter copies it into `ServiceError.status`.
+        The only error body, for every non-2xx status: documented rules and framework-generated or unexpected failures
+        alike. It never contains borrower names, purposes, booking ids, stack traces or other private or internal data.
+        The HTTP status line carries the status; the frontend adapter copies it into `ServiceError.status`.
       required: [code, message]
       properties:
         code: {$ref: '#/components/schemas/ErrorCode'}
@@ -1247,3 +1373,21 @@ components:
       value: {code: CONFLICT, message: Maintenance is blocked by an active loan or pending/approved reservation ending today or later. Record active returns and reject or cancel unresolved reservations at the coordinator desk first.}
     Unavailable:
       value: {code: SERVICE_UNAVAILABLE, message: The service is unavailable. Try again.}
+    ValidationAssetId:
+      value:
+        code: VALIDATION_ERROR
+        message: Check the highlighted request fields.
+        fields:
+          assetId: Choose the equipment to reserve.
+    RouteNotFound:
+      value:
+        code: NOT_FOUND
+        message: This resource could not be found.
+    MalformedBody:
+      value:
+        code: VALIDATION_ERROR
+        message: The request body must be a JSON object.
+    UnexpectedFailure:
+      value:
+        code: SERVICE_UNAVAILABLE
+        message: Something went wrong on our side. Try again.

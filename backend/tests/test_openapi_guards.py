@@ -300,7 +300,7 @@ def test_known_flow_mapping_descriptions_are_not_truncated(document: dict[str, A
     assert schemas["AssetInput"]["properties"]["description"]["description"] == "Required but may be empty."
     assert schemas["Asset"]["properties"]["description"]["description"] == "May be empty."
     assert schemas["StaffBooking"]["properties"]["borrower"]["description"] == "The owner's username."
-    assert document["components"]["headers"]["WWWAuthenticate"]["schema"]["examples"] == ["Bearer"]
+    assert document["components"]["headers"]["Allow"]["schema"]["examples"] == ["GET, HEAD"]
 
 
 def test_every_example_in_the_document_is_valid_exactly_as_written(document: dict[str, Any]) -> None:

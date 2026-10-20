@@ -4,7 +4,7 @@ Companion to the versioned contract [`openapi.yml`](../openapi.yml) (OpenAPI 3.1
 
 ## Service method to HTTP operation
 
-All business routes live under `/api/v1`. Every operation in `openapi.yml` carries `x-service-method` (the exact `GearShareService` method, also its `operationId`) and `x-access`. `GET /health` is infrastructure and has no service method. Success statuses are in the third column; every operation can also answer `503`.
+All business routes live under `/api/v1`. Every operation in `openapi.yml` carries `x-service-method` (the exact `GearShareService` method, also its `operationId`) and `x-access`. `GET /health` is infrastructure and has no service method. Success statuses are in the fourth column; every operation can also answer `503` and carries a `default` response for framework-generated and unexpected failures (404 unknown route, 405, a body that is not JSON, 500), all in the `Error` shape.
 
 | Service method | HTTP operation | Access | Success | Error statuses |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,9 @@ Request and response schemas are the `components.schemas` entries named in the t
 ## Conventions
 
 * JSON bodies (`application/json`). Identifiers are opaque server-generated strings. **Unknown request properties are ignored, never trusted:** a `role`, `id`, `userId`, `ownerId`, `actorId`, `state`, `version`, `events` or timestamp in any body cannot set identity, ownership, status, version or audit data. Registration therefore always creates a student, and a created booking is always `pending`, version 1, owned by the caller.
-* **Text trimming.** Properties marked `x-trimmed: true` are trimmed of outer whitespace by the server first. The pattern and length limits below apply to the trimmed value, and the trimmed value is what is stored and returned. (JSON Schema cannot express "trim then check", so schema validators must trim these fields before validating a request.)
+* **Text trimming (`x-trimmed: true`).** The server strips leading and trailing whitespace **first** and only then applies the pattern and length limits; the trimmed value is what is stored and returned. So `"  New_Member9  "` is a valid username and registers `new_member9`. JSON Schema cannot express "trim, then check", therefore the schemas and every `example` in `openapi.yml` describe the **trimmed** value and are valid exactly as written (a linter, mock server or schema-validating client must never see an example that its own schema rejects); a schema validator run against a raw request must trim the `x-trimmed` fields first. `password` is never trimmed. "Whitespace" is the set removed by ECMAScript `String.prototype.trim`, which is what the mock uses: tab, line feed, vertical tab, form feed, carriage return, space, U+00A0, U+FEFF, U+2028, U+2029 and every Unicode space separator (category `Zs`). Python's `str.strip()` differs in exactly two ways (it also strips U+001C-U+001F and U+0085 and does not strip U+FEFF), so a Python backend uses an explicit character set instead of `strip()` with no arguments.
+* **Ids.** Identifiers are opaque server-generated strings of 1-100 characters (`Id`). A **path** id the server does not know - including one longer than 100 characters or otherwise malformed - is **404 `NOT_FOUND`**, never 422; the length limits describe ids the server issues and are not enforced as a validation rule on path parameters. For a booking id the 404 is byte-identical to the one a student gets for somebody else's booking. A **body** `assetId` (`requestBooking`) that is missing, not a string, empty or longer than 100 characters is **422 `VALIDATION_ERROR` with `fields.assetId`**, reported together with the other offending fields; a well-formed `assetId` that matches no unit is 404, checked after field validation. `userId`, `ownerId` and similar keys in a body are ignored, never validated.
+* **`expectedVersion` is a strict integer.** It must be a JSON integer literal from 1 to 2147483647. Missing, `null`, booleans, strings (even `"2"`), arrays, objects, fractions (`2.5`) and numbers written with a fraction or exponent (`2.0`, `2e0`) are 422 `fields.expectedVersion`; the server must not coerce them (a default lax integer field accepts `true` and `"2"`, so use a strict integer type). The mock cannot see the `2.0` case because `JSON.parse` erases it, and the SPA's `JSON.stringify` never produces it.
 * **Order of results.** `listBookings`, `listStaffBookings.bookings` and `listInventory` use stable creation order, oldest first; clients group and sort for display. `Booking.events` is chronological.
 
 ### Frozen validation limits
@@ -70,23 +72,39 @@ Request and response schemas are the `components.schemas` entries named in the t
 
 ## Errors
 
-Every error uses the shared `Error` schema: `{ code, message, unavailableDates?, fields? }`. `code` is exactly the frontend `ServiceErrorCode` union; the HTTP status is carried by the status line, and the adapter copies it into `ServiceError.status`. `message` is safe to show. Errors never contain another user's name, purpose, booking id or other private data.
+Every non-2xx response uses the shared `Error` schema: `{ code, message, unavailableDates?, fields? }`. That includes the responses the web framework would otherwise write itself (see [Framework-generated and unexpected errors](#framework-generated-and-unexpected-errors)); each operation documents them with a `default` response. `code` is exactly the frontend `ServiceErrorCode` union; the HTTP status is carried by the status line, and the adapter copies it into `ServiceError.status`. `message` is safe to show. Errors never contain another user's name, purpose, booking id, stack trace or other private or internal data.
 
 | HTTP status | `code` | Meaning |
 | --- | --- | --- |
 | 401 | `UNAUTHENTICATED` | No valid session (also the response of `currentUser`/`logout` without one) |
 | 401 | `INVALID_CREDENTIALS` | Wrong username or password at `login` |
 | 403 | `FORBIDDEN` | Valid session, role is not a coordinator |
-| 404 | `NOT_FOUND` | Unknown asset, or an unknown/not-visible booking |
+| 404 | `NOT_FOUND` | Unknown asset, or an unknown/not-visible booking (any unknown path id, however malformed); also an unknown route |
+| 405 | `NOT_FOUND` | Known route, unsupported method (with an `Allow` header) |
 | 409 | `CONFLICT` | Date conflict, stale `expectedVersion`, transition not allowed, time/custody rule, duplicate inventory code, maintenance blocked |
 | 409 | `USERNAME_TAKEN` | Normalized duplicate username at `register` |
 | 422 | `VALIDATION_ERROR` | A documented field rule failed; `fields` names each field |
+| 500 | `SERVICE_UNAVAILABLE` | Unhandled exception: generic message, no internals, transaction rolled back |
 | 503 | `SERVICE_UNAVAILABLE` | The service cannot answer (also used by the frontend for network failures) |
 
-* `fields` keys are the offending request properties: `username`, `password`, `startDate`, `endDate`, `category`, `purpose`, `note`, `name`, `inventoryCode`, `location`, `description`, `state`, `expectedVersion`.
+* `fields` keys are the offending query parameter or body property names: `username`, `password`, `assetId`, `startDate`, `endDate`, `category`, `purpose`, `note`, `name`, `inventoryCode`, `location`, `description`, `state`, `expectedVersion` (the same set as `ServiceError.fields` in `types.ts`; `assetId` was added in the #6 correction). A 422 caused by the request envelope (below) has no `fields`.
 * `unavailableDates` appears only on the `requestBooking` 409: the requested days already held by a pending, approved or checked-out booking of that unit, ascending, with no identities. It is an empty array when the conflict is that the unit is in maintenance.
 * A **stale-version** 409 carries `fields.expectedVersion`; an ordinary invalid-transition or business-rule 409 carries no `fields`, so clients can tell "someone changed this" from "this action is not possible".
 * A failed request changes nothing: no state, version, timestamp, event, reserved day, active loan, inventory record or session.
+
+### Framework-generated and unexpected errors
+
+The web framework (FastAPI/Starlette) answers some failures itself with a `{"detail": ...}` body, which would break the `Error` contract and the frontend's error handling. The backend (#7 onward) therefore **installs exception handlers** for the framework's request-validation error, its HTTP errors and any unhandled exception, so that these are the only possible non-2xx bodies:
+
+| Situation | Status | `code` | `fields` |
+| --- | --- | --- | --- |
+| Body is not parseable JSON, is not a JSON object, or is not sent as `application/json` | 422 | `VALIDATION_ERROR` | omitted |
+| A query parameter or body property rejected by the framework | 422 | `VALIDATION_ERROR` | keyed by the contract property name (never a framework path such as `body.note`); locations with no contract name are omitted |
+| Unknown route | 404 | `NOT_FOUND` | omitted |
+| Known route, unsupported method | 405 + `Allow` header | `NOT_FOUND` | omitted |
+| Unhandled exception | 500 | `SERVICE_UNAVAILABLE` | omitted |
+
+The 500 message is generic (never a stack trace, SQL, file path or exception text), every write is in one transaction that is rolled back, and the failure is logged server-side without credentials. The code set is deliberately unchanged: adding `METHOD_NOT_ALLOWED` or `INTERNAL_ERROR` codes would change the frontend `ServiceErrorCode` union, which this correction does not touch; 405 and 500 never occur through the SPA's adapter.
 
 ### Evaluation order
 
@@ -96,14 +114,17 @@ When more than one rule applies, the first match decides the response. This make
 | --- | --- |
 | 1 | 401 no valid session |
 | 2 | 403 wrong role (staff routes), even for an unknown id |
-| 3 | 404 unknown booking, or a booking a student does not own |
-| 4 | 422 `expectedVersion` missing or not an integer from 1 to 2147483647 |
+| 2b | 422 request envelope: the body is not parseable JSON, not a JSON object, or not `application/json` (no `fields`) |
+| 3 | 404 unknown booking (any unknown or malformed id), or a booking a student does not own |
+| 4 | 422 `expectedVersion` missing or not a strict integer from 1 to 2147483647 |
 | 5 | 409 `expectedVersion` differs from the stored version (stale) |
 | 6 | 409 the current state does not allow the action (invalid, repeated, terminal) |
-| 7 | 422 `note` invalid (reject, checkout, return) |
+| 7 | 422 `note` invalid (reject, checkout, return): missing, not a string, or not 3-500 characters after trimming |
 | 8 | 409 time or custody rule (approve after the end date, checkout outside the booked days, unit still on loan) |
 
-Other operations: `requestBooking` is 401, then 422 (dates, purpose), then 404 (unknown asset), then 409 (maintenance, then day conflicts). `addAsset` is 401, 403, 422, 409. `editAsset` and `setAssetState` are 401, 403, 404, then 422, then 409. `login` is 422 before credentials are checked.
+Authentication and authorization come first even for a malformed body. **A declarative limit on `note` in the request model must not pre-empt steps 5 and 6**: a stale or impossible request with an invalid note is 409 (the QA-passed mock checks the state before the note), so `note` is validated by hand at step 7, and the body model accepts any value for it. The same goes for `expectedVersion`: the model must not reject it before steps 2 (403) and 3 (404) have run. The version, state and rule checks (steps 5-8) and the commit are one atomic unit (see [Concurrency](#concurrency-and-atomic-outcomes)).
+
+Other operations (the request-envelope 422 of step 2b comes right after 401/403 in all of them): `requestBooking` is 401, then 422 (`assetId`, dates, purpose, all reported together), then 404 (a well-formed unknown `assetId`), then 409 (maintenance, then day conflicts). `addAsset` is 401, 403, 422, 409. `editAsset` and `setAssetState` are 401, 403, 404, then 422, then 409. `login` is 422 before credentials are checked.
 
 ## Roles, ownership and privacy
 
@@ -130,7 +151,30 @@ Other operations: `requestBooking` is 401, then 422 (dates, purpose), then 404 (
 
 Every other pair is a 409 and leaves the record unchanged; `rejected`, `cancelled` and `returned` are terminal. `overdue` is derived (`checked_out` and `endDate` before today in `Asia/Almaty`), never stored. An existing overdue active loan blocks checkout of a later approved booking of the same unit even when the scheduled days do not overlap. The same table is machine-readable as `x-transitions` on the `BookingState` schema.
 
-Each `create` and every successful transition writes exactly one immutable `BookingEvent` (`id`, `bookingId`, `actorId`, `action`, `priorState` (`null` only for `create`), `newState`, UTC `timestamp`, `note`). The actor is always the authenticated caller; `note` is the purpose for `create`, the trimmed note for reject/checkout/return and a fixed system sentence for approve/cancel.
+Each `create` and every successful transition writes exactly one immutable `BookingEvent` (`id`, `bookingId`, `actorId`, `action`, `priorState` (`null` only for `create`), `newState`, UTC `timestamp`, `note`) in the same transaction as the state change. The actor is always the authenticated caller; the event `id` is opaque and unique (the mock's `<bookingId>-<action>` format is not contractual); `timestamp` is the server's UTC commit time. The exact per-action shape is pinned here and machine-readably as `x-events` on the `BookingEvent` schema:
+
+| `action` | `actorId` | `priorState` -> `newState` | `note` |
+| --- | --- | --- | --- |
+| `create` | the owner | `null` -> `pending` | the trimmed `purpose` |
+| `approve` | a coordinator | `pending` -> `approved` | exactly `Reservation approved.` |
+| `reject` | a coordinator | `pending` -> `rejected` | the trimmed rejection reason |
+| `cancel` | the owner or a coordinator | `pending` or `approved` (the state before) -> `cancelled` | exactly `Reservation cancelled; reserved dates released.` |
+| `checkout` | a coordinator | `approved` -> `checked_out` | the trimmed outgoing condition |
+| `return` | a coordinator | `checked_out` -> `returned` | the trimmed incoming condition |
+
+The two system sentences are contractual text (clients show them in the timeline), not free wording.
+
+### Staff desk counts
+
+`StaffDesk.counts` and `StaffBooking.overdue` are computed from the same snapshot as `bookings`, with `today` the `Asia/Almaty` date reported in the same response:
+
+| Field | Definition |
+| --- | --- |
+| `counts.pending` | number of bookings in state `pending`, from every user and **regardless of their dates**; a pending request whose end date has passed still counts until it is rejected or cancelled (it can no longer be approved) |
+| `counts.dueToday` | number of `checked_out` bookings whose `endDate == today` |
+| `counts.overdue` | number of `checked_out` bookings whose `endDate < today`; always equal to the number of rows with `overdue: true` |
+| `StaffBooking.overdue` | `state == checked_out` and `endDate < today` (derived, never stored); other states are never overdue |
+| `StaffBooking.currentlyOnLoan` | some booking of the same asset is `checked_out`, regardless of dates |
 
 ## Concurrency and atomic outcomes
 
@@ -143,6 +187,21 @@ Each `create` and every successful transition writes exactly one immutable `Book
 * **Maintenance.** Switching to `maintenance` is 409 (nothing changes) while the unit has a checked-out booking or any pending/approved booking with `endDate >= today`; staff first reject, cancel or return those. The maintenance switch and `requestBooking` serialize on the same asset availability state: when they race exactly one commits and the other rechecks, so a unit can never be left in maintenance with a newly committed booking. Maintenance units refuse new requests and show every day as `maintenance` publicly.
 * The memory-adapter lock (#9/#10) and database uniqueness/transactions (#11/#12) are the implementations; this contract states only the observable result. The browser mock demonstrates deterministic semantics, not server locking.
 
+## Notes for the backend stories (#7-#10) and the HTTP wiring (#13)
+
+These are consequences of the contract that a framework's defaults would get wrong; each is verified by an experiment or by the contract tests, not assumed.
+
+1. **Order versus FastAPI body validation.** A typed request-body parameter makes FastAPI validate (and decode) the body itself. Experiments with FastAPI 0.146 showed that an unauthenticated request with a body that merely has the wrong shape still gets 401 (dependencies run first), but an unauthenticated request whose body is not parseable JSON gets 422, because the JSON is decoded before dependencies run; and a declarative `note: constr(min_length=3)` turns "stale version + bad note" into 422 where the contract requires 409. So the five booking mutations (and `requestBooking`, `addAsset`, `editAsset`, `setAssetState`) take the `Request`, authenticate and authorize through dependencies, then parse the body by hand and apply the documented order. Body models, if used at all, are lenient (every field optional, `Any`) and the real checks run in the order of the [evaluation order](#evaluation-order) table.
+2. **Exception handlers.** Register handlers for `RequestValidationError`, Starlette's `HTTPException` (404, 405 and the like) and `Exception`; their bodies are `Error`, never `{"detail": ...}`. See [Framework-generated and unexpected errors](#framework-generated-and-unexpected-errors).
+3. **Trimming.** Strip `x-trimmed` fields first (see the character set above), validate the trimmed value, store and return the trimmed value, lowercase usernames, uppercase inventory codes, and never trim `password`. A model generated from the schema (`constr(pattern=...)`) drops the trimming, so do not rely on a generated model for these fields.
+4. **Strict integers.** Use a strict integer check for `expectedVersion` (`true` and `"2"` must be 422).
+5. **Ids.** Unknown path ids, however malformed, are 404 (do not declare `max_length` on path parameters); a malformed body `assetId` is 422 `fields.assetId`.
+
+### Prerequisites for the HTTP wiring (#13), outside the wire contract
+
+* **CORS or a development proxy.** The contract server is `http://127.0.0.1:8000` and the SPA's development server is `http://127.0.0.1:5173`, which are different origins, and the `Authorization` header makes every call non-simple. #13 must either allow exactly the SPA origin (methods `GET, POST, PUT, OPTIONS`, headers `Authorization, Content-Type`, no wildcard with credentials) or use a Vite development proxy so the SPA calls a same-origin `/api`. Neither exists today; the mock makes no network calls.
+* **Time-zone database.** `Asia/Almaty` is UTC+5 only with tzdata 2024a or newer (the zone moved from UTC+6 on 2024-03-01). Every rule about "today" depends on it, so the first backend story that computes the club date (#8) must add `tzdata>=2024a` to the locked backend dependencies (a slim container image has no system database) and test that `zoneinfo.ZoneInfo('Asia/Almaty')` is UTC+5 for a 2026 date; #13 re-checks it in the deployed environment.
+
 ## Frontend types and the contract
 
 `frontend/src/services/types.ts` is the single source of the DTO shapes. `openapi.yml` mirrors them field for field (names, required, nullable, enums, error codes), plus the wire-only `Session`. Differences that are intentional:
@@ -154,10 +213,11 @@ Each `create` and every successful transition writes exactly one immutable `Book
 
 ## Not in this contract
 
-Pagination, rate limiting, CORS and deployment hardening (#22), account recovery and SSO, password change, email/SMS, file uploads, waitlists (#21), QR handover (#23) and any public asset version. They are post-MVP or deployment concerns, not omissions to be guessed by implementers.
+Pagination, rate limiting, deployment hardening (#22), account recovery and SSO, password change, email/SMS, file uploads, waitlists (#21), QR handover (#23) and any public asset version. They are post-MVP or deployment concerns, not omissions to be guessed by implementers. CORS and the time-zone database are *not* post-MVP: they are prerequisites listed next.
 
 ## Verification and change control
 
-* `cd backend && uv run --locked pytest` runs `tests/test_openapi_contract.py`: the real `openapi-spec-validator` (locked dev dependency), the operation/service-method mapping, documented error statuses, schema-versus-TypeScript field comparisons, validated examples, absence of password/hash fields, and validation of every mock-generated sample.
-* `cd frontend && npm test` runs `tests/contract.test.mjs` and `tests/versioning.test.mjs`, including a check that `tests/fixtures/contract-samples.json` equals what the mock produces now.
+* `cd backend && uv run --locked pytest` runs `tests/test_openapi_contract.py`: the real `openapi-spec-validator` (locked dev dependency), the operation/service-method mapping, the status and shared-response wiring of every operation, schema-versus-TypeScript field comparisons, validated examples, absence of password/hash fields, and validation of every mock-generated sample. `tests/test_openapi_guards.py` adds YAML-authoring guards that need no external linter: no duplicate keys, no empty (implicit-null) values, no unknown schema keywords, complete descriptions, and **every** `example`/`examples` value (media types, parameters, headers, schemas) validated against its own schema exactly as written, with no implicit trimming.
+* The contract is additionally linted by hand with tools that are **not** repository dependencies: `npx --yes @redocly/cli@1.34.5 lint openapi.yml` and `npx --yes @stoplight/spectral-cli@6.14.3 lint openapi.yml --ruleset <file extending spectral:oas>`. Both must report 0 errors; the exact remaining warnings and results are in `evidence.md`.
+* `cd frontend && npm test` runs `tests/contract.test.mjs`, `tests/versioning.test.mjs` and `tests/contract-decisions.test.mjs` (ids, event shape and system notes, desk counts), including a check that `tests/fixtures/contract-samples.json` equals what the mock produces now.
 * To change the contract: edit `openapi.yml`, this file, `types.ts` and the mock together, regenerate samples with `cd frontend && node tests/contract-samples.mjs --write`, review the diff, and run both suites. Do not weaken a rule in one place only.

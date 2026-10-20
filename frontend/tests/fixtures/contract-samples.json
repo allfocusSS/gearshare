@@ -985,6 +985,34 @@
    }
   },
   {
+   "method": "getAsset",
+   "label": "over-long id is 404, not 422",
+   "request": {
+    "path": {
+     "assetId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
+   "method": "getAssetAvailability",
+   "label": "over-long id is 404, not 422",
+   "request": {
+    "path": {
+     "assetId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
    "method": "login",
    "label": "wrong password",
    "request": {
@@ -1470,6 +1498,89 @@
   },
   {
    "method": "requestBooking",
+   "label": "missing assetId",
+   "request": {
+    "body": {
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "Student club film"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted request fields.",
+    "fields": {
+     "assetId": "Choose the equipment to reserve."
+    }
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "empty assetId",
+   "request": {
+    "body": {
+     "assetId": "",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted request fields.",
+    "fields": {
+     "assetId": "Choose the equipment to reserve."
+    }
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "over-long assetId",
+   "request": {
+    "body": {
+     "assetId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted request fields.",
+    "fields": {
+     "assetId": "Choose the equipment to reserve."
+    }
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "non-string assetId",
+   "request": {
+    "body": {
+     "assetId": 7,
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted request fields.",
+    "fields": {
+     "assetId": "Choose the equipment to reserve."
+    }
+   }
+  },
+  {
+   "method": "requestBooking",
    "label": "range and purpose rules",
    "request": {
     "body": {
@@ -1783,6 +1894,20 @@
    "request": {
     "path": {
      "bookingId": "fixture-pending"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "Reservation not found or unavailable to this account."
+   }
+  },
+  {
+   "method": "getBooking",
+   "label": "over-long id is 404, not 422",
+   "request": {
+    "path": {
+     "bookingId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     }
    },
    "status": 404,
@@ -2432,6 +2557,90 @@
      "bookingId": "fixture-pending"
     },
     "body": {}
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the reservation version before continuing.",
+    "fields": {
+     "expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."
+    }
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "boolean expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": true
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the reservation version before continuing.",
+    "fields": {
+     "expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."
+    }
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "numeric string expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": "1"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the reservation version before continuing.",
+    "fields": {
+     "expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."
+    }
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "fractional expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 1.5
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the reservation version before continuing.",
+    "fields": {
+     "expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."
+    }
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "null expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": null
+    }
    },
    "schemaInvalid": true,
    "status": 422,

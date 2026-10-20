@@ -62,6 +62,10 @@ export async function buildSamples() {
   await call('getAssetAvailability', ['camera-02'], { path: { assetId: 'camera-02' } })
   await call('getAssetAvailability', ['camera-03'], { path: { assetId: 'camera-03' } }, 'maintenance unit')
   await call('getAssetAvailability', ['missing'], { path: { assetId: 'missing' } }, 'unknown id')
+  // A path id the server does not know is 404 however long or malformed; it is never a 422.
+  const overLongId = 'x'.repeat(101)
+  await call('getAsset', [overLongId], { path: { assetId: overLongId } }, 'over-long id is 404, not 422')
+  await call('getAssetAvailability', [overLongId], { path: { assetId: overLongId } }, 'over-long id is 404, not 422')
   await call('login', [{ username: 'maya_student', password: 'WrongPassword42!' }], { body: { username: 'maya_student', password: 'WrongPassword42!' } }, 'wrong password')
   await call('login', [{ username: 'ab', password: 'short' }], { body: { username: 'ab', password: 'short' } }, 'malformed input', true)
   await call('listBookings', [], {}, 'anonymous')
@@ -82,6 +86,15 @@ export async function buildSamples() {
   await call('requestBooking', [maintenance], { body: maintenance }, 'maintenance unit')
   const missing = { ...request, assetId: 'missing' }
   await call('requestBooking', [missing], { body: missing }, 'unknown asset')
+  // A malformed body assetId is a field error (422 fields.assetId); only a well-formed unknown id is 404.
+  const noAsset = { startDate: T, endDate: T, purpose: 'Student club film' }
+  await call('requestBooking', [noAsset], { body: noAsset }, 'missing assetId', true)
+  const blankAsset = { ...request, assetId: '' }
+  await call('requestBooking', [blankAsset], { body: blankAsset }, 'empty assetId', true)
+  const longAsset = { ...request, assetId: 'a'.repeat(101) }
+  await call('requestBooking', [longAsset], { body: longAsset }, 'over-long assetId', true)
+  const numericAsset = { ...request, assetId: 7 }
+  await call('requestBooking', [numericAsset], { body: numericAsset }, 'non-string assetId', true)
   const invalid = { assetId: 'accessory-03', startDate: T, endDate: addDays(T, 14), purpose: 'x' }
   await call('requestBooking', [invalid], { body: invalid }, 'range and purpose rules', true)
   await call('cancelBooking', [created.id, {}], { path: { bookingId: created.id }, body: {} }, 'missing expectedVersion', true)
@@ -106,6 +119,7 @@ export async function buildSamples() {
   await call('register', [registration], { body: registration }, 'trimmed, lowercased, role ignored')
   await call('currentUser', [], {}, 'newly registered student')
   await call('getBooking', ['fixture-pending'], { path: { bookingId: 'fixture-pending' } }, 'foreign private booking is indistinguishable from missing')
+  await call('getBooking', [overLongId], { path: { bookingId: overLongId } }, 'over-long id is 404, not 422')
   await call('cancelBooking', ['fixture-pending', { expectedVersion: 1 }], { path: { bookingId: 'fixture-pending' }, body: { expectedVersion: 1 } }, 'foreign private booking')
   const duplicate = { username: ' NEW_MEMBER9 ', password: 'ExamplePass42!' }
   await call('register', [duplicate], { body: duplicate }, 'normalized duplicate')
@@ -127,6 +141,10 @@ export async function buildSamples() {
   const unknown = { path: { bookingId: 'missing' }, body: { expectedVersion: 1 } }
   await call('approveBooking', ['missing', { expectedVersion: 1 }], unknown, 'unknown booking')
   await call('approveBooking', [pending.id, {}], { path: { bookingId: pending.id }, body: {} }, 'missing expectedVersion', true)
+  // expectedVersion must be a strict integer: booleans, strings, fractions and null are not integers.
+  for (const [label, expectedVersion] of [['boolean', true], ['numeric string', '1'], ['fractional', 1.5], ['null', null]]) {
+    await call('approveBooking', [pending.id, { expectedVersion }], { path: { bookingId: pending.id }, body: { expectedVersion } }, `${label} expectedVersion`, true)
+  }
   await call('approveBooking', [pending.id, { expectedVersion: 5 }], { path: { bookingId: pending.id }, body: { expectedVersion: 5 } }, 'stale expectedVersion')
   const approved = await call('approveBooking', [pending.id, { expectedVersion: pending.version }], { path: { bookingId: pending.id }, body: { expectedVersion: pending.version } })
   await call('approveBooking', [pending.id, { expectedVersion: approved.version }], { path: { bookingId: pending.id }, body: { expectedVersion: approved.version } }, 'repeat from the current version')

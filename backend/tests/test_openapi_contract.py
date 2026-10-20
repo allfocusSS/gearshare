@@ -37,11 +37,15 @@ EXPECTED_METHODS = {
     "requestBooking", "listBookings", "getBooking", "cancelBooking", "listStaffBookings", "approveBooking",
     "rejectBooking", "checkoutBooking", "returnBooking", "listInventory", "addAsset", "editAsset", "setAssetState",
 }
+# 405 (unsupported method) is NOT_FOUND and 500 (unhandled exception) is SERVICE_UNAVAILABLE: the code set is unchanged.
 STATUS_BY_CODE = {
     "VALIDATION_ERROR": {"422"}, "INVALID_CREDENTIALS": {"401"}, "USERNAME_TAKEN": {"409"},
-    "SERVICE_UNAVAILABLE": {"503"}, "NOT_FOUND": {"404"}, "UNAUTHENTICATED": {"401"}, "FORBIDDEN": {"403"},
+    "SERVICE_UNAVAILABLE": {"503", "500"}, "NOT_FOUND": {"404", "405"}, "UNAUTHENTICATED": {"401"}, "FORBIDDEN": {"403"},
     "CONFLICT": {"409"},
 }
+# The `default` response covers statuses that are not individually documented; each of its examples names one.
+DEFAULT_EXAMPLE_STATUS = {"unknownRoute": "404", "malformedBody": "422", "unexpected": "500"}
+
 
 
 # --------------------------------------------------------------------------- loading helpers
@@ -330,6 +334,7 @@ def test_error_statuses_are_documented_where_applicable(spec: dict[str, Any]) ->
         statuses = set(op["responses"])
         assert required[name] <= statuses, f"{name}: missing {sorted(required[name] - statuses)}"
         assert "503" in statuses, f"{name}: service-unavailable is not documented"
+        assert "default" in statuses, f"{name}: framework-generated and unexpected errors are not documented"
         # Derived rules, so a new operation cannot silently skip them.
         if op.get("security"):
             assert "401" in statuses
@@ -340,10 +345,10 @@ def test_error_statuses_are_documented_where_applicable(spec: dict[str, Any]) ->
         for status, response in op["responses"].items():
             response = resolve(spec, response)
             assert response.get("description"), f"{name} {status}: no description"
-            if status.startswith(("4", "5")):
+            if status.startswith(("4", "5")) or status == "default":
                 body = response["content"]["application/json"]["schema"]
                 assert schema_name(body) == "Error", f"{name} {status}: error bodies use the shared Error schema"
-            assert status in {"200", "201", "204", "401", "403", "404", "409", "422", "503"}
+            assert status in {"200", "201", "204", "401", "403", "404", "409", "422", "503", "default"}
 
 
 def test_private_booking_policy_is_404_not_403_and_staff_routes_are_403(spec: dict[str, Any]) -> None:
@@ -358,6 +363,75 @@ def test_private_booking_policy_is_404_not_403_and_staff_routes_are_403(spec: di
     for name, (_, _, op) in methods.items():
         if op["x-access"] == "coordinator":
             assert "403" in op["responses"]
+
+
+def test_decided_ambiguities_are_written_into_the_contract(spec: dict[str, Any]) -> None:
+    """Decisions taken for the backend stories (#7-#10) must stay in the contract text, not only in a review."""
+    def flat(text: str) -> str:  # YAML block scalars keep their line breaks; compare the wording, not the wrapping
+        return " ".join(text.split())
+
+    info = flat(spec["info"]["description"])
+    responses, schemas, params = spec["components"]["responses"], spec["components"]["schemas"], spec["components"]["parameters"]
+    # Evaluation order, in this exact sequence, with the declarative-note warning.
+    sequence = ["401 unauthenticated", "403 wrong role", "404 unknown or not-visible", "422 `expectedVersion`", "409 stale `expectedVersion`",
+                "409 transition not allowed", "422 invalid `note`", "409 time/custody rule"]
+    positions = [info.index(phrase) for phrase in sequence]
+    assert positions == sorted(positions), "evaluation order changed in info.description"
+    assert "must not run before the 409 checks" in info and "validated by hand after the state check" in info
+    assert "authentication and authorization always come first" in info.lower()
+    # Error envelope for framework-generated failures.
+    assert '`{"detail": ...}`' in info and "exception handlers" in info
+    unexpected = responses["UnexpectedError"]
+    assert schema_name(unexpected["content"]["application/json"]["schema"]) == "Error" and "Allow" in unexpected["headers"]
+    for phrase in ("exception handlers", "405", "500", "422", "404", "without `fields`", "rolled-back"):
+        assert phrase in flat(unexpected["description"]), phrase
+    # Ids: unknown path ids are 404, a malformed body assetId is 422 fields.assetId.
+    for name in ("AssetId", "BookingId"):
+        assert "404" in params[name]["description"] and "never 422" in params[name]["description"]
+    assert "assetId" in schemas["FieldErrors"]["properties"]
+    asset_id = schemas["BookingRequest"]["properties"]["assetId"]
+    assert schema_name(asset_id) == "Id" and "422 `fields.assetId`" in asset_id["description"] and "404" in asset_id["description"]
+    assert "fields.assetId" in responses["BookingRequestInvalid"]["description"]
+    assert "422 `fields.assetId`" in flat(responses["AssetNotFound"]["description"])
+    # Trimming and strict integers.
+    assert "valid exactly as written" in info and "never trimmed" in info and "ECMAScript" in info
+    version = flat(schemas["BookingPrecondition"]["properties"]["expectedVersion"]["description"])
+    assert "strict JSON integer" in version and "`true`" in version and '`"2"`' in version and "`2.0`" in version
+    assert "strict" in responses["VersionInvalid"]["description"]
+    mapping = flat(schemas["ErrorCode"]["description"])
+    assert "405" in mapping and "500" in mapping and "unsupported method" in mapping and "unhandled exception" in mapping
+    # What each shared response promises, in words (the wiring test fixes which operation uses which).
+    promises = {
+        "TransitionConflict": ("stale", "`fields.expectedVersion`", "unchanged"),
+        "Forbidden": ("coordinator", "before any resource lookup"),
+        "Unauthenticated": ("token", "`UNAUTHENTICATED`"),
+        "ValidationFailed": ("`fields`", "without `fields`"),
+        "DuplicateInventoryCode": ("`fields.inventoryCode`", "case-insensitive"),
+        "ServiceUnavailable": ("`SERVICE_UNAVAILABLE`", "retry"),
+        "VersionInvalid": ("`fields.expectedVersion`", "Nothing changed"),
+        "NoteOrVersionInvalid": ("`fields.note`", "checked first"),
+    }
+    for name, phrases in promises.items():
+        for phrase in phrases:
+            assert phrase in flat(responses[name]["description"]), f"{name}: {phrase}"
+    note = schemas["BookingTransitionInput"]
+    assert "must not be enforced declaratively" in flat(note["description"]) and "by hand" in flat(note["description"])
+    assert "409" in note["properties"]["note"]["description"]
+
+
+def test_api_notes_agree_with_the_contract_on_field_keys_and_evaluation_order(spec: dict[str, Any]) -> None:
+    doc = (ROOT / "_docs" / "api.md").read_text(encoding="utf-8")
+    line = next(line for line in doc.splitlines() if line.startswith("* `fields` keys are"))
+    listed = set(re.findall(r"`(\w+)`", line.split(":", 1)[1].split("(")[0]))
+    assert listed == set(spec["components"]["schemas"]["FieldErrors"]["properties"]), "api.md lists the FieldErrors keys"
+    section = doc.split("### Evaluation order", 1)[1].split("\n## ", 1)[0]
+    rows = re.findall(r"^\| (\d+b?) \| (.+?) \|$", section, flags=re.M)
+    assert [label for label, _ in rows] == ["1", "2", "2b", "3", "4", "5", "6", "7", "8"]
+    expected = ["401 no valid session", "403 wrong role", "422 request envelope", "404 unknown booking", "422 `expectedVersion`",
+                "409 `expectedVersion` differs", "409 the current state", "422 `note` invalid", "409 time or custody rule"]
+    for (label, text), prefix in zip(rows, expected):
+        assert text.startswith(prefix), f"api.md evaluation order row {label}"
+    assert "must not pre-empt steps 5 and 6" in section and "validated by hand at step 7" in section
 
 
 def test_booking_mutations_require_expected_version_and_document_the_precedence(spec: dict[str, Any]) -> None:
@@ -474,10 +548,80 @@ def test_frozen_field_limits_patterns_and_date_semantics(spec: dict[str, Any]) -
     info = spec["info"]["description"]
     for phrase in ("Asia/Almaty", "T + 90", "1-14 days", "inclusive", "UTC"):
         assert phrase in info, phrase
+    assert "`T <= startDate <= endDate <= T + 90 days`" in info
     # Anonymous availability exposes exactly date + state.
     assert set(s["AvailabilityDay"]["properties"]) == {"date", "state"} and set(s["AvailabilityDay"]["required"]) == {"date", "state"}
     assert set(s["AssetAvailability"]["properties"]) == {"assetId", "today", "horizonEnd", "timeZone", "days"}
     assert s["AvailabilityState"]["enum"] == ["available", "occupied", "maintenance"]
+
+
+def sample_bookings(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    for sample in samples:
+        body = sample.get("body")
+        if sample["method"] == "listStaffBookings" and sample["status"] == 200:
+            found += body["bookings"]
+        elif sample["status"] < 300 and isinstance(body, list) and body and "events" in body[0]:
+            found += body
+        elif sample["status"] < 300 and isinstance(body, dict) and "events" in body:
+            found.append(body)
+    return found
+
+
+def test_event_shape_and_system_notes_are_pinned(spec: dict[str, Any], samples: list[dict[str, Any]]) -> None:
+    event = spec["components"]["schemas"]["BookingEvent"]
+    pinned = {entry["action"]: entry for entry in event["x-events"]}
+    transitions = {t["action"]: t for t in spec["components"]["schemas"]["BookingState"]["x-transitions"]}
+    assert set(pinned) == set(spec["components"]["schemas"]["BookingAction"]["enum"]) == {"create", *transitions}
+    assert pinned["create"] == {"action": "create", "actor": "owner", "priorState": None, "newState": "pending", "note": "the trimmed purpose"}
+    for action, transition in transitions.items():
+        assert pinned[action]["newState"] == transition["to"] and pinned[action]["actor"] == transition["actor"], action
+        if len(transition["from"]) == 1:
+            assert pinned[action]["priorState"] == transition["from"][0], action
+    assert pinned["approve"]["note"] == "Reservation approved."
+    assert pinned["cancel"]["note"] == "Reservation cancelled; reserved dates released."
+    description = event["properties"]["note"]["description"]
+    assert "`Reservation approved.`" in description and "`Reservation cancelled; reserved dates released.`" in description
+    doc = (ROOT / "_docs" / "api.md").read_text(encoding="utf-8")
+    assert "exactly `Reservation approved.`" in doc and "exactly `Reservation cancelled; reserved dates released.`" in doc
+    bookings = sample_bookings(samples)
+    assert len(bookings) >= 30
+    seen = set()
+    for booking in bookings:
+        events = booking["events"]
+        assert len({e["id"] for e in events}) == len(events), "event ids are unique within a booking"
+        for index, e in enumerate(events):
+            rule = pinned[e["action"]]
+            seen.add(e["action"])
+            assert e["newState"] == rule["newState"], f"{booking['id']} {e['action']}"
+            assert e["bookingId"] == booking["id"] and e["priorState"] == (None if index == 0 else events[index - 1]["newState"])
+            if e["action"] == "create":
+                assert index == 0 and e["actorId"] == booking["userId"] and e["note"] == booking["purpose"]
+            elif e["action"] == "cancel":
+                assert e["priorState"] in {"pending", "approved"} and e["note"] == rule["note"]
+            elif e["action"] == "approve":
+                assert e["actorId"] == "coordinator-demo" and e["note"] == rule["note"]
+            else:
+                assert e["priorState"] == rule["priorState"] and e["actorId"] == "coordinator-demo"
+                assert e["note"] == e["note"].strip() and 3 <= len(e["note"]) <= 500
+        assert events[-1]["newState"] == booking["state"]
+    assert seen == set(pinned), "the samples exercise every event action"
+
+
+def test_decided_ids_and_strict_integers_are_exercised_by_the_mock_samples(samples: list[dict[str, Any]]) -> None:
+    def find(method: str, status: int, label: str) -> list[dict[str, Any]]:
+        return [s for s in samples if s["method"] == method and s["status"] == status and label in s.get("label", "")]
+
+    for label in ("missing assetId", "empty assetId", "over-long assetId", "non-string assetId"):
+        (sample,) = find("requestBooking", 422, label)
+        assert set(sample["body"]["fields"]) == {"assetId"} and sample.get("schemaInvalid"), label
+    assert find("requestBooking", 404, "unknown asset")
+    for method in ("getAsset", "getAssetAvailability", "getBooking"):
+        (sample,) = find(method, 404, "over-long id")
+        assert sample["body"]["code"] == "NOT_FOUND" and "fields" not in sample["body"]
+    for label in ("missing", "boolean", "numeric string", "fractional", "null"):
+        (sample,) = find("approveBooking", 422, f"{label} expectedVersion")
+        assert set(sample["body"]["fields"]) == {"expectedVersion"} and sample.get("schemaInvalid"), label
 
 
 def test_transition_table_matches_the_product_rules(spec: dict[str, Any]) -> None:
@@ -613,7 +757,7 @@ def test_error_schema_matches_service_error(spec: dict[str, Any], ts: str) -> No
     declared = spec["components"]["schemas"]["FieldErrors"]
     assert set(declared["properties"]) == keys
     assert declared["additionalProperties"] is False
-    assert "expectedVersion" in keys
+    assert {"expectedVersion", "assetId"} <= keys
 
 
 def test_service_signatures_carry_the_version_precondition(ts: str) -> None:
@@ -667,6 +811,10 @@ def test_error_examples_use_the_documented_status_code_mapping(spec: dict[str, A
                 for name, example in media.get("examples", {}).items():
                     value = resolve(spec, example)["value"]
                     if isinstance(value, dict) and "code" in value:
+                        if status == "default":  # not one status: each example names the status it stands for
+                            status_of_example = DEFAULT_EXAMPLE_STATUS[name]
+                            assert status_of_example in STATUS_BY_CODE[value["code"]], f"{method.upper()} {path} default example {name} uses {value['code']}"
+                            continue
                         assert status in STATUS_BY_CODE[value["code"]], f"{method.upper()} {path} {status} example {name} uses {value['code']}"
 
 

@@ -179,7 +179,9 @@ export function createMockService(options: MockOptions = {}) {
       if (!signedIn) return failure(unauthorized)
       const dateError = validateDateRange(input.startDate, input.endDate, today())
       const purpose = input.purpose.trim()
-      const fields = { ...dateError?.fields, ...(!input.startDate ? { startDate: 'Choose a start date.' } : {}), ...(!input.endDate ? { endDate: 'Choose an end date.' } : {}), ...(purpose.length < 5 || purpose.length > 500 ? { purpose: 'Use 5–500 characters describing your project.' } : {}) }
+      // Contract (openapi.yml `BookingRequest.assetId`): a missing, non-string, empty or over-long id is a field error; only a well-formed unknown id is 404.
+      const assetIdValid = typeof input.assetId === 'string' && input.assetId.length >= 1 && input.assetId.length <= 100
+      const fields = { ...dateError?.fields, ...(!assetIdValid ? { assetId: 'Choose the equipment to reserve.' } : {}), ...(!input.startDate ? { startDate: 'Choose a start date.' } : {}), ...(!input.endDate ? { endDate: 'Choose an end date.' } : {}), ...(purpose.length < 5 || purpose.length > 500 ? { purpose: 'Use 5–500 characters describing your project.' } : {}) }
       if (Object.keys(fields).length) return failure({ code: 'VALIDATION_ERROR', message: 'Check the highlighted request fields.', fields })
       const asset = assets.find(a => a.id === input.assetId)
       if (!asset) return failure(missing)

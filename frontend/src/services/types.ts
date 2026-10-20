@@ -72,7 +72,7 @@ export interface ServiceError {
   message: string
   status?: number
   unavailableDates?: string[]
-  fields?: Partial<Record<keyof Credentials | 'startDate' | 'endDate' | 'category' | 'purpose' | 'note' | 'name' | 'inventoryCode' | 'location' | 'description' | 'state' | 'expectedVersion', string>>
+  fields?: Partial<Record<keyof Credentials | 'assetId' | 'startDate' | 'endDate' | 'category' | 'purpose' | 'note' | 'name' | 'inventoryCode' | 'location' | 'description' | 'state' | 'expectedVersion', string>>
 }
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; error: ServiceError }
