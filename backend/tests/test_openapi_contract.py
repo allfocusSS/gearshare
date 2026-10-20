@@ -45,7 +45,38 @@ STATUS_BY_CODE = {
 }
 # The `default` response covers statuses that are not individually documented; each of its examples names one.
 DEFAULT_EXAMPLE_STATUS = {"unknownRoute": "404", "malformedBody": "422", "unexpected": "500"}
-
+# Non-2xx wiring of every operation: a shared `components.responses` name, or `inline:<example refs>` for a response
+# written in place. This is what stops one shared response being swapped for another (e.g. a 422 `VersionInvalid`
+# replaced by the generic `ValidationFailed`).
+ERROR_WIRING = {
+    "register": {"409": "inline:UsernameTaken", "422": "ValidationFailed"},
+    "login": {"401": "inline:InvalidCredentials", "422": "ValidationFailed"},
+    "logout": {"401": "Unauthenticated"},
+    "currentUser": {"401": "Unauthenticated"},
+    "listAssets": {"422": "ValidationFailed"},
+    "getAsset": {"404": "AssetNotFound"},
+    "getAssetAvailability": {"404": "AssetNotFound"},
+    "requestBooking": {"401": "Unauthenticated", "404": "AssetNotFound", "409": "inline:DatesUnavailable", "422": "BookingRequestInvalid"},
+    "listBookings": {"401": "Unauthenticated"},
+    "getBooking": {"401": "Unauthenticated", "404": "BookingNotFound"},
+    "cancelBooking": {"401": "Unauthenticated", "404": "BookingNotFound", "409": "TransitionConflict", "422": "VersionInvalid"},
+    "listStaffBookings": {"401": "Unauthenticated", "403": "Forbidden"},
+    "approveBooking": {"401": "Unauthenticated", "403": "Forbidden", "404": "BookingNotFound", "409": "TransitionConflict", "422": "VersionInvalid"},
+    "rejectBooking": {"401": "Unauthenticated", "403": "Forbidden", "404": "BookingNotFound", "409": "TransitionConflict", "422": "NoteOrVersionInvalid"},
+    "checkoutBooking": {"401": "Unauthenticated", "403": "Forbidden", "404": "BookingNotFound", "409": "TransitionConflict", "422": "NoteOrVersionInvalid"},
+    "returnBooking": {"401": "Unauthenticated", "403": "Forbidden", "404": "BookingNotFound", "409": "TransitionConflict", "422": "NoteOrVersionInvalid"},
+    "listInventory": {"401": "Unauthenticated", "403": "Forbidden"},
+    "addAsset": {"401": "Unauthenticated", "403": "Forbidden", "409": "DuplicateInventoryCode", "422": "ValidationFailed"},
+    "editAsset": {"401": "Unauthenticated", "403": "Forbidden", "404": "AssetNotFound", "409": "DuplicateInventoryCode", "422": "ValidationFailed"},
+    "setAssetState": {"401": "Unauthenticated", "403": "Forbidden", "404": "AssetNotFound", "409": "inline:MaintenanceBlocked", "422": "ValidationFailed"},
+}
+SUCCESS_STATUS = {
+    "register": "201", "login": "200", "logout": "204", "currentUser": "200", "listAssets": "200", "getAsset": "200",
+    "getAssetAvailability": "200", "requestBooking": "201", "listBookings": "200", "getBooking": "200",
+    "cancelBooking": "200", "listStaffBookings": "200", "approveBooking": "200", "rejectBooking": "200",
+    "checkoutBooking": "200", "returnBooking": "200", "listInventory": "200", "addAsset": "201", "editAsset": "200",
+    "setAssetState": "200",
+}
 
 
 # --------------------------------------------------------------------------- loading helpers
@@ -365,6 +396,79 @@ def test_private_booking_policy_is_404_not_403_and_staff_routes_are_403(spec: di
             assert "403" in op["responses"]
 
 
+SUCCESS_SCHEMA = {
+    "register": "Session", "login": "Session", "logout": None, "currentUser": "User", "listAssets": "CatalogueResult",
+    "getAsset": "Asset", "getAssetAvailability": "AssetAvailability", "requestBooking": "Booking", "listBookings": ["Booking"],
+    "getBooking": "Booking", "cancelBooking": "Booking", "listStaffBookings": "StaffDesk", "approveBooking": "Booking",
+    "rejectBooking": "Booking", "checkoutBooking": "Booking", "returnBooking": "Booking", "listInventory": ["Asset"],
+    "addAsset": "Asset", "editAsset": "Asset", "setAssetState": "Asset",
+}
+REQUEST_SCHEMA = {
+    "register": "Credentials", "login": "Credentials", "requestBooking": "BookingRequest", "cancelBooking": "BookingPrecondition",
+    "approveBooking": "BookingPrecondition", "rejectBooking": "BookingTransitionInput", "checkoutBooking": "BookingTransitionInput",
+    "returnBooking": "BookingTransitionInput", "addAsset": "AssetInput", "editAsset": "AssetInput", "setAssetState": "AssetStateInput",
+}
+
+
+def response_wiring(response: Any) -> str:
+    """``components.responses`` name for a shared response, else ``inline:`` plus the reusable examples it points at."""
+    if isinstance(response, dict) and "$ref" in response:
+        return str(schema_name(response))
+    examples = response.get("content", {}).get("application/json", {}).get("examples", {})
+    return "inline:" + ",".join(sorted(name for name in map(schema_name, examples.values()) if name))
+
+
+def test_every_operation_wires_exactly_the_documented_schemas_and_shared_responses(spec: dict[str, Any]) -> None:
+    methods = by_service_method(spec)
+    assert set(ERROR_WIRING) == set(SUCCESS_STATUS) == set(SUCCESS_SCHEMA) == EXPECTED_METHODS
+    for name, (path, method, op) in methods.items():
+        responses = op["responses"]
+        assert set(responses) == {SUCCESS_STATUS[name], "503", "default"} | set(ERROR_WIRING[name]), f"{name}: documented statuses"
+        assert responses["503"] == {"$ref": "#/components/responses/ServiceUnavailable"}, name
+        assert responses["default"] == {"$ref": "#/components/responses/UnexpectedError"}, name
+        for status, expected in ERROR_WIRING[name].items():
+            assert response_wiring(responses[status]) == expected, f"{name} {status}: wrong shared response"
+        success = responses[SUCCESS_STATUS[name]]
+        expected_schema = SUCCESS_SCHEMA[name]
+        if expected_schema is None:
+            assert "content" not in success, f"{name}: {SUCCESS_STATUS[name]} has no body"
+        else:
+            body = success["content"]["application/json"]["schema"]
+            if isinstance(expected_schema, list):
+                assert body["type"] == "array" and schema_name(body["items"]) == expected_schema[0], name
+            else:
+                assert schema_name(body) == expected_schema, f"{name}: success schema"
+        if name in REQUEST_SCHEMA:
+            assert op["requestBody"]["required"] is True
+            assert schema_name(op["requestBody"]["content"]["application/json"]["schema"]) == REQUEST_SCHEMA[name], name
+        else:
+            assert "requestBody" not in op, f"{name}: takes no body"
+        # Path templates and declared path parameters agree, and each is a required shared id parameter.
+        templated = set(re.findall(r"\{(\w+)\}", path))
+        declared = {resolve(spec, p)["name"]: p for p in op.get("parameters", []) if resolve(spec, p)["in"] == "path"}
+        assert set(declared) == templated, f"{name}: path parameters"
+        for param_name, param in declared.items():
+            assert schema_name(param) == {"assetId": "AssetId", "bookingId": "BookingId"}[param_name]
+            assert resolve(spec, param)["required"] is True
+            assert schema_name(resolve(spec, param)["schema"]) == "Id"
+
+
+def test_list_assets_query_parameters_match_asset_filters(spec: dict[str, Any], ts: str) -> None:
+    _, _, op = by_service_method(spec)["listAssets"]
+    params = {resolve(spec, p)["name"]: resolve(spec, p) for p in op["parameters"]}
+    filters = ts_members(ts_interfaces(ts), "AssetFilters")
+    assert set(params) == set(filters) == {"search", "category", "startDate", "endDate"}
+    assert all(optional for optional, _ in filters.values()), "every AssetFilters member is optional"
+    for name, param in params.items():
+        assert param["in"] == "query", name
+        assert param.get("required", False) is False, f"{name} must stay optional"
+    assert params["search"]["schema"]["type"] == "string"
+    assert schema_name(params["category"]["schema"]) == "Category"
+    assert schema_name(params["startDate"]["schema"]) == schema_name(params["endDate"]["schema"]) == "CalendarDate"
+    assert "requestBody" not in op
+    assert "together" in params["startDate"]["description"] and "together" in params["endDate"]["description"]
+
+
 def test_decided_ambiguities_are_written_into_the_contract(spec: dict[str, Any]) -> None:
     """Decisions taken for the backend stories (#7-#10) must stay in the contract text, not only in a review."""
     def flat(text: str) -> str:  # YAML block scalars keep their line breaks; compare the wording, not the wrapping
@@ -553,6 +657,62 @@ def test_frozen_field_limits_patterns_and_date_semantics(spec: dict[str, Any]) -
     assert set(s["AvailabilityDay"]["properties"]) == {"date", "state"} and set(s["AvailabilityDay"]["required"]) == {"date", "state"}
     assert set(s["AssetAvailability"]["properties"]) == {"assetId", "today", "horizonEnd", "timeZone", "days"}
     assert s["AvailabilityState"]["enum"] == ["available", "occupied", "maintenance"]
+
+
+def test_shared_schemas_repeat_the_frozen_limits_and_formats(spec: dict[str, Any], samples: list[dict[str, Any]]) -> None:
+    s = spec["components"]["schemas"]
+    for schema in ("Asset", "AssetInput"):
+        props = s[schema]["properties"]
+        assert (props["inventoryCode"]["minLength"], props["inventoryCode"]["maxLength"]) == (2, 30), schema
+        assert (props["name"]["minLength"], props["name"]["maxLength"]) == (2, 100), schema
+        assert (props["location"]["minLength"], props["location"]["maxLength"]) == (2, 100), schema
+        assert props["description"]["maxLength"] == 2000 and "minLength" not in props["description"], schema
+    staff = s["StaffBooking"]["properties"]
+    assert (staff["inventoryCode"]["minLength"], staff["inventoryCode"]["maxLength"]) == (2, 30)
+    assert (staff["location"]["minLength"], staff["location"]["maxLength"]) == (2, 100)
+    for schema in ("Booking", "StaffBooking"):
+        props = s[schema]["properties"]
+        assert (props["purpose"]["minLength"], props["purpose"]["maxLength"]) == (5, 500), schema
+        assert props["events"]["minItems"] == 1 and schema_name(props["events"]["items"]) == "BookingEvent", schema
+        assert (props["version"]["minimum"], props["version"]["maximum"]) == (1, 2147483647), schema
+    event_note = s["BookingEvent"]["properties"]["note"]
+    assert (event_note["minLength"], event_note["maxLength"]) == (3, 500)
+    # Wire instants and dates: the session expiry is a UTC instant and the token is long and opaque.
+    session = s["Session"]["properties"]
+    assert schema_name(session["expiresAt"]) == "UtcTimestamp"
+    assert session["token"]["type"] == "string" and session["token"]["minLength"] == 32
+    instant = s["UtcTimestamp"]
+    assert (instant["type"], instant["format"]) == ("string", "date-time") and instant["pattern"].endswith("Z$")
+    assert re.fullmatch(instant["pattern"], "2026-10-19T06:00:00.000Z") and not re.fullmatch(instant["pattern"], "2026-10-19T06:00:00+05:00")
+    assert re.fullmatch(instant["pattern"], "2026-10-19T06:00:00Z") and not re.fullmatch(instant["pattern"], "2026-10-19 06:00:00Z")
+    assert (s["CalendarDate"]["type"], s["CalendarDate"]["format"]) == ("string", "date")
+    # The `format` keywords really bite: the patterns alone accept impossible values, so only a live format checker rejects them.
+    assert {"date", "date-time"} <= set(Draft202012Validator.FORMAT_CHECKER.checkers), "format checking needs rfc3339-validator"
+    registry = Registry().with_resource(BASE, Resource.from_contents(spec, default_specification=DRAFT202012))
+    assert schema_errors(registry, {"$ref": "#/components/schemas/UtcTimestamp"}, "2026-13-45T25:61:61Z")
+    assert schema_errors(registry, {"$ref": "#/components/schemas/CalendarDate"}, "2026-02-30")
+    assert not schema_errors(registry, {"$ref": "#/components/schemas/UtcTimestamp"}, "2026-10-19T06:00:00.000Z")
+    # Desk counts are required integers with a precise meaning, and the mock's desks obey it.
+    counts = s["StaffDesk"]["properties"]["counts"]
+    assert set(counts["required"]) == set(counts["properties"]) == {"pending", "dueToday", "overdue"}
+    for prop in counts["properties"].values():
+        assert (prop["type"], prop["minimum"]) == ("integer", 0)
+    described = {key: value["description"] for key, value in counts["properties"].items()}
+    assert "regardless of their dates" in described["pending"] and "`pending`" in described["pending"]
+    assert "`checked_out`" in described["dueToday"] and "equals today" in described["dueToday"]
+    assert "`checked_out`" in described["overdue"] and "before today" in described["overdue"]
+    desks = [sample for sample in samples if sample["method"] == "listStaffBookings" and sample["status"] == 200]
+    assert desks
+    for sample in desks:
+        desk, today = sample["body"], sample["body"]["today"]
+        rows = desk["bookings"]
+        assert desk["counts"] == {
+            "pending": sum(row["state"] == "pending" for row in rows),
+            "dueToday": sum(row["state"] == "checked_out" and row["endDate"] == today for row in rows),
+            "overdue": sum(row["state"] == "checked_out" and row["endDate"] < today for row in rows),
+        }, "counts follow the documented definitions"
+        assert all(row["overdue"] == (row["state"] == "checked_out" and row["endDate"] < today) for row in rows)
+        assert desk["counts"]["overdue"] == sum(row["overdue"] for row in rows)
 
 
 def sample_bookings(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
