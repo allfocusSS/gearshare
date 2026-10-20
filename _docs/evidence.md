@@ -1,8 +1,8 @@
 # Verification evidence
 
-Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate and the [#27](https://github.com/allfocusSS/gearshare/issues/27) visually-hidden-label correction are implemented. Standard engineer checks pass on `f89c963b8b0193d159f74742e126a966a0053bd3`; focused label regression results are recorded in evidence.md. Both issues remain open for complete independent verification. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
+Current stage update (2026-10-20): independent QA passed and closed #1–5 and the observed bugs #24–28, including the [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800), [#27](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6287900059), [#28](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6294272406) and [#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984) PASS verdicts; the standalone mock stage gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) is an engineer candidate: root `openapi.yml` (OpenAPI 3.1) is derived from the completed `GearShareService`, adds private `Booking.version` with a required `expectedVersion` precondition on the five booking mutations, and is checked by `backend/tests/test_openapi_contract.py` (see `_docs/api.md` and evidence.md). #6 stays open for independent QA. #7 and later stages (backend business APIs, persistence, HTTP adapter) remain gated. Historical entries below retain their recorded point-in-time results.
 
-Current application status: #1–4/#24–26 are independently verified and closed. The complete mock frontend now includes student and coordinator lending plus inventory. #5 and the #27 label correction await their full independent verdicts; no mock-stage gate, API/storage implementation or final submission PASS is claimed. Historical records below preserve the actual failures and pending states from their original checkpoints.
+Current application status: #1–5 and #24–28 are independently verified and closed; the standalone mock frontend gate passed. The #6 `openapi.yml` contract candidate (below) has passing engineer checks and awaits independent QA. No backend business API, persistence, HTTP adapter or final submission PASS is claimed. Historical records below preserve the actual failures and pending states from their original checkpoints.
 
 ## Work actually completed
 
@@ -13,7 +13,8 @@ Current application status: #1–4/#24–26 are independently verified and close
 - Implemented the groomed #1 bootstrap: React/TypeScript startup screen, FastAPI health endpoint, real endpoint test, public dependency locks and verified setup/run/check commands.
 - Implemented the groomed #2 shell/auth boundary after #1 QA PASS; recorded the real #24 browser defect, stopped for PM grooming and independent QA reproduction/cases, then corrected its focus lifecycle and ran the scoped regression suite. QA subsequently passed and closed both.
 - After those QA gates, implemented #3 public catalogue/filter/detail/anonymous-calendar scope and ran its dedicated tests plus the preserved auth/focus regression.
-- Implemented independently verified #4 private requests/history/cancellation and the #25 availability correction. Added #5 mock staff transitions, custody/counts/queues and inventory; observed #27 through real screenshot inspection, waited for PM/QA cases and applied its narrow visually-hidden utility correction.
+- Implemented independently verified #4 private requests/history/cancellation and the #25 availability correction. Added #5 mock staff transitions, custody/counts/queues and inventory; observed #27 through real screenshot inspection, waited for PM/QA cases and applied its narrow visually-hidden utility correction. Independent QA later passed #27, #28 and #5.
+- Derived the #6 `openapi.yml` and `_docs/api.md` from the QA-passed mock, added Booking `version`/`expectedVersion` optimistic concurrency to the shared types and mock, and added locked backend contract tests (see the #6 section below).
 
 Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 unique MVP draft IDs, 3 unique post-MVP draft IDs; all relative Markdown links resolve; every MVP draft contains Goal, Description, Acceptance criteria, Out of scope and Constraints. These checks verify documents only; they are not application tests.
 
@@ -22,14 +23,14 @@ Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 uniq
 | Check | Result | Command / commit / observation |
 | --- | --- | --- |
 | Bootstrap health test/build | Independent QA PASS, #1 closed | Published `a8ec9b7469b9d1e2f091bc0fdf0369be7e9ba6ad`; [actual QA evidence](https://github.com/allfocusSS/gearshare/issues/1#issuecomment-6261432589); historical engineer details below |
-| Mock frontend browser flows | #1–4/#24–26 independently verified; #5/#27 open | Pre-fix #5 app: auth 26, catalogue 28, student booking and staff 8 functional browser groups passed. Corrected f89c963: 41 unit tests/typecheck/build passed; saved focused label result has 448/448 successful assertions. Full surrounding post-fix browser verification remains for the fresh independent QA handoff |
-| OpenAPI validation | Not run | Contract must be derived in iteration 2 |
+| Mock frontend browser flows | #1–5 and #24–28 independently verified and closed | Independent QA PASS for the mock stage ([#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984)). The #6 changes (Booking version) were re-run by the engineer on `0486a4e`: all browser suites exit 0 (see the #6 section) |
+| OpenAPI validation | Engineer PASS on `0486a4e`; independent QA pending (#6) | `cd backend && uv run --locked pytest` 22 passed including `tests/test_openapi_contract.py` (21); `uv run --locked openapi-spec-validator ../openapi.yml` reports OK; details in the #6 section |
 | In-memory API tests | Not run | Backend currently exposes only health; domain/memory stage follows mock/contract gates |
 | ORM/SQLite tests | Not run | Storage implementation does not exist |
 | Concurrent requests/rollback | Not run | Deferred to actual database stage |
 | Process-restart persistence | Not run | Requires actual runnable backend |
 | Two-role browser integration | Not run | Requires implemented frontend/backend |
-| Exploratory user testing | Mock auth/catalogue/student/staff screens exercised | Real #24/#25/#26 defects were independently verified and closed. Actual #27 screenshot defect was filed before correction; its full independent verdict and final integrated exploration remain outstanding |
+| Exploratory user testing | Mock auth/catalogue/student/staff screens exercised | Real #24–#28 defects were each filed before correction and independently verified and closed. Final integrated exploration remains outstanding |
 | Final CI / clean checkout | Not run | Bootstrap locks were installed into a clean source copy; independent committed-checkout QA and final CI remain separate checks |
 
 ## Iteration 0 — engineer verification for #1
@@ -142,7 +143,7 @@ Bug issue, correction commit and retest, when applicable:
 
 Remote: https://github.com/allfocusSS/gearshare.
 
-MVP issues #1–20 are published and PM-groomed. #1–4 and observed bugs #24–26 are independently verified and closed. #5 and the implemented #27 correction remain open pending their full independent verdicts. Post-MVP #21–23 remain deferred. No final completion count is claimed; full product/integration verification remains outstanding.
+MVP issues #1–20 are published and PM-groomed. #1–5 and observed bugs #24–28 were checked with `gh api repos/allfocusSS/gearshare/issues?state=all` on 2026-10-20 and are closed after independent QA PASS; #6–20 are open, and #6 is an engineer candidate awaiting QA. Post-MVP #21–23 show as closed on GitHub although they are deferred scope; they were not touched or re-verified here. No final completion count is claimed; full product/integration verification remains outstanding.
 
 Do not report “0 open issues” as completion before the backlog exists. On final submission, record the actual issue counts and links for queries `is:issue is:open label:mvp` and `is:issue is:open label:user-test-bug` in the correct repository.
 
@@ -276,3 +277,52 @@ Focused #28 `test-results/qa28-after/results.json` records the tested canonical 
 Engineer visually inspected `qa28-after/approve-{1440,390}-unavailable.png` and `staff/desk-{1440,390}.png`. The saved-action/read-failure explanation and focused Refresh button remain readable at both widths; unavailable data is withheld and the trusted queue views retain concise action labels. All six #28 transition variants have generated both-width unavailable-state screenshots; automated checks also verify overflow and meaningful focus.
 
 These are engineer checks of the memory-only frontend, not an independent QA verdict, backend security/concurrency/persistence proof or mock-stage PASS. Request fresh independent QA of #28 and the still-open #5 on the published handoff. Only QA may close them after all criteria pass. #27 is already independently closed; #6/OpenAPI and later stages remain gated.
+
+## Iteration 2 — #6 engineer candidate: openapi.yml and Booking version (2026-10-20 UTC)
+
+Candidate commits on `main` (local until the orchestrator pushes; started from `f4d2440`): `e9ceec1` Booking `version` and `expectedVersion` in types, mock, UI call sites and tests; `42e4d99` `openapi.yml` and `_docs/api.md`; `0486a4e` locked backend validator dependencies, `backend/tests/test_openapi_contract.py` and documentation/status corrections. The checks below ran against clean `0486a4e90c8731eae61e42e21933f52e08ee272a` (tree `6b6d8882c73ee2296d84ea63c82a47ddb61e91f7`, `git status` empty). The commit that records this section changes only evidence.md and iterations.md.
+
+### Environment and limits
+
+Linux x86_64. **Node v22.22.0 and npm 10.9.4, not the pinned Node 24.x/npm 11.x.** The backend virtualenv used Python 3.12.3 (system `python3` is 3.13.16) with **uv 0.11.32, not the pinned 0.12.23**; `uv.lock` was preserved at `revision = 5` and `uv lock --check` passes. Playwright 1.62.1 with the supplied Chromium 153.0.8010.0 through `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`; browser suites ran one at a time with real async timers and a fixed browser Date, and no server was left running afterwards. No backend process, database or network API was used. These versions differ from the documented prerequisites and from earlier QA runs on Node 24.19.0/npm 11.9.0, so independent QA should repeat the checks on the pinned toolchain.
+
+### Commands actually executed on 0486a4e
+
+| Command (directory) | Actual result |
+| --- | --- |
+| `uv run --locked pytest` (`backend/`) | Exit 0; 22 passed (1 health, 21 in `test_openapi_contract.py`) |
+| `uv run --locked openapi-spec-validator ../openapi.yml` (`backend/`) | `../openapi.yml: OK` |
+| `uv lock --check` (`backend/`) | Exit 0; 39 packages resolved; `head -3 uv.lock` shows `revision = 5` |
+| `npm test` (`frontend/`) | Exit 0; 74 passed, 0 failed (41 earlier tests, 28 in `versioning.test.mjs`, 5 in `contract.test.mjs`) |
+| `npm run typecheck` | Exit 0 |
+| `npm run build` | Exit 0; 33 modules transformed |
+| `npm run test:browser` | Exit 0; "All 26 scoped browser checks passed." |
+| `npm run test:browser:catalogue` | Exit 0; "All 28 catalogue browser checks passed." |
+| `npm run test:browser:bookings` | Exit 0; #4 request/history/cancellation/conflict/privacy at 390/1440 PASS |
+| `npm run test:browser:staff` | Exit 0; "All 8 staff browser groups passed; no backend/API requests." |
+| `npm run test:browser:labels` | Exit 0; 448 checks, 448 passed, 0 failed |
+| `npm run test:browser:resources` | Exit 0; 18 PASS lines (dev and preview, both widths) |
+| `node tests/qa28.browser.mjs` | Exit 0; 635 checks, 635 passed, 0 failed; result file records commit `0486a4e` |
+| `node tests/qa4.browser.mjs` | Exit 0; 4 groups, no console/page errors |
+| `node tests/qa25.browser.mjs` | Exit 0; 4 controlled groups, no console/page errors |
+
+The browser suites do not call the contract; they confirm that the UI call sites sending `expectedVersion` still complete the student and coordinator journeys. The `qa28` runner requires a clean committed tree and passed. Raw logs are under the session scratchpad and `frontend/test-results/` (ignored, not committed).
+
+### What the contract tests check
+
+`tests/test_openapi_contract.py` loads `openapi.yml` with PyYAML and validates it with the real `openapi-spec-validator`. It parses `GearShareService` from `frontend/src/services/types.ts` and requires each of the 20 methods to appear exactly once as `x-service-method` (and `operationId`); every operation has `x-service-method`, security and role metadata; 401/403/404/409/422 are present where the rules apply (404 for private bookings, 403 only on staff routes); DTO interfaces match schemas field for field (required, nullable, enums); `Session` is distinct from `User`; no schema in the document has `password` (outside the write-only credential bodies), `passwordHash` or `tokenHash`; and the limits, date pattern, transition table and version rules are frozen. It also validates the 82 mock-generated samples in `frontend/tests/fixtures/contract-samples.json` against their operation schemas, including 422/409/404 error shapes. `npm test` (`tests/contract.test.mjs`) regenerates the samples from the mock and fails if the committed file differs.
+
+`tests/versioning.test.mjs` verifies, with fixed clocks: version 1 on creation and +1 per successful approve/reject/cancel/checkout/return (equal to event count); missing, non-integer, zero, negative and oversize `expectedVersion` as 422 with `fields.expectedVersion`; stale versions as 409 for all five mutations with record, events, allocations and custody unchanged; the precedence order (403/404 before 422 before stale 409 before state 409 before note 422); and **both orderings of the approve-versus-cancel race** (approve first makes the student's cancel with version 1 a 409; cancel first makes the coordinator's approve a 409).
+
+Mutation check (engineer harness kept in the session scratchpad, not committed; it edits temporary copies only): 23 deliberate defects such as a dropped `x-service-method`, a `passwordHash` or `token` property on `User`, `version` made optional, a weakened username pattern, `password` max 64, a PUT turned POST, a missing 403, an extra service method in `types.ts` and a leaked `passwordHash` in a sample were each caught by at least one failing contract test (23 caught, 0 missed; the unmutated baseline passes).
+
+### Decisions recorded for QA
+
+* Evaluation order, non-owner 404, `Session` versus `User`, token handling and the mock-versus-wire differences are in `_docs/api.md`.
+* The mock applies the state check (409) before the note check (422) because the QA-passed mock did; the contract documents that order.
+* `currentUser`, `logout`, `login` and `register` differ between mock and wire as documented in `api.md`; the future adapter absorbs them (#13/#14).
+* No backend business API, repository, ORM, HTTP adapter or database was added. `GET /health` is still the only served route.
+
+### Limits of this evidence
+
+These are engineer checks on a non-pinned toolchain. They show the contract is internally valid, consistent with `types.ts` and with the behavior of the memory mock; they do not show that any server implements it, nor database concurrency, persistence, real authentication security or an independent-QA PASS. #6 remains open for fresh independent QA, which alone may close it. #7 and later stages remain gated.
