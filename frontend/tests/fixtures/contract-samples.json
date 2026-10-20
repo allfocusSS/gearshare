@@ -1,0 +1,3983 @@
+{
+ "generatedBy": "node tests/contract-samples.mjs --write",
+ "clock": "2026-10-19T06:00:00Z",
+ "samples": [
+  {
+   "method": "listAssets",
+   "label": "no filters",
+   "request": {
+    "query": {}
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": "camera-01",
+      "inventoryCode": "CAM-001",
+      "name": "Field Camera · Unit 01",
+      "category": "Cameras",
+      "description": "A fictional mirrorless camera kit for interviews, club films and everyday storytelling. Includes a standard lens and a padded case.",
+      "location": "Media room · North desk",
+      "state": "active"
+     },
+     {
+      "id": "camera-02",
+      "inventoryCode": "CAM-002",
+      "name": "Field Camera · Unit 02",
+      "category": "Cameras",
+      "description": "A second independent physical unit of the field camera kit. Its calendar is separate from Unit 01.",
+      "location": "Media room · North desk",
+      "state": "active"
+     },
+     {
+      "id": "camera-03",
+      "inventoryCode": "CAM-003",
+      "name": "Pocket Video Camera",
+      "category": "Cameras",
+      "description": "A compact fictional video camera for small productions. Temporarily undergoing a lens and battery inspection.",
+      "location": "Media room · Care shelf",
+      "state": "maintenance"
+     },
+     {
+      "id": "audio-01",
+      "inventoryCode": "AUD-001",
+      "name": "Directional Microphone",
+      "category": "Audio",
+      "description": "A fictional directional microphone with a wind shield, cable and carry pouch for clear location sound.",
+      "location": "Sound cabinet · Shelf A",
+      "state": "active"
+     },
+     {
+      "id": "audio-02",
+      "inventoryCode": "AUD-002",
+      "name": "Portable Sound Recorder",
+      "category": "Audio",
+      "description": "A handheld fictional recorder for interviews, atmosphere and live club sessions. Includes a protective case.",
+      "location": "Sound cabinet · Shelf B",
+      "state": "active"
+     },
+     {
+      "id": "presentation-01",
+      "inventoryCode": "PRE-001",
+      "name": "Compact Projector",
+      "category": "Presentation",
+      "description": "A fictional portable projector for screenings and small-room presentations. Includes power and display cables.",
+      "location": "Club office · Equipment desk",
+      "state": "active"
+     },
+     {
+      "id": "presentation-02",
+      "inventoryCode": "PRE-002",
+      "name": "Folding Projection Screen",
+      "category": "Presentation",
+      "description": "A fictional freestanding screen for presentations. Folds into one carry case; please allow space for setup.",
+      "location": "Club office · Tall storage",
+      "state": "active"
+     },
+     {
+      "id": "accessory-01",
+      "inventoryCode": "ACC-001",
+      "name": "Travel Tripod",
+      "category": "Accessories",
+      "description": "A fictional lightweight tripod with a quick-release plate for stable interviews and static shots.",
+      "location": "Media room · Stand rack",
+      "state": "active"
+     },
+     {
+      "id": "accessory-02",
+      "inventoryCode": "ACC-002",
+      "name": "Soft LED Light",
+      "category": "Accessories",
+      "description": "A fictional dimmable light panel with stand and soft diffuser for small sets and interviews.",
+      "location": "Media room · Light shelf",
+      "state": "active"
+     },
+     {
+      "id": "accessory-03",
+      "inventoryCode": "ACC-003",
+      "name": "Capture Adapter Kit",
+      "category": "Accessories",
+      "description": "A fictional video capture adapter with labeled cables for club livestream and presentation setups.",
+      "location": "Club office · Cable drawer",
+      "state": "active"
+     }
+    ],
+    "range": null,
+    "today": "2026-10-19",
+    "horizonEnd": "2027-01-17"
+   }
+  },
+  {
+   "method": "listAssets",
+   "label": "intersection with paired dates",
+   "request": {
+    "query": {
+     "search": "  field CAMERA ",
+     "category": "Cameras",
+     "startDate": "2026-10-20",
+     "endDate": "2026-10-20"
+    }
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": "camera-01",
+      "inventoryCode": "CAM-001",
+      "name": "Field Camera · Unit 01",
+      "category": "Cameras",
+      "description": "A fictional mirrorless camera kit for interviews, club films and everyday storytelling. Includes a standard lens and a padded case.",
+      "location": "Media room · North desk",
+      "state": "active"
+     }
+    ],
+    "range": {
+     "startDate": "2026-10-20",
+     "endDate": "2026-10-20"
+    },
+    "today": "2026-10-19",
+    "horizonEnd": "2027-01-17"
+   }
+  },
+  {
+   "method": "listAssets",
+   "label": "only one date",
+   "request": {
+    "query": {
+     "startDate": "2026-10-19"
+    }
+   },
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the date range before viewing availability.",
+    "fields": {
+     "endDate": "Choose a valid end date."
+    }
+   }
+  },
+  {
+   "method": "listAssets",
+   "label": "unknown category",
+   "request": {
+    "query": {
+     "category": "Unknown"
+    }
+   },
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Choose a listed category.",
+    "fields": {
+     "category": "Choose a listed category."
+    }
+   }
+  },
+  {
+   "method": "getAsset",
+   "label": "",
+   "request": {
+    "path": {
+     "assetId": "camera-01"
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "camera-01",
+    "inventoryCode": "CAM-001",
+    "name": "Field Camera · Unit 01",
+    "category": "Cameras",
+    "description": "A fictional mirrorless camera kit for interviews, club films and everyday storytelling. Includes a standard lens and a padded case.",
+    "location": "Media room · North desk",
+    "state": "active"
+   }
+  },
+  {
+   "method": "getAsset",
+   "label": "unknown id",
+   "request": {
+    "path": {
+     "assetId": "missing"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
+   "method": "getAssetAvailability",
+   "label": "",
+   "request": {
+    "path": {
+     "assetId": "camera-02"
+    }
+   },
+   "status": 200,
+   "body": {
+    "assetId": "camera-02",
+    "today": "2026-10-19",
+    "horizonEnd": "2027-01-17",
+    "timeZone": "Asia/Almaty",
+    "days": [
+     {
+      "date": "2026-10-19",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-20",
+      "state": "occupied"
+     },
+     {
+      "date": "2026-10-21",
+      "state": "occupied"
+     },
+     {
+      "date": "2026-10-22",
+      "state": "occupied"
+     },
+     {
+      "date": "2026-10-23",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-24",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-25",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-26",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-27",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-28",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-29",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-30",
+      "state": "available"
+     },
+     {
+      "date": "2026-10-31",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-01",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-02",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-03",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-04",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-05",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-06",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-07",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-08",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-09",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-10",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-11",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-12",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-13",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-14",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-15",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-16",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-17",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-18",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-19",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-20",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-21",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-22",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-23",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-24",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-25",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-26",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-27",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-28",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-29",
+      "state": "available"
+     },
+     {
+      "date": "2026-11-30",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-01",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-02",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-03",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-04",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-05",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-06",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-07",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-08",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-09",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-10",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-11",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-12",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-13",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-14",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-15",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-16",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-17",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-18",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-19",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-20",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-21",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-22",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-23",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-24",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-25",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-26",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-27",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-28",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-29",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-30",
+      "state": "available"
+     },
+     {
+      "date": "2026-12-31",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-01",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-02",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-03",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-04",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-05",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-06",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-07",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-08",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-09",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-10",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-11",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-12",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-13",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-14",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-15",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-16",
+      "state": "available"
+     },
+     {
+      "date": "2027-01-17",
+      "state": "available"
+     }
+    ]
+   }
+  },
+  {
+   "method": "getAssetAvailability",
+   "label": "maintenance unit",
+   "request": {
+    "path": {
+     "assetId": "camera-03"
+    }
+   },
+   "status": 200,
+   "body": {
+    "assetId": "camera-03",
+    "today": "2026-10-19",
+    "horizonEnd": "2027-01-17",
+    "timeZone": "Asia/Almaty",
+    "days": [
+     {
+      "date": "2026-10-19",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-20",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-21",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-22",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-23",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-24",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-25",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-26",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-27",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-28",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-29",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-30",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-10-31",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-01",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-02",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-03",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-04",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-05",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-06",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-07",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-08",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-09",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-10",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-11",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-12",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-13",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-14",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-15",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-16",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-17",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-18",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-19",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-20",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-21",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-22",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-23",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-24",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-25",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-26",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-27",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-28",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-29",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-11-30",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-01",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-02",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-03",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-04",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-05",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-06",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-07",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-08",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-09",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-10",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-11",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-12",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-13",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-14",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-15",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-16",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-17",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-18",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-19",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-20",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-21",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-22",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-23",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-24",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-25",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-26",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-27",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-28",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-29",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-30",
+      "state": "maintenance"
+     },
+     {
+      "date": "2026-12-31",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-01",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-02",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-03",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-04",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-05",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-06",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-07",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-08",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-09",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-10",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-11",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-12",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-13",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-14",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-15",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-16",
+      "state": "maintenance"
+     },
+     {
+      "date": "2027-01-17",
+      "state": "maintenance"
+     }
+    ]
+   }
+  },
+  {
+   "method": "getAssetAvailability",
+   "label": "unknown id",
+   "request": {
+    "path": {
+     "assetId": "missing"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
+   "method": "login",
+   "label": "wrong password",
+   "request": {
+    "body": {
+     "username": "maya_student",
+     "password": "WrongPassword42!"
+    }
+   },
+   "status": 401,
+   "body": {
+    "code": "INVALID_CREDENTIALS",
+    "message": "Username or password is incorrect. Try the fictional demo credentials below."
+   }
+  },
+  {
+   "method": "login",
+   "label": "malformed input",
+   "request": {
+    "body": {
+     "username": "ab",
+     "password": "short"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted fields.",
+    "fields": {
+     "username": "Use 3–30 ASCII letters, digits or underscores.",
+     "password": "Use a password with 10–128 characters."
+    }
+   }
+  },
+  {
+   "method": "listBookings",
+   "label": "anonymous",
+   "request": {},
+   "status": 401,
+   "body": {
+    "code": "UNAUTHENTICATED",
+    "message": "Sign in to manage your reservations."
+   }
+  },
+  {
+   "method": "getBooking",
+   "label": "anonymous",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    }
+   },
+   "status": 401,
+   "body": {
+    "code": "UNAUTHENTICATED",
+    "message": "Sign in to manage your reservations."
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "anonymous",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 401,
+   "body": {
+    "code": "UNAUTHENTICATED",
+    "message": "Sign in to manage your reservations."
+   }
+  },
+  {
+   "method": "listStaffBookings",
+   "label": "anonymous",
+   "request": {},
+   "status": 401,
+   "body": {
+    "code": "UNAUTHENTICATED",
+    "message": "Sign in to manage your reservations."
+   }
+  },
+  {
+   "method": "login",
+   "label": "",
+   "request": {
+    "body": {
+     "username": "maya_student",
+     "password": "StudentDemo42!"
+    }
+   },
+   "status": 200,
+   "mapsTo": "Session.user",
+   "body": {
+    "id": "student-demo",
+    "username": "maya_student",
+    "role": "student"
+   }
+  },
+  {
+   "method": "currentUser",
+   "label": "",
+   "request": {},
+   "status": 200,
+   "body": {
+    "id": "student-demo",
+    "username": "maya_student",
+    "role": "student"
+   }
+  },
+  {
+   "method": "listBookings",
+   "label": "six-state owner fixture",
+   "request": {},
+   "status": 200,
+   "body": [
+    {
+     "id": "fixture-pending",
+     "assetId": "camera-01",
+     "assetName": "Field Camera · Unit 01",
+     "userId": "student-demo",
+     "purpose": "Fictional club production",
+     "startDate": "2026-10-21",
+     "endDate": "2026-10-23",
+     "state": "pending",
+     "version": 1,
+     "events": [
+      {
+       "id": "fixture-pending-create",
+       "bookingId": "fixture-pending",
+       "actorId": "student-demo",
+       "action": "create",
+       "priorState": null,
+       "newState": "pending",
+       "timestamp": "2026-10-16T06:00:00.000Z",
+       "note": "Fictional club production"
+      }
+     ]
+    },
+    {
+     "id": "fixture-approved",
+     "assetId": "camera-02",
+     "assetName": "Field Camera · Unit 02",
+     "userId": "student-demo",
+     "purpose": "Fictional club production",
+     "startDate": "2026-10-20",
+     "endDate": "2026-10-22",
+     "state": "approved",
+     "version": 2,
+     "events": [
+      {
+       "id": "fixture-approved-create",
+       "bookingId": "fixture-approved",
+       "actorId": "student-demo",
+       "action": "create",
+       "priorState": null,
+       "newState": "pending",
+       "timestamp": "2026-10-16T06:00:00.000Z",
+       "note": "Fictional club production"
+      },
+      {
+       "id": "fixture-approved-approve",
+       "bookingId": "fixture-approved",
+       "actorId": "coordinator-demo",
+       "action": "approve",
+       "priorState": "pending",
+       "newState": "approved",
+       "timestamp": "2026-10-17T06:00:00.000Z",
+       "note": "Reservation approved."
+      }
+     ]
+    },
+    {
+     "id": "fixture-checked_out",
+     "assetId": "audio-01",
+     "assetName": "Directional Microphone",
+     "userId": "student-demo",
+     "purpose": "Fictional club production",
+     "startDate": "2026-10-16",
+     "endDate": "2026-10-17",
+     "state": "checked_out",
+     "version": 3,
+     "events": [
+      {
+       "id": "fixture-checked_out-create",
+       "bookingId": "fixture-checked_out",
+       "actorId": "student-demo",
+       "action": "create",
+       "priorState": null,
+       "newState": "pending",
+       "timestamp": "2026-10-13T06:00:00.000Z",
+       "note": "Fictional club production"
+      },
+      {
+       "id": "fixture-checked_out-approve",
+       "bookingId": "fixture-checked_out",
+       "actorId": "coordinator-demo",
+       "action": "approve",
+       "priorState": "pending",
+       "newState": "approved",
+       "timestamp": "2026-10-14T06:00:00.000Z",
+       "note": "Reservation approved."
+      },
+      {
+       "id": "fixture-checked_out-checkout",
+       "bookingId": "fixture-checked_out",
+       "actorId": "coordinator-demo",
+       "action": "checkout",
+       "priorState": "approved",
+       "newState": "checked_out",
+       "timestamp": "2026-10-16T06:00:00.000Z",
+       "note": "Complete kit; tested and working."
+      }
+     ]
+    },
+    {
+     "id": "fixture-rejected",
+     "assetId": "camera-03",
+     "assetName": "Pocket Video Camera",
+     "userId": "student-demo",
+     "purpose": "Fictional club production",
+     "startDate": "2026-10-06",
+     "endDate": "2026-10-07",
+     "state": "rejected",
+     "version": 2,
+     "events": [
+      {
+       "id": "fixture-rejected-create",
+       "bookingId": "fixture-rejected",
+       "actorId": "student-demo",
+       "action": "create",
+       "priorState": null,
+       "newState": "pending",
+       "timestamp": "2026-10-03T06:00:00.000Z",
+       "note": "Fictional club production"
+      },
+      {
+       "id": "fixture-rejected-reject",
+       "bookingId": "fixture-rejected",
+       "actorId": "coordinator-demo",
+       "action": "reject",
+       "priorState": "pending",
+       "newState": "rejected",
+       "timestamp": "2026-10-04T06:00:00.000Z",
+       "note": "Equipment inspection required."
+      }
+     ]
+    },
+    {
+     "id": "fixture-cancelled",
+     "assetId": "audio-02",
+     "assetName": "Portable Sound Recorder",
+     "userId": "student-demo",
+     "purpose": "Fictional club production",
+     "startDate": "2026-10-05",
+     "endDate": "2026-10-06",
+     "state": "cancelled",
+     "version": 2,
+     "events": [
+      {
+       "id": "fixture-cancelled-create",
+       "bookingId": "fixture-cancelled",
+       "actorId": "student-demo",
+       "action": "create",
+       "priorState": null,
+       "newState": "pending",
+       "timestamp": "2026-10-02T06:00:00.000Z",
+       "note": "Fictional club production"
+      },
+      {
+       "id": "fixture-cancelled-cancel",
+       "bookingId": "fixture-cancelled",
+       "actorId": "student-demo",
+       "action": "cancel",
+       "priorState": "pending",
+       "newState": "cancelled",
+       "timestamp": "2026-10-03T06:00:00.000Z",
+       "note": "Reservation cancelled; reserved dates released."
+      }
+     ]
+    },
+    {
+     "id": "fixture-returned",
+     "assetId": "presentation-01",
+     "assetName": "Compact Projector",
+     "userId": "student-demo",
+     "purpose": "Fictional club production",
+     "startDate": "2026-10-04",
+     "endDate": "2026-10-05",
+     "state": "returned",
+     "version": 4,
+     "events": [
+      {
+       "id": "fixture-returned-create",
+       "bookingId": "fixture-returned",
+       "actorId": "student-demo",
+       "action": "create",
+       "priorState": null,
+       "newState": "pending",
+       "timestamp": "2026-10-01T06:00:00.000Z",
+       "note": "Fictional club production"
+      },
+      {
+       "id": "fixture-returned-approve",
+       "bookingId": "fixture-returned",
+       "actorId": "coordinator-demo",
+       "action": "approve",
+       "priorState": "pending",
+       "newState": "approved",
+       "timestamp": "2026-10-02T06:00:00.000Z",
+       "note": "Reservation approved."
+      },
+      {
+       "id": "fixture-returned-checkout",
+       "bookingId": "fixture-returned",
+       "actorId": "coordinator-demo",
+       "action": "checkout",
+       "priorState": "approved",
+       "newState": "checked_out",
+       "timestamp": "2026-10-04T06:00:00.000Z",
+       "note": "Complete kit; tested and working."
+      },
+      {
+       "id": "fixture-returned-return",
+       "bookingId": "fixture-returned",
+       "actorId": "coordinator-demo",
+       "action": "return",
+       "priorState": "checked_out",
+       "newState": "returned",
+       "timestamp": "2026-10-05T06:00:00.000Z",
+       "note": "Complete kit returned in good condition."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "method": "getBooking",
+   "label": "checked out, nullable priorState only on create",
+   "request": {
+    "path": {
+     "bookingId": "fixture-checked_out"
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "fixture-checked_out",
+    "assetId": "audio-01",
+    "assetName": "Directional Microphone",
+    "userId": "student-demo",
+    "purpose": "Fictional club production",
+    "startDate": "2026-10-16",
+    "endDate": "2026-10-17",
+    "state": "checked_out",
+    "version": 3,
+    "events": [
+     {
+      "id": "fixture-checked_out-create",
+      "bookingId": "fixture-checked_out",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-13T06:00:00.000Z",
+      "note": "Fictional club production"
+     },
+     {
+      "id": "fixture-checked_out-approve",
+      "bookingId": "fixture-checked_out",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-14T06:00:00.000Z",
+      "note": "Reservation approved."
+     },
+     {
+      "id": "fixture-checked_out-checkout",
+      "bookingId": "fixture-checked_out",
+      "actorId": "coordinator-demo",
+      "action": "checkout",
+      "priorState": "approved",
+      "newState": "checked_out",
+      "timestamp": "2026-10-16T06:00:00.000Z",
+      "note": "Complete kit; tested and working."
+     }
+    ]
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "one-day booking",
+   "request": {
+    "body": {
+     "assetId": "accessory-03",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "status": 201,
+   "body": {
+    "id": "booking-1",
+    "assetId": "accessory-03",
+    "assetName": "Capture Adapter Kit",
+    "userId": "student-demo",
+    "purpose": "Student club film",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-19",
+    "state": "pending",
+    "version": 1,
+    "events": [
+     {
+      "id": "booking-1-create",
+      "bookingId": "booking-1",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Student club film"
+     }
+    ]
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "same unit and day again",
+   "request": {
+    "body": {
+     "assetId": "accessory-03",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "These dates were reserved. Review the refreshed calendar and choose another range.",
+    "unavailableDates": [
+     "2026-10-19"
+    ]
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "maintenance unit",
+   "request": {
+    "body": {
+     "assetId": "camera-03",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This unit is in maintenance and cannot be requested.",
+    "unavailableDates": []
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "unknown asset",
+   "request": {
+    "body": {
+     "assetId": "missing",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "  Student club film  "
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "range and purpose rules",
+   "request": {
+    "body": {
+     "assetId": "accessory-03",
+     "startDate": "2026-10-19",
+     "endDate": "2026-11-02",
+     "purpose": "x"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted request fields.",
+    "fields": {
+     "endDate": "Choose at most 14 inclusive days.",
+     "purpose": "Use 5–500 characters describing your project."
+    }
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "missing expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "booking-1"
+    },
+    "body": {}
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the reservation version before continuing.",
+    "fields": {
+     "expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."
+    }
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "stale expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "booking-1"
+    },
+    "body": {
+     "expectedVersion": 7
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This reservation changed after you opened it. Refresh to review its current state; nothing was changed.",
+    "fields": {
+     "expectedVersion": "Stale: the reservation is no longer at the version you acted on."
+    }
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "terminal state",
+   "request": {
+    "path": {
+     "bookingId": "fixture-returned"
+    },
+    "body": {
+     "expectedVersion": 4
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "Only pending or approved reservations can be cancelled."
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "owner cancels pending",
+   "request": {
+    "path": {
+     "bookingId": "booking-1"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "booking-1",
+    "assetId": "accessory-03",
+    "assetName": "Capture Adapter Kit",
+    "userId": "student-demo",
+    "purpose": "Student club film",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-19",
+    "state": "cancelled",
+    "version": 2,
+    "events": [
+     {
+      "id": "booking-1-create",
+      "bookingId": "booking-1",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Student club film"
+     },
+     {
+      "id": "booking-1-cancel",
+      "bookingId": "booking-1",
+      "actorId": "student-demo",
+      "action": "cancel",
+      "priorState": "pending",
+      "newState": "cancelled",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Reservation cancelled; reserved dates released."
+     }
+    ]
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "horizon end and 500-character purpose",
+   "request": {
+    "body": {
+     "assetId": "presentation-02",
+     "startDate": "2027-01-17",
+     "endDate": "2027-01-17",
+     "purpose": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+    }
+   },
+   "status": 201,
+   "body": {
+    "id": "booking-2",
+    "assetId": "presentation-02",
+    "assetName": "Folding Projection Screen",
+    "userId": "student-demo",
+    "purpose": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+    "startDate": "2027-01-17",
+    "endDate": "2027-01-17",
+    "state": "pending",
+    "version": 1,
+    "events": [
+     {
+      "id": "booking-2-create",
+      "bookingId": "booking-2",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+     }
+    ]
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "14 inclusive days and 5-character purpose",
+   "request": {
+    "body": {
+     "assetId": "presentation-02",
+     "startDate": "2026-11-08",
+     "endDate": "2026-11-21",
+     "purpose": "abcde"
+    }
+   },
+   "status": 201,
+   "body": {
+    "id": "booking-3",
+    "assetId": "presentation-02",
+    "assetName": "Folding Projection Screen",
+    "userId": "student-demo",
+    "purpose": "abcde",
+    "startDate": "2026-11-08",
+    "endDate": "2026-11-21",
+    "state": "pending",
+    "version": 1,
+    "events": [
+     {
+      "id": "booking-3-create",
+      "bookingId": "booking-3",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "abcde"
+     }
+    ]
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "15 days and 501-character purpose",
+   "request": {
+    "body": {
+     "assetId": "presentation-02",
+     "startDate": "2026-11-28",
+     "endDate": "2026-12-12",
+     "purpose": "ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted request fields.",
+    "fields": {
+     "endDate": "Choose at most 14 inclusive days.",
+     "purpose": "Use 5–500 characters describing your project."
+    }
+   }
+  },
+  {
+   "method": "listStaffBookings",
+   "label": "student",
+   "request": {},
+   "status": 403,
+   "body": {
+    "code": "FORBIDDEN",
+    "message": "Coordinator access is required for this action."
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "student",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 403,
+   "body": {
+    "code": "FORBIDDEN",
+    "message": "Coordinator access is required for this action."
+   }
+  },
+  {
+   "method": "listInventory",
+   "label": "student",
+   "request": {},
+   "status": 403,
+   "body": {
+    "code": "FORBIDDEN",
+    "message": "Coordinator access is required for this action."
+   }
+  },
+  {
+   "method": "addAsset",
+   "label": "student",
+   "request": {
+    "body": {
+     "name": "Studio camera",
+     "inventoryCode": "NEW-001",
+     "category": "Cameras",
+     "location": "Club store",
+     "description": ""
+    }
+   },
+   "status": 403,
+   "body": {
+    "code": "FORBIDDEN",
+    "message": "Coordinator access is required for this action."
+   }
+  },
+  {
+   "method": "logout",
+   "label": "student session",
+   "request": {},
+   "status": 204
+  },
+  {
+   "method": "register",
+   "label": "trimmed, lowercased, role ignored",
+   "request": {
+    "body": {
+     "username": "  New_Member9  ",
+     "password": "ExamplePass42!",
+     "role": "coordinator",
+     "id": "coordinator-demo"
+    }
+   },
+   "status": 201,
+   "mapsTo": "Session.user",
+   "body": {
+    "id": "student-4",
+    "username": "new_member9",
+    "role": "student"
+   }
+  },
+  {
+   "method": "currentUser",
+   "label": "newly registered student",
+   "request": {},
+   "status": 200,
+   "body": {
+    "id": "student-4",
+    "username": "new_member9",
+    "role": "student"
+   }
+  },
+  {
+   "method": "getBooking",
+   "label": "foreign private booking is indistinguishable from missing",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "Reservation not found or unavailable to this account."
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "foreign private booking",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "Reservation not found or unavailable to this account."
+   }
+  },
+  {
+   "method": "register",
+   "label": "normalized duplicate",
+   "request": {
+    "body": {
+     "username": " NEW_MEMBER9 ",
+     "password": "ExamplePass42!"
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "USERNAME_TAKEN",
+    "message": "That username is already in use.",
+    "fields": {
+     "username": "Choose a different username."
+    }
+   }
+  },
+  {
+   "method": "register",
+   "label": "password too short",
+   "request": {
+    "body": {
+     "username": "ok_name",
+     "password": "short"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted fields.",
+    "fields": {
+     "password": "Use a password with 10–128 characters."
+    }
+   }
+  },
+  {
+   "method": "register",
+   "label": "3-character name, 10-character password",
+   "request": {
+    "body": {
+     "username": "abc",
+     "password": "xxxxxxxxxx"
+    }
+   },
+   "status": 201,
+   "mapsTo": "Session.user",
+   "body": {
+    "id": "student-5",
+    "username": "abc",
+    "role": "student"
+   }
+  },
+  {
+   "method": "register",
+   "label": "30-character name, 128-character password",
+   "request": {
+    "body": {
+     "username": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+     "password": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    }
+   },
+   "status": 201,
+   "mapsTo": "Session.user",
+   "body": {
+    "id": "student-6",
+    "username": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "role": "student"
+   }
+  },
+  {
+   "method": "register",
+   "label": "31-character name, 129-character password",
+   "request": {
+    "body": {
+     "username": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "password": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted fields.",
+    "fields": {
+     "username": "Use 3–30 ASCII letters, digits or underscores.",
+     "password": "Use a password with 10–128 characters."
+    }
+   }
+  },
+  {
+   "method": "login",
+   "label": "",
+   "request": {
+    "body": {
+     "username": "alex_coordinator",
+     "password": "CoordinatorDemo42!"
+    }
+   },
+   "status": 200,
+   "mapsTo": "Session.user",
+   "body": {
+    "id": "coordinator-demo",
+    "username": "alex_coordinator",
+    "role": "coordinator"
+   }
+  },
+  {
+   "method": "listStaffBookings",
+   "label": "full desk",
+   "request": {},
+   "status": 200,
+   "body": {
+    "today": "2026-10-19",
+    "timeZone": "Asia/Almaty",
+    "counts": {
+     "pending": 5,
+     "dueToday": 0,
+     "overdue": 1
+    },
+    "bookings": [
+     {
+      "id": "fixture-pending",
+      "assetId": "camera-01",
+      "assetName": "Field Camera · Unit 01",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-21",
+      "endDate": "2026-10-23",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "fixture-pending-create",
+        "bookingId": "fixture-pending",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "CAM-001",
+      "location": "Media room · North desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-approved",
+      "assetId": "camera-02",
+      "assetName": "Field Camera · Unit 02",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-20",
+      "endDate": "2026-10-22",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-approved-create",
+        "bookingId": "fixture-approved",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-approved-approve",
+        "bookingId": "fixture-approved",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-17T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "CAM-002",
+      "location": "Media room · North desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-checked_out",
+      "assetId": "audio-01",
+      "assetName": "Directional Microphone",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-16",
+      "endDate": "2026-10-17",
+      "state": "checked_out",
+      "version": 3,
+      "events": [
+       {
+        "id": "fixture-checked_out-create",
+        "bookingId": "fixture-checked_out",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-13T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-checked_out-approve",
+        "bookingId": "fixture-checked_out",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-14T06:00:00.000Z",
+        "note": "Reservation approved."
+       },
+       {
+        "id": "fixture-checked_out-checkout",
+        "bookingId": "fixture-checked_out",
+        "actorId": "coordinator-demo",
+        "action": "checkout",
+        "priorState": "approved",
+        "newState": "checked_out",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Complete kit; tested and working."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "AUD-001",
+      "location": "Sound cabinet · Shelf A",
+      "currentlyOnLoan": true,
+      "overdue": true
+     },
+     {
+      "id": "fixture-rejected",
+      "assetId": "camera-03",
+      "assetName": "Pocket Video Camera",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-06",
+      "endDate": "2026-10-07",
+      "state": "rejected",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-rejected-create",
+        "bookingId": "fixture-rejected",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-03T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-rejected-reject",
+        "bookingId": "fixture-rejected",
+        "actorId": "coordinator-demo",
+        "action": "reject",
+        "priorState": "pending",
+        "newState": "rejected",
+        "timestamp": "2026-10-04T06:00:00.000Z",
+        "note": "Equipment inspection required."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "CAM-003",
+      "location": "Media room · Care shelf",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-cancelled",
+      "assetId": "audio-02",
+      "assetName": "Portable Sound Recorder",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-05",
+      "endDate": "2026-10-06",
+      "state": "cancelled",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-cancelled-create",
+        "bookingId": "fixture-cancelled",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-02T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-cancelled-cancel",
+        "bookingId": "fixture-cancelled",
+        "actorId": "student-demo",
+        "action": "cancel",
+        "priorState": "pending",
+        "newState": "cancelled",
+        "timestamp": "2026-10-03T06:00:00.000Z",
+        "note": "Reservation cancelled; reserved dates released."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "AUD-002",
+      "location": "Sound cabinet · Shelf B",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-returned",
+      "assetId": "presentation-01",
+      "assetName": "Compact Projector",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-04",
+      "endDate": "2026-10-05",
+      "state": "returned",
+      "version": 4,
+      "events": [
+       {
+        "id": "fixture-returned-create",
+        "bookingId": "fixture-returned",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-01T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-returned-approve",
+        "bookingId": "fixture-returned",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-02T06:00:00.000Z",
+        "note": "Reservation approved."
+       },
+       {
+        "id": "fixture-returned-checkout",
+        "bookingId": "fixture-returned",
+        "actorId": "coordinator-demo",
+        "action": "checkout",
+        "priorState": "approved",
+        "newState": "checked_out",
+        "timestamp": "2026-10-04T06:00:00.000Z",
+        "note": "Complete kit; tested and working."
+       },
+       {
+        "id": "fixture-returned-return",
+        "bookingId": "fixture-returned",
+        "actorId": "coordinator-demo",
+        "action": "return",
+        "priorState": "checked_out",
+        "newState": "returned",
+        "timestamp": "2026-10-05T06:00:00.000Z",
+        "note": "Complete kit returned in good condition."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "PRE-001",
+      "location": "Club office · Equipment desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-next-pickup",
+      "assetId": "audio-01",
+      "assetName": "Directional Microphone",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-19",
+      "endDate": "2026-10-20",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-next-pickup-create",
+        "bookingId": "fixture-next-pickup",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-next-pickup-approve",
+        "bookingId": "fixture-next-pickup",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-17T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "AUD-001",
+      "location": "Sound cabinet · Shelf A",
+      "currentlyOnLoan": true,
+      "overdue": false
+     },
+     {
+      "id": "fixture-audio-request",
+      "assetId": "audio-02",
+      "assetName": "Portable Sound Recorder",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-26",
+      "endDate": "2026-10-27",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "fixture-audio-request-create",
+        "bookingId": "fixture-audio-request",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "AUD-002",
+      "location": "Sound cabinet · Shelf B",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-screening-request",
+      "assetId": "presentation-01",
+      "assetName": "Compact Projector",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-29",
+      "endDate": "2026-10-31",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "fixture-screening-request-create",
+        "bookingId": "fixture-screening-request",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "PRE-001",
+      "location": "Club office · Equipment desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-light-pickup",
+      "assetId": "accessory-02",
+      "assetName": "Soft LED Light",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-24",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-light-pickup-create",
+        "bookingId": "fixture-light-pickup",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-light-pickup-approve",
+        "bookingId": "fixture-light-pickup",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-17T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "ACC-002",
+      "location": "Media room · Light shelf",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-1",
+      "assetId": "accessory-03",
+      "assetName": "Capture Adapter Kit",
+      "userId": "student-demo",
+      "purpose": "Student club film",
+      "startDate": "2026-10-19",
+      "endDate": "2026-10-19",
+      "state": "cancelled",
+      "version": 2,
+      "events": [
+       {
+        "id": "booking-1-create",
+        "bookingId": "booking-1",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Student club film"
+       },
+       {
+        "id": "booking-1-cancel",
+        "bookingId": "booking-1",
+        "actorId": "student-demo",
+        "action": "cancel",
+        "priorState": "pending",
+        "newState": "cancelled",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Reservation cancelled; reserved dates released."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "ACC-003",
+      "location": "Club office · Cable drawer",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-2",
+      "assetId": "presentation-02",
+      "assetName": "Folding Projection Screen",
+      "userId": "student-demo",
+      "purpose": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+      "startDate": "2027-01-17",
+      "endDate": "2027-01-17",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "booking-2-create",
+        "bookingId": "booking-2",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "PRE-002",
+      "location": "Club office · Tall storage",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-3",
+      "assetId": "presentation-02",
+      "assetName": "Folding Projection Screen",
+      "userId": "student-demo",
+      "purpose": "abcde",
+      "startDate": "2026-11-08",
+      "endDate": "2026-11-21",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "booking-3-create",
+        "bookingId": "booking-3",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "abcde"
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "PRE-002",
+      "location": "Club office · Tall storage",
+      "currentlyOnLoan": false,
+      "overdue": false
+     }
+    ]
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "unknown booking",
+   "request": {
+    "path": {
+     "bookingId": "missing"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "Reservation not found or unavailable to this account."
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "missing expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {}
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the reservation version before continuing.",
+    "fields": {
+     "expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."
+    }
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "stale expectedVersion",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 5
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This reservation changed after you opened it. Refresh to review its current state; nothing was changed.",
+    "fields": {
+     "expectedVersion": "Stale: the reservation is no longer at the version you acted on."
+    }
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "fixture-pending",
+    "assetId": "camera-01",
+    "assetName": "Field Camera · Unit 01",
+    "userId": "student-demo",
+    "purpose": "Fictional club production",
+    "startDate": "2026-10-21",
+    "endDate": "2026-10-23",
+    "state": "approved",
+    "version": 2,
+    "events": [
+     {
+      "id": "fixture-pending-create",
+      "bookingId": "fixture-pending",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-16T06:00:00.000Z",
+      "note": "Fictional club production"
+     },
+     {
+      "id": "fixture-pending-approve",
+      "bookingId": "fixture-pending",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Reservation approved."
+     }
+    ]
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "repeat from the current version",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 2
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "Cannot approve a approved reservation. Refresh the desk to review its current state."
+   }
+  },
+  {
+   "method": "cancelBooking",
+   "label": "cancel from the old pending snapshot",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This reservation changed after you opened it. Refresh to review its current state; nothing was changed.",
+    "fields": {
+     "expectedVersion": "Stale: the reservation is no longer at the version you acted on."
+    }
+   }
+  },
+  {
+   "method": "rejectBooking",
+   "label": "note too short",
+   "request": {
+    "path": {
+     "bookingId": "fixture-audio-request"
+    },
+    "body": {
+     "expectedVersion": 1,
+     "note": "ab"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the note before continuing.",
+    "fields": {
+     "note": "Use 3–500 characters after trimming whitespace."
+    }
+   }
+  },
+  {
+   "method": "rejectBooking",
+   "label": "",
+   "request": {
+    "path": {
+     "bookingId": "fixture-audio-request"
+    },
+    "body": {
+     "expectedVersion": 1,
+     "note": "  Equipment inspection required.  "
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "fixture-audio-request",
+    "assetId": "audio-02",
+    "assetName": "Portable Sound Recorder",
+    "userId": "student-other",
+    "purpose": "Fictional club production",
+    "startDate": "2026-10-26",
+    "endDate": "2026-10-27",
+    "state": "rejected",
+    "version": 2,
+    "events": [
+     {
+      "id": "fixture-audio-request-create",
+      "bookingId": "fixture-audio-request",
+      "actorId": "student-other",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-16T06:00:00.000Z",
+      "note": "Fictional club production"
+     },
+     {
+      "id": "fixture-audio-request-reject",
+      "bookingId": "fixture-audio-request",
+      "actorId": "coordinator-demo",
+      "action": "reject",
+      "priorState": "pending",
+      "newState": "rejected",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Equipment inspection required."
+     }
+    ]
+   }
+  },
+  {
+   "method": "checkoutBooking",
+   "label": "outside the booked days",
+   "request": {
+    "path": {
+     "bookingId": "fixture-light-pickup"
+    },
+    "body": {
+     "expectedVersion": 2,
+     "note": "Complete kit"
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "Check out only within the inclusive booked dates in Asia/Almaty."
+   }
+  },
+  {
+   "method": "requestBooking",
+   "label": "",
+   "request": {
+    "body": {
+     "assetId": "accessory-01",
+     "startDate": "2026-10-19",
+     "endDate": "2026-10-19",
+     "purpose": "Coordinator test shoot"
+    }
+   },
+   "status": 201,
+   "body": {
+    "id": "booking-7",
+    "assetId": "accessory-01",
+    "assetName": "Travel Tripod",
+    "userId": "coordinator-demo",
+    "purpose": "Coordinator test shoot",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-19",
+    "state": "pending",
+    "version": 1,
+    "events": [
+     {
+      "id": "booking-7-create",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Coordinator test shoot"
+     }
+    ]
+   }
+  },
+  {
+   "method": "approveBooking",
+   "label": "approved for same-day pickup",
+   "request": {
+    "path": {
+     "bookingId": "booking-7"
+    },
+    "body": {
+     "expectedVersion": 1
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "booking-7",
+    "assetId": "accessory-01",
+    "assetName": "Travel Tripod",
+    "userId": "coordinator-demo",
+    "purpose": "Coordinator test shoot",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-19",
+    "state": "approved",
+    "version": 2,
+    "events": [
+     {
+      "id": "booking-7-create",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Coordinator test shoot"
+     },
+     {
+      "id": "booking-7-approve",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Reservation approved."
+     }
+    ]
+   }
+  },
+  {
+   "method": "checkoutBooking",
+   "label": "",
+   "request": {
+    "path": {
+     "bookingId": "booking-7"
+    },
+    "body": {
+     "expectedVersion": 2,
+     "note": "  Complete kit; tested and working.  "
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "booking-7",
+    "assetId": "accessory-01",
+    "assetName": "Travel Tripod",
+    "userId": "coordinator-demo",
+    "purpose": "Coordinator test shoot",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-19",
+    "state": "checked_out",
+    "version": 3,
+    "events": [
+     {
+      "id": "booking-7-create",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Coordinator test shoot"
+     },
+     {
+      "id": "booking-7-approve",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Reservation approved."
+     },
+     {
+      "id": "booking-7-checkout",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "checkout",
+      "priorState": "approved",
+      "newState": "checked_out",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Complete kit; tested and working."
+     }
+    ]
+   }
+  },
+  {
+   "method": "checkoutBooking",
+   "label": "unit still on loan",
+   "request": {
+    "path": {
+     "bookingId": "fixture-next-pickup"
+    },
+    "body": {
+     "expectedVersion": 2,
+     "note": "Complete kit"
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This physical unit is still on loan. Record its return before checking it out again, including any overdue loan."
+   }
+  },
+  {
+   "method": "listStaffBookings",
+   "label": "with an active loan and an overdue booking",
+   "request": {},
+   "status": 200,
+   "body": {
+    "today": "2026-10-19",
+    "timeZone": "Asia/Almaty",
+    "counts": {
+     "pending": 3,
+     "dueToday": 1,
+     "overdue": 1
+    },
+    "bookings": [
+     {
+      "id": "fixture-pending",
+      "assetId": "camera-01",
+      "assetName": "Field Camera · Unit 01",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-21",
+      "endDate": "2026-10-23",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-pending-create",
+        "bookingId": "fixture-pending",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-pending-approve",
+        "bookingId": "fixture-pending",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "CAM-001",
+      "location": "Media room · North desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-approved",
+      "assetId": "camera-02",
+      "assetName": "Field Camera · Unit 02",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-20",
+      "endDate": "2026-10-22",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-approved-create",
+        "bookingId": "fixture-approved",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-approved-approve",
+        "bookingId": "fixture-approved",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-17T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "CAM-002",
+      "location": "Media room · North desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-checked_out",
+      "assetId": "audio-01",
+      "assetName": "Directional Microphone",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-16",
+      "endDate": "2026-10-17",
+      "state": "checked_out",
+      "version": 3,
+      "events": [
+       {
+        "id": "fixture-checked_out-create",
+        "bookingId": "fixture-checked_out",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-13T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-checked_out-approve",
+        "bookingId": "fixture-checked_out",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-14T06:00:00.000Z",
+        "note": "Reservation approved."
+       },
+       {
+        "id": "fixture-checked_out-checkout",
+        "bookingId": "fixture-checked_out",
+        "actorId": "coordinator-demo",
+        "action": "checkout",
+        "priorState": "approved",
+        "newState": "checked_out",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Complete kit; tested and working."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "AUD-001",
+      "location": "Sound cabinet · Shelf A",
+      "currentlyOnLoan": true,
+      "overdue": true
+     },
+     {
+      "id": "fixture-rejected",
+      "assetId": "camera-03",
+      "assetName": "Pocket Video Camera",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-06",
+      "endDate": "2026-10-07",
+      "state": "rejected",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-rejected-create",
+        "bookingId": "fixture-rejected",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-03T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-rejected-reject",
+        "bookingId": "fixture-rejected",
+        "actorId": "coordinator-demo",
+        "action": "reject",
+        "priorState": "pending",
+        "newState": "rejected",
+        "timestamp": "2026-10-04T06:00:00.000Z",
+        "note": "Equipment inspection required."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "CAM-003",
+      "location": "Media room · Care shelf",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-cancelled",
+      "assetId": "audio-02",
+      "assetName": "Portable Sound Recorder",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-05",
+      "endDate": "2026-10-06",
+      "state": "cancelled",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-cancelled-create",
+        "bookingId": "fixture-cancelled",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-02T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-cancelled-cancel",
+        "bookingId": "fixture-cancelled",
+        "actorId": "student-demo",
+        "action": "cancel",
+        "priorState": "pending",
+        "newState": "cancelled",
+        "timestamp": "2026-10-03T06:00:00.000Z",
+        "note": "Reservation cancelled; reserved dates released."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "AUD-002",
+      "location": "Sound cabinet · Shelf B",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-returned",
+      "assetId": "presentation-01",
+      "assetName": "Compact Projector",
+      "userId": "student-demo",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-04",
+      "endDate": "2026-10-05",
+      "state": "returned",
+      "version": 4,
+      "events": [
+       {
+        "id": "fixture-returned-create",
+        "bookingId": "fixture-returned",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-01T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-returned-approve",
+        "bookingId": "fixture-returned",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-02T06:00:00.000Z",
+        "note": "Reservation approved."
+       },
+       {
+        "id": "fixture-returned-checkout",
+        "bookingId": "fixture-returned",
+        "actorId": "coordinator-demo",
+        "action": "checkout",
+        "priorState": "approved",
+        "newState": "checked_out",
+        "timestamp": "2026-10-04T06:00:00.000Z",
+        "note": "Complete kit; tested and working."
+       },
+       {
+        "id": "fixture-returned-return",
+        "bookingId": "fixture-returned",
+        "actorId": "coordinator-demo",
+        "action": "return",
+        "priorState": "checked_out",
+        "newState": "returned",
+        "timestamp": "2026-10-05T06:00:00.000Z",
+        "note": "Complete kit returned in good condition."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "PRE-001",
+      "location": "Club office · Equipment desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-next-pickup",
+      "assetId": "audio-01",
+      "assetName": "Directional Microphone",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-19",
+      "endDate": "2026-10-20",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-next-pickup-create",
+        "bookingId": "fixture-next-pickup",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-next-pickup-approve",
+        "bookingId": "fixture-next-pickup",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-17T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "AUD-001",
+      "location": "Sound cabinet · Shelf A",
+      "currentlyOnLoan": true,
+      "overdue": false
+     },
+     {
+      "id": "fixture-audio-request",
+      "assetId": "audio-02",
+      "assetName": "Portable Sound Recorder",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-26",
+      "endDate": "2026-10-27",
+      "state": "rejected",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-audio-request-create",
+        "bookingId": "fixture-audio-request",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-audio-request-reject",
+        "bookingId": "fixture-audio-request",
+        "actorId": "coordinator-demo",
+        "action": "reject",
+        "priorState": "pending",
+        "newState": "rejected",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Equipment inspection required."
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "AUD-002",
+      "location": "Sound cabinet · Shelf B",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-screening-request",
+      "assetId": "presentation-01",
+      "assetName": "Compact Projector",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-29",
+      "endDate": "2026-10-31",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "fixture-screening-request-create",
+        "bookingId": "fixture-screening-request",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "PRE-001",
+      "location": "Club office · Equipment desk",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "fixture-light-pickup",
+      "assetId": "accessory-02",
+      "assetName": "Soft LED Light",
+      "userId": "student-other",
+      "purpose": "Fictional club production",
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-24",
+      "state": "approved",
+      "version": 2,
+      "events": [
+       {
+        "id": "fixture-light-pickup-create",
+        "bookingId": "fixture-light-pickup",
+        "actorId": "student-other",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-16T06:00:00.000Z",
+        "note": "Fictional club production"
+       },
+       {
+        "id": "fixture-light-pickup-approve",
+        "bookingId": "fixture-light-pickup",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-17T06:00:00.000Z",
+        "note": "Reservation approved."
+       }
+      ],
+      "borrower": "sam_student",
+      "inventoryCode": "ACC-002",
+      "location": "Media room · Light shelf",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-1",
+      "assetId": "accessory-03",
+      "assetName": "Capture Adapter Kit",
+      "userId": "student-demo",
+      "purpose": "Student club film",
+      "startDate": "2026-10-19",
+      "endDate": "2026-10-19",
+      "state": "cancelled",
+      "version": 2,
+      "events": [
+       {
+        "id": "booking-1-create",
+        "bookingId": "booking-1",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Student club film"
+       },
+       {
+        "id": "booking-1-cancel",
+        "bookingId": "booking-1",
+        "actorId": "student-demo",
+        "action": "cancel",
+        "priorState": "pending",
+        "newState": "cancelled",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Reservation cancelled; reserved dates released."
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "ACC-003",
+      "location": "Club office · Cable drawer",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-2",
+      "assetId": "presentation-02",
+      "assetName": "Folding Projection Screen",
+      "userId": "student-demo",
+      "purpose": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+      "startDate": "2027-01-17",
+      "endDate": "2027-01-17",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "booking-2-create",
+        "bookingId": "booking-2",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "PRE-002",
+      "location": "Club office · Tall storage",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-3",
+      "assetId": "presentation-02",
+      "assetName": "Folding Projection Screen",
+      "userId": "student-demo",
+      "purpose": "abcde",
+      "startDate": "2026-11-08",
+      "endDate": "2026-11-21",
+      "state": "pending",
+      "version": 1,
+      "events": [
+       {
+        "id": "booking-3-create",
+        "bookingId": "booking-3",
+        "actorId": "student-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "abcde"
+       }
+      ],
+      "borrower": "maya_student",
+      "inventoryCode": "PRE-002",
+      "location": "Club office · Tall storage",
+      "currentlyOnLoan": false,
+      "overdue": false
+     },
+     {
+      "id": "booking-7",
+      "assetId": "accessory-01",
+      "assetName": "Travel Tripod",
+      "userId": "coordinator-demo",
+      "purpose": "Coordinator test shoot",
+      "startDate": "2026-10-19",
+      "endDate": "2026-10-19",
+      "state": "checked_out",
+      "version": 3,
+      "events": [
+       {
+        "id": "booking-7-create",
+        "bookingId": "booking-7",
+        "actorId": "coordinator-demo",
+        "action": "create",
+        "priorState": null,
+        "newState": "pending",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Coordinator test shoot"
+       },
+       {
+        "id": "booking-7-approve",
+        "bookingId": "booking-7",
+        "actorId": "coordinator-demo",
+        "action": "approve",
+        "priorState": "pending",
+        "newState": "approved",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Reservation approved."
+       },
+       {
+        "id": "booking-7-checkout",
+        "bookingId": "booking-7",
+        "actorId": "coordinator-demo",
+        "action": "checkout",
+        "priorState": "approved",
+        "newState": "checked_out",
+        "timestamp": "2026-10-19T06:00:00.000Z",
+        "note": "Complete kit; tested and working."
+       }
+      ],
+      "borrower": "alex_coordinator",
+      "inventoryCode": "ACC-001",
+      "location": "Media room · Stand rack",
+      "currentlyOnLoan": true,
+      "overdue": false
+     }
+    ]
+   }
+  },
+  {
+   "method": "returnBooking",
+   "label": "",
+   "request": {
+    "path": {
+     "bookingId": "booking-7"
+    },
+    "body": {
+     "expectedVersion": 3,
+     "note": "Returned complete."
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "booking-7",
+    "assetId": "accessory-01",
+    "assetName": "Travel Tripod",
+    "userId": "coordinator-demo",
+    "purpose": "Coordinator test shoot",
+    "startDate": "2026-10-19",
+    "endDate": "2026-10-19",
+    "state": "returned",
+    "version": 4,
+    "events": [
+     {
+      "id": "booking-7-create",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Coordinator test shoot"
+     },
+     {
+      "id": "booking-7-approve",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Reservation approved."
+     },
+     {
+      "id": "booking-7-checkout",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "checkout",
+      "priorState": "approved",
+      "newState": "checked_out",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Complete kit; tested and working."
+     },
+     {
+      "id": "booking-7-return",
+      "bookingId": "booking-7",
+      "actorId": "coordinator-demo",
+      "action": "return",
+      "priorState": "checked_out",
+      "newState": "returned",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Returned complete."
+     }
+    ]
+   }
+  },
+  {
+   "method": "returnBooking",
+   "label": "overdue return",
+   "request": {
+    "path": {
+     "bookingId": "fixture-checked_out"
+    },
+    "body": {
+     "expectedVersion": 3,
+     "note": "Late return complete"
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "fixture-checked_out",
+    "assetId": "audio-01",
+    "assetName": "Directional Microphone",
+    "userId": "student-demo",
+    "purpose": "Fictional club production",
+    "startDate": "2026-10-16",
+    "endDate": "2026-10-17",
+    "state": "returned",
+    "version": 4,
+    "events": [
+     {
+      "id": "fixture-checked_out-create",
+      "bookingId": "fixture-checked_out",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-13T06:00:00.000Z",
+      "note": "Fictional club production"
+     },
+     {
+      "id": "fixture-checked_out-approve",
+      "bookingId": "fixture-checked_out",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-14T06:00:00.000Z",
+      "note": "Reservation approved."
+     },
+     {
+      "id": "fixture-checked_out-checkout",
+      "bookingId": "fixture-checked_out",
+      "actorId": "coordinator-demo",
+      "action": "checkout",
+      "priorState": "approved",
+      "newState": "checked_out",
+      "timestamp": "2026-10-16T06:00:00.000Z",
+      "note": "Complete kit; tested and working."
+     },
+     {
+      "id": "fixture-checked_out-return",
+      "bookingId": "fixture-checked_out",
+      "actorId": "coordinator-demo",
+      "action": "return",
+      "priorState": "checked_out",
+      "newState": "returned",
+      "timestamp": "2026-10-19T06:00:00.000Z",
+      "note": "Late return complete"
+     }
+    ]
+   }
+  },
+  {
+   "method": "getBooking",
+   "label": "coordinator reads any booking",
+   "request": {
+    "path": {
+     "bookingId": "fixture-returned"
+    }
+   },
+   "status": 200,
+   "body": {
+    "id": "fixture-returned",
+    "assetId": "presentation-01",
+    "assetName": "Compact Projector",
+    "userId": "student-demo",
+    "purpose": "Fictional club production",
+    "startDate": "2026-10-04",
+    "endDate": "2026-10-05",
+    "state": "returned",
+    "version": 4,
+    "events": [
+     {
+      "id": "fixture-returned-create",
+      "bookingId": "fixture-returned",
+      "actorId": "student-demo",
+      "action": "create",
+      "priorState": null,
+      "newState": "pending",
+      "timestamp": "2026-10-01T06:00:00.000Z",
+      "note": "Fictional club production"
+     },
+     {
+      "id": "fixture-returned-approve",
+      "bookingId": "fixture-returned",
+      "actorId": "coordinator-demo",
+      "action": "approve",
+      "priorState": "pending",
+      "newState": "approved",
+      "timestamp": "2026-10-02T06:00:00.000Z",
+      "note": "Reservation approved."
+     },
+     {
+      "id": "fixture-returned-checkout",
+      "bookingId": "fixture-returned",
+      "actorId": "coordinator-demo",
+      "action": "checkout",
+      "priorState": "approved",
+      "newState": "checked_out",
+      "timestamp": "2026-10-04T06:00:00.000Z",
+      "note": "Complete kit; tested and working."
+     },
+     {
+      "id": "fixture-returned-return",
+      "bookingId": "fixture-returned",
+      "actorId": "coordinator-demo",
+      "action": "return",
+      "priorState": "checked_out",
+      "newState": "returned",
+      "timestamp": "2026-10-05T06:00:00.000Z",
+      "note": "Complete kit returned in good condition."
+     }
+    ]
+   }
+  },
+  {
+   "method": "listInventory",
+   "label": "including maintenance",
+   "request": {},
+   "status": 200,
+   "body": [
+    {
+     "id": "camera-01",
+     "inventoryCode": "CAM-001",
+     "name": "Field Camera · Unit 01",
+     "category": "Cameras",
+     "description": "A fictional mirrorless camera kit for interviews, club films and everyday storytelling. Includes a standard lens and a padded case.",
+     "location": "Media room · North desk",
+     "state": "active"
+    },
+    {
+     "id": "camera-02",
+     "inventoryCode": "CAM-002",
+     "name": "Field Camera · Unit 02",
+     "category": "Cameras",
+     "description": "A second independent physical unit of the field camera kit. Its calendar is separate from Unit 01.",
+     "location": "Media room · North desk",
+     "state": "active"
+    },
+    {
+     "id": "camera-03",
+     "inventoryCode": "CAM-003",
+     "name": "Pocket Video Camera",
+     "category": "Cameras",
+     "description": "A compact fictional video camera for small productions. Temporarily undergoing a lens and battery inspection.",
+     "location": "Media room · Care shelf",
+     "state": "maintenance"
+    },
+    {
+     "id": "audio-01",
+     "inventoryCode": "AUD-001",
+     "name": "Directional Microphone",
+     "category": "Audio",
+     "description": "A fictional directional microphone with a wind shield, cable and carry pouch for clear location sound.",
+     "location": "Sound cabinet · Shelf A",
+     "state": "active"
+    },
+    {
+     "id": "audio-02",
+     "inventoryCode": "AUD-002",
+     "name": "Portable Sound Recorder",
+     "category": "Audio",
+     "description": "A handheld fictional recorder for interviews, atmosphere and live club sessions. Includes a protective case.",
+     "location": "Sound cabinet · Shelf B",
+     "state": "active"
+    },
+    {
+     "id": "presentation-01",
+     "inventoryCode": "PRE-001",
+     "name": "Compact Projector",
+     "category": "Presentation",
+     "description": "A fictional portable projector for screenings and small-room presentations. Includes power and display cables.",
+     "location": "Club office · Equipment desk",
+     "state": "active"
+    },
+    {
+     "id": "presentation-02",
+     "inventoryCode": "PRE-002",
+     "name": "Folding Projection Screen",
+     "category": "Presentation",
+     "description": "A fictional freestanding screen for presentations. Folds into one carry case; please allow space for setup.",
+     "location": "Club office · Tall storage",
+     "state": "active"
+    },
+    {
+     "id": "accessory-01",
+     "inventoryCode": "ACC-001",
+     "name": "Travel Tripod",
+     "category": "Accessories",
+     "description": "A fictional lightweight tripod with a quick-release plate for stable interviews and static shots.",
+     "location": "Media room · Stand rack",
+     "state": "active"
+    },
+    {
+     "id": "accessory-02",
+     "inventoryCode": "ACC-002",
+     "name": "Soft LED Light",
+     "category": "Accessories",
+     "description": "A fictional dimmable light panel with stand and soft diffuser for small sets and interviews.",
+     "location": "Media room · Light shelf",
+     "state": "active"
+    },
+    {
+     "id": "accessory-03",
+     "inventoryCode": "ACC-003",
+     "name": "Capture Adapter Kit",
+     "category": "Accessories",
+     "description": "A fictional video capture adapter with labeled cables for club livestream and presentation setups.",
+     "location": "Club office · Cable drawer",
+     "state": "active"
+    }
+   ]
+  },
+  {
+   "method": "addAsset",
+   "label": "",
+   "request": {
+    "body": {
+     "name": "  Studio camera  ",
+     "inventoryCode": "  new-001  ",
+     "category": "Cameras",
+     "location": "  Club store  ",
+     "description": "  A complete fictional kit.  "
+    }
+   },
+   "status": 201,
+   "body": {
+    "name": "Studio camera",
+    "inventoryCode": "NEW-001",
+    "category": "Cameras",
+    "location": "Club store",
+    "description": "A complete fictional kit.",
+    "id": "asset-8",
+    "state": "active"
+   }
+  },
+  {
+   "method": "addAsset",
+   "label": "duplicate inventory code",
+   "request": {
+    "body": {
+     "name": "  Studio camera  ",
+     "inventoryCode": "  new-001  ",
+     "category": "Cameras",
+     "location": "  Club store  ",
+     "description": "  A complete fictional kit.  "
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This inventory code is already in use. Choose a unique code for this physical unit.",
+    "fields": {
+     "inventoryCode": "This code is already in use."
+    }
+   }
+  },
+  {
+   "method": "addAsset",
+   "label": "maximum lengths",
+   "request": {
+    "body": {
+     "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+     "inventoryCode": "cccccccccccccccccccccccccccccc",
+     "category": "Audio",
+     "location": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll",
+     "description": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+   },
+   "status": 201,
+   "body": {
+    "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "inventoryCode": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+    "category": "Audio",
+    "location": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll",
+    "description": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "id": "asset-9",
+    "state": "active"
+   }
+  },
+  {
+   "method": "addAsset",
+   "label": "minimum lengths and empty description",
+   "request": {
+    "body": {
+     "name": "ab",
+     "inventoryCode": "ab-",
+     "category": "Presentation",
+     "location": "ab",
+     "description": ""
+    }
+   },
+   "status": 201,
+   "body": {
+    "name": "ab",
+    "inventoryCode": "AB-",
+    "category": "Presentation",
+    "location": "ab",
+    "description": "",
+    "id": "asset-10",
+    "state": "active"
+   }
+  },
+  {
+   "method": "addAsset",
+   "label": "one over every maximum",
+   "request": {
+    "body": {
+     "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+     "inventoryCode": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+     "category": "Audio",
+     "location": "lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll",
+     "description": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted equipment fields.",
+    "fields": {
+     "name": "Use 2–100 characters.",
+     "inventoryCode": "Use 2–30 characters.",
+     "location": "Use 2–100 characters.",
+     "description": "Use at most 2,000 characters."
+    }
+   }
+  },
+  {
+   "method": "addAsset",
+   "label": "limits",
+   "request": {
+    "body": {
+     "name": "a",
+     "inventoryCode": "x",
+     "category": "Cameras",
+     "location": "  Club store  ",
+     "description": "  A complete fictional kit.  "
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the highlighted equipment fields.",
+    "fields": {
+     "name": "Use 2–100 characters.",
+     "inventoryCode": "Use 2–30 characters."
+    }
+   }
+  },
+  {
+   "method": "editAsset",
+   "label": "",
+   "request": {
+    "path": {
+     "assetId": "asset-8"
+    },
+    "body": {
+     "name": "Renamed unit",
+     "inventoryCode": "  new-001  ",
+     "category": "Cameras",
+     "location": "  Club store  ",
+     "description": "  A complete fictional kit.  "
+    }
+   },
+   "status": 200,
+   "body": {
+    "name": "Renamed unit",
+    "inventoryCode": "NEW-001",
+    "category": "Cameras",
+    "location": "Club store",
+    "description": "A complete fictional kit.",
+    "id": "asset-8",
+    "state": "active"
+   }
+  },
+  {
+   "method": "editAsset",
+   "label": "unknown id",
+   "request": {
+    "path": {
+     "assetId": "missing"
+    },
+    "body": {
+     "name": "Renamed unit",
+     "inventoryCode": "  new-001  ",
+     "category": "Cameras",
+     "location": "  Club store  ",
+     "description": "  A complete fictional kit.  "
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
+   "method": "editAsset",
+   "label": "code of another unit",
+   "request": {
+    "path": {
+     "assetId": "asset-8"
+    },
+    "body": {
+     "name": "Renamed unit",
+     "inventoryCode": "cam-001",
+     "category": "Cameras",
+     "location": "  Club store  ",
+     "description": "  A complete fictional kit.  "
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This inventory code is already in use. Choose a unique code for this physical unit.",
+    "fields": {
+     "inventoryCode": "This code is already in use."
+    }
+   }
+  },
+  {
+   "method": "setAssetState",
+   "label": "",
+   "request": {
+    "path": {
+     "assetId": "asset-8"
+    },
+    "body": {
+     "state": "maintenance"
+    }
+   },
+   "status": 200,
+   "body": {
+    "name": "Renamed unit",
+    "inventoryCode": "NEW-001",
+    "category": "Cameras",
+    "location": "Club store",
+    "description": "A complete fictional kit.",
+    "id": "asset-8",
+    "state": "maintenance"
+   }
+  },
+  {
+   "method": "setAssetState",
+   "label": "already in that state",
+   "request": {
+    "path": {
+     "assetId": "asset-8"
+    },
+    "body": {
+     "state": "maintenance"
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "This unit is already maintenance."
+   }
+  },
+  {
+   "method": "setAssetState",
+   "label": "blocked by an approved booking",
+   "request": {
+    "path": {
+     "assetId": "camera-02"
+    },
+    "body": {
+     "state": "maintenance"
+    }
+   },
+   "status": 409,
+   "body": {
+    "code": "CONFLICT",
+    "message": "Maintenance is blocked by an active loan or pending/approved reservation ending today or later. Record active returns and reject or cancel unresolved reservations at the coordinator desk first."
+   }
+  },
+  {
+   "method": "setAssetState",
+   "label": "invalid state",
+   "request": {
+    "path": {
+     "assetId": "asset-8"
+    },
+    "body": {
+     "state": "deleted"
+    }
+   },
+   "schemaInvalid": true,
+   "status": 422,
+   "body": {
+    "code": "VALIDATION_ERROR",
+    "message": "Choose active or maintenance.",
+    "fields": {
+     "state": "Choose active or maintenance."
+    }
+   }
+  },
+  {
+   "method": "setAssetState",
+   "label": "unknown id",
+   "request": {
+    "path": {
+     "assetId": "missing"
+    },
+    "body": {
+     "state": "active"
+    }
+   },
+   "status": 404,
+   "body": {
+    "code": "NOT_FOUND",
+    "message": "This equipment could not be found. Return to Explore to choose another physical unit."
+   }
+  },
+  {
+   "method": "logout",
+   "label": "coordinator session",
+   "request": {},
+   "status": 204
+  },
+  {
+   "method": "listAssets",
+   "label": "service unavailable",
+   "request": {
+    "query": {}
+   },
+   "status": 503,
+   "body": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "The demo service is unavailable. Try again or choose the Normal fixture."
+   }
+  },
+  {
+   "method": "getBooking",
+   "label": "service unavailable",
+   "request": {
+    "path": {
+     "bookingId": "fixture-pending"
+    }
+   },
+   "status": 503,
+   "body": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "The demo service is unavailable. Try again or choose the Normal fixture."
+   }
+  }
+ ]
+}

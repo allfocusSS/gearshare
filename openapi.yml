@@ -1,0 +1,1247 @@
+openapi: 3.1.0
+info:
+  title: GearShare API
+  version: 1.0.0
+  summary: HTTP contract for the GearShare campus equipment-lending service.
+  description: |
+    Contract candidate for [#6](https://github.com/allfocusSS/gearshare/issues/6), derived from the completed
+    standalone mock frontend (`frontend/src/services/types.ts` and `mockService.ts`). **No backend implements this yet**:
+    `GET /health` is the only route served today. The memory-backed API (#7-#10), SQLite persistence (#11-#12) and
+    the frontend HTTP adapter (#13-#14) are separate, later stages that must conform to this file. Narrative companion:
+    `_docs/api.md`.
+
+    ## Machine-checkable mapping
+
+    Every operation under `/api/v1` carries two vendor extensions:
+
+    * `x-service-method`: the exact name of the `GearShareService` method it implements (also the `operationId`).
+      Each of the 20 service methods maps to exactly one operation. `GET /health` is infrastructure and has none.
+    * `x-access`: `public` (no token), `authenticated` (any valid session), `owner-or-coordinator` (the booking
+      owner or any coordinator) or `coordinator` (staff only).
+
+    ## Conventions
+
+    * JSON (`application/json`, UTF-8). Unknown request properties are **ignored, never trusted**: `role`, `id`,
+      `userId`, `ownerId`, `actorId`, `state`, `version`, `events`, timestamps and any other server-owned field in a request
+      body can never set identity, ownership, status, version or audit data.
+    * **Dates** are inclusive club-local calendar dates in `Asia/Almaty` (`YYYY-MM-DD`, no time, no offset). Let `T` be
+      today's `Asia/Almaty` date: bookings require `T <= startDate <= endDate <= T + 90 days` and an inclusive length of
+      1-14 days. A one-day booking has `startDate == endDate`. The day after an inclusive end never conflicts.
+    * **Timestamps** (booking events, session expiry) are timezone-aware UTC ISO-8601 instants ending in `Z`.
+      They are never used as calendar dates.
+    * **Text fields marked `x-trimmed: true`** are trimmed of outer whitespace by the server first; the stated
+      pattern/length limits apply to the trimmed value, and the trimmed value is what is stored and returned.
+    * **Authentication**: opaque bearer token from `login`/`register`, absolute 24-hour expiry, revoked by `logout`.
+      See `bearerAuth` and `_docs/api.md`.
+    * **Concurrency**: private Booking snapshots carry `version`; the five booking mutations require
+      `expectedVersion`. Stale -> 409, missing/invalid -> 422, and nothing changes on any failure.
+    * **Evaluation order** when several rules apply (first match wins): 401 unauthenticated, 403 wrong role,
+      404 unknown or not-visible resource, 422 `expectedVersion` missing/invalid, 409 stale `expectedVersion`,
+      409 transition not allowed from the current state, 422 invalid `note`, 409 time/custody rule. Operations
+      without a precondition validate their body (422) before looking up the asset (404) where noted.
+    * **Errors** always use the shared `Error` schema. The `code` values equal the frontend `ServiceErrorCode`
+      union; the HTTP status is the status line and is not repeated in the body.
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local development server (uvicorn default, see README)
+tags:
+  - name: health
+    description: Liveness probe implemented by the bootstrap backend.
+  - name: auth
+    description: Registration, sessions and the current user.
+  - name: catalogue
+    description: Public equipment catalogue and anonymous availability.
+  - name: bookings
+    description: Private reservations of the signed-in user (and coordinator cancellation).
+  - name: staff-bookings
+    description: Coordinator desk and the lending state machine.
+  - name: staff-inventory
+    description: Coordinator equipment management.
+security: []
+paths:
+  /health:
+    get:
+      operationId: health
+      tags: [health]
+      summary: Liveness probe
+      description: Implemented by the bootstrap backend. Not part of the frontend `GearShareService`, so it has no `x-service-method`.
+      security: []
+      responses:
+        '200':
+          description: The process is up.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthStatus'}
+              examples:
+                up: {value: {status: ok}}
+  /api/v1/auth/register:
+    post:
+      operationId: register
+      x-service-method: register
+      x-access: public
+      tags: [auth]
+      summary: Register a student account and sign in
+      description: |
+        Always creates a **student**; a coordinator can only be created by trusted server configuration, never by this
+        route. Any `role`, `id` or other server-owned property in the body is ignored. The username is trimmed,
+        must match `^[A-Za-z0-9_]{3,30}$`, is stored and returned **lowercase**, and is unique case-insensitively
+        (`Alice`, `ALICE` and `  alice ` are the same account). The password is 10-128 characters and is stored only
+        as a salted hash. Creation and the uniqueness check are one atomic step: two concurrent registrations of the
+        same normalized name produce exactly one account and one 409. On success a session is created and returned
+        (the user is signed in). Nothing is created on any failure.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Credentials'}
+            examples:
+              newStudent: {value: {username: '  New_Member9  ', password: ExamplePass42!}}
+      responses:
+        '201':
+          description: Account created and signed in. The user's `role` is always `student` and `username` is the normalized value.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+              examples:
+                created: {$ref: '#/components/examples/SessionExample'}
+        '409':
+          description: A normalized duplicate username exists (`USERNAME_TAKEN`). No account or session was created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+              examples:
+                taken: {$ref: '#/components/examples/UsernameTaken'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      x-service-method: login
+      x-access: public
+      tags: [auth]
+      summary: Sign in and receive an expiring bearer session
+      description: |
+        Looks the user up by normalized (trimmed, lowercase) username and verifies the password against the stored
+        salted hash. Success creates a new session whose opaque token is returned once; the server persists only a hash
+        of it, the user reference and an `expiresAt` exactly 24 hours after issue (UTC). Wrong username or password
+        gives 401 `INVALID_CREDENTIALS` and creates no session; the response never says which part was wrong.
+        Malformed input (username pattern, password length) is 422 before credentials are checked.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Credentials'}
+            examples:
+              student: {value: {username: maya_student, password: StudentDemo42!}}
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Session'}
+              examples:
+                signedIn: {$ref: '#/components/examples/SessionExample'}
+        '401':
+          description: Wrong username or password (`INVALID_CREDENTIALS`). This is not an expired session; clients must not treat it as one.
+          headers:
+            WWW-Authenticate: {$ref: '#/components/headers/WWWAuthenticate'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+              examples:
+                wrong: {$ref: '#/components/examples/InvalidCredentials'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      x-service-method: logout
+      x-access: authenticated
+      tags: [auth]
+      summary: Revoke the presented session
+      description: |
+        Revokes the session identified by the presented token only (other sessions of the same user are unaffected).
+        The revocation is atomic and immediate: the same token is 401 on its next use. Absent, unknown, expired or
+        already revoked tokens get 401; a client clears its stored token on logout regardless of the response.
+      security:
+        - bearerAuth: []
+      responses:
+        '204': {description: Session revoked. No body.}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/auth/me:
+    get:
+      operationId: currentUser
+      x-service-method: currentUser
+      x-access: authenticated
+      tags: [auth]
+      summary: Return the user of the presented session
+      description: |
+        Identity and role are resolved on the server from the session; no client-supplied role or id is read.
+        Absent, unknown, expired or revoked tokens get 401. The frontend service returns `User | null`, so the HTTP
+        adapter maps a missing token or a 401 here to `null` (after clearing the stored token), not to an error.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The public user (no password, hash or token material).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/User'}
+              examples:
+                student: {value: {id: student-demo, username: maya_student, role: student}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/assets:
+    get:
+      operationId: listAssets
+      x-service-method: listAssets
+      x-access: public
+      tags: [catalogue]
+      summary: List and filter equipment
+      description: |
+        Public. `search` (case-insensitive, trimmed, substring of name, inventory code, category, description or
+        location), `category` and the paired `startDate`/`endDate` combine as an **intersection**. With dates, only
+        units that are active and have no pending/approved/checked-out reservation on any day of the inclusive range
+        are returned, and `range` echoes the pair; without dates `range` is `null` and no availability claim is made
+        (maintenance units are still listed, with `state: maintenance`). Supplying only one date, a malformed date,
+        a past start, a reversed range, more than 14 inclusive days or an end beyond today + 90 days is 422 with
+        `fields.startDate`/`fields.endDate`; an unknown category is 422 with `fields.category`.
+      security: []
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: {type: string}
+          description: Free-text filter; empty or whitespace-only means no filter.
+        - name: category
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/Category'}
+        - name: startDate
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/CalendarDate'}
+          description: Inclusive club-local start. Must be sent together with `endDate`.
+        - name: endDate
+          in: query
+          required: false
+          schema: {$ref: '#/components/schemas/CalendarDate'}
+          description: Inclusive club-local end. Must be sent together with `startDate`.
+      responses:
+        '200':
+          description: Matching physical units plus the club-local window the server used.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CatalogueResult'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/assets/{assetId}:
+    get:
+      operationId: getAsset
+      x-service-method: getAsset
+      x-access: public
+      tags: [catalogue]
+      summary: Get one physical unit
+      description: Public. One record is exactly one physical unit; two cameras of the same model have different ids.
+      security: []
+      parameters:
+        - {$ref: '#/components/parameters/AssetId'}
+      responses:
+        '200':
+          description: The asset (no bookings, borrowers or version).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Asset'}
+        '404': {$ref: '#/components/responses/AssetNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/assets/{assetId}/availability:
+    get:
+      operationId: getAssetAvailability
+      x-service-method: getAssetAvailability
+      x-access: public
+      tags: [catalogue]
+      summary: Anonymous availability calendar for one unit
+      description: |
+        Public and anonymous: exactly 91 consecutive club-local days from today through today + 90, each
+        `available`, `occupied` (reserved by a pending, approved or checked-out booking) or `maintenance` (every day of
+        a unit in maintenance). It never contains borrower names or ids, purposes, notes, booking ids, versions or
+        counts, so visitors and other students cannot learn who holds a unit. The calendar is scheduled availability
+        only; it is not a promise that an overdue loan will return in time.
+      security: []
+      parameters:
+        - {$ref: '#/components/parameters/AssetId'}
+      responses:
+        '200':
+          description: The anonymous calendar.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AssetAvailability'}
+        '404': {$ref: '#/components/responses/AssetNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/bookings:
+    post:
+      operationId: requestBooking
+      x-service-method: requestBooking
+      x-access: authenticated
+      tags: [bookings]
+      summary: Request a unit for an inclusive date range
+      description: |
+        The owner is always the authenticated user and the new booking is always `pending` with `version` 1 and one
+        `create` event; any `userId`, `state`, `version` or `events` in the body is ignored. Validation: the date rules
+        from the API description and a trimmed `purpose` of 5-500 characters -> 422 with `fields.startDate`,
+        `fields.endDate` and/or `fields.purpose` (nothing allocated). Then the asset must exist (404) and be
+        `active` (a maintenance unit is 409 with an empty `unavailableDates`).
+
+        **Atomic allocation.** The booking, its `create` event and one reservation slot for every requested day are
+        written in one transaction, rejecting the whole request if any day is already held by a pending, approved
+        or checked-out booking of the same unit: 409 `CONFLICT` whose `unavailableDates` lists exactly the
+        requested days that are taken (ascending, no borrower information) and nothing is written - no booking,
+        event or stranded slot. Two simultaneous overlapping requests for one unit yield exactly one 201 and one
+        409. Different units, and a range starting the day after another range's inclusive end, never conflict.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingRequest'}
+            examples:
+              oneDay: {value: {assetId: accessory-03, startDate: '2026-10-19', endDate: '2026-10-19', purpose: Student club film}}
+      responses:
+        '201':
+          description: Pending booking created (version 1, one create event).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+              examples:
+                pending: {$ref: '#/components/examples/PendingBooking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/AssetNotFound'}
+        '409':
+          description: Requested days are unavailable, or the unit is in maintenance. Nothing was written.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+              examples:
+                datesTaken: {$ref: '#/components/examples/DatesUnavailable'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+    get:
+      operationId: listBookings
+      x-service-method: listBookings
+      x-access: authenticated
+      tags: [bookings]
+      summary: List the signed-in user's own bookings
+      description: |
+        Only bookings owned by the authenticated user, including for a coordinator (staff use `listStaffBookings`
+        for the desk). Ordered by creation, oldest first; clients group and sort for display. Each booking is the full
+        private snapshot with its events and current `version`.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Own bookings (possibly empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Booking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/bookings/{bookingId}:
+    get:
+      operationId: getBooking
+      x-service-method: getBooking
+      x-access: owner-or-coordinator
+      tags: [bookings]
+      summary: Get one private booking with its event history
+      description: |
+        Visible only to the owner and to coordinators. **Non-owner policy: 404.** A student asking for another
+        student's booking receives exactly the same 404 `NOT_FOUND` as for an id that does not exist, so existence is
+        never disclosed; 403 is not used for private records. Events are chronological (oldest first) and immutable.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/BookingId'}
+      responses:
+        '200':
+          description: The private snapshot, including `version` and `events`.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+              examples:
+                pending: {$ref: '#/components/examples/PendingBooking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/BookingNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/bookings/{bookingId}/cancel:
+    post:
+      operationId: cancelBooking
+      x-service-method: cancelBooking
+      x-access: owner-or-coordinator
+      tags: [bookings]
+      summary: Cancel a pending or approved booking
+      description: |
+        Allowed for the owner or any coordinator. A non-owner student gets the same 404 as for a missing id.
+        Transition `pending|approved -> cancelled`. **Atomic:** after comparing `expectedVersion` with the stored
+        version and the current state, one transaction sets `cancelled`, increments `version` by exactly 1, appends the
+        matching `cancel` event (actor = caller, UTC timestamp) and releases every reserved day; the booking and its
+        history are retained. A stale `expectedVersion` or a state that does not allow cancellation (checked out or
+        already terminal, including a repeat) is 409 and nothing changes. A missing or invalid `expectedVersion` is 422.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/BookingId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingPrecondition'}
+            examples:
+              fromSnapshot: {value: {expectedVersion: 2}}
+      responses:
+        '200':
+          description: The cancelled booking (state `cancelled`, version incremented once).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/BookingNotFound'}
+        '409': {$ref: '#/components/responses/TransitionConflict'}
+        '422': {$ref: '#/components/responses/VersionInvalid'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/bookings:
+    get:
+      operationId: listStaffBookings
+      x-service-method: listStaffBookings
+      x-access: coordinator
+      tags: [staff-bookings]
+      summary: Coordinator desk snapshot
+      description: |
+        Coordinators only (students: 403, anonymous: 401). Returns every booking with the borrower's username, the
+        unit's code and pickup location, whether the unit is currently on loan (a checked-out booking exists for the
+        asset), whether this booking is overdue, and the desk counts, all computed from one consistent snapshot using
+        today's `Asia/Almaty` date. `overdue` is derived (`checked_out` and `endDate < today`), never a stored state.
+        `dueToday` counts checked-out bookings whose `endDate` is today. A future approved booking of a unit that is
+        still on loan is not checkoutable (see `checkoutBooking`). Bookings are in creation order, oldest first.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The desk snapshot.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffDesk'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/bookings/{bookingId}/approve:
+    post:
+      operationId: approveBooking
+      x-service-method: approveBooking
+      x-access: coordinator
+      tags: [staff-bookings]
+      summary: Approve a pending request
+      description: |
+        Transition `pending -> approved`, coordinators only, allowed only while the booking's `endDate` has not
+        passed in `Asia/Almaty` (an expired pending request is 409; reject or cancel it instead). **Atomic:** version
+        compare, state change, `version + 1` and the `approve` event (note `Reservation approved.`) commit together;
+        the reserved days stay reserved. Stale `expectedVersion`, any other current state, or an expired end date is
+        409 with nothing changed; a missing/invalid `expectedVersion` is 422.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/BookingId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingPrecondition'}
+            examples:
+              fromSnapshot: {value: {expectedVersion: 1}}
+      responses:
+        '200':
+          description: The approved booking (state `approved`, version incremented once).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BookingNotFound'}
+        '409': {$ref: '#/components/responses/TransitionConflict'}
+        '422': {$ref: '#/components/responses/VersionInvalid'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/bookings/{bookingId}/reject:
+    post:
+      operationId: rejectBooking
+      x-service-method: rejectBooking
+      x-access: coordinator
+      tags: [staff-bookings]
+      summary: Reject a pending request with a reason
+      description: |
+        Transition `pending -> rejected`, coordinators only. `note` is the rejection reason, trimmed to 3-500
+        characters (422 `fields.note` otherwise, nothing changed). **Atomic:** version compare, state change,
+        `version + 1`, the `reject` event carrying the trimmed note, and release of every reserved day commit
+        together. Stale `expectedVersion` or any state other than `pending` is 409 and nothing changes. A missing or
+        invalid `expectedVersion` is 422 `fields.expectedVersion`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/BookingId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingTransitionInput'}
+            examples:
+              reason: {value: {expectedVersion: 1, note: Equipment inspection required.}}
+      responses:
+        '200':
+          description: The rejected booking (state `rejected`, dates released, version incremented once).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BookingNotFound'}
+        '409': {$ref: '#/components/responses/TransitionConflict'}
+        '422': {$ref: '#/components/responses/NoteOrVersionInvalid'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/bookings/{bookingId}/checkout:
+    post:
+      operationId: checkoutBooking
+      x-service-method: checkoutBooking
+      x-access: coordinator
+      tags: [staff-bookings]
+      summary: Hand over an approved booking with an outgoing condition
+      description: |
+        Transition `approved -> checked_out`, coordinators only. `note` is the outgoing condition, trimmed to
+        3-500 characters. Today's `Asia/Almaty` date must lie within the inclusive booked range (before the start day
+        or after the end day is 409). **Atomic physical custody:** a unique active loan per asset is created in the
+        same transaction as the state change, `version + 1` and the `checkout` event. If the asset already has an
+        active loan - including an overdue one whose scheduled days no longer overlap - the checkout is 409 and
+        nothing changes; simultaneous checkouts of one unit create at most one active loan. Stale `expectedVersion`
+        or any state other than `approved` is 409. A missing or invalid `expectedVersion`, or a `note` that is not 3-500
+        characters after trimming, is 422 and nothing changes.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/BookingId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingTransitionInput'}
+            examples:
+              condition: {value: {expectedVersion: 2, note: Complete kit; tested and working.}}
+      responses:
+        '200':
+          description: The checked-out booking (state `checked_out`, active loan recorded, version incremented once).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BookingNotFound'}
+        '409': {$ref: '#/components/responses/TransitionConflict'}
+        '422': {$ref: '#/components/responses/NoteOrVersionInvalid'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/bookings/{bookingId}/return:
+    post:
+      operationId: returnBooking
+      x-service-method: returnBooking
+      x-access: coordinator
+      tags: [staff-bookings]
+      summary: Record the return with an incoming condition
+      description: |
+        Transition `checked_out -> returned`, coordinators only. `note` is the incoming condition, trimmed to 3-500
+        characters. A return is allowed on any day, including when the booking is overdue. **Atomic:** the active loan
+        is removed, remaining reserved days are released, `version + 1` and the `return` event commit together.
+        Stale `expectedVersion` or any state other than `checked_out` is 409 and nothing changes. A missing or invalid
+        `expectedVersion`, or a `note` that is not 3-500 characters after trimming, is 422 and nothing changes.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/BookingId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingTransitionInput'}
+            examples:
+              condition: {value: {expectedVersion: 3, note: Complete kit returned in good condition.}}
+      responses:
+        '200':
+          description: The returned booking (state `returned`, custody and days released, version incremented once).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Booking'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/BookingNotFound'}
+        '409': {$ref: '#/components/responses/TransitionConflict'}
+        '422': {$ref: '#/components/responses/NoteOrVersionInvalid'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/assets:
+    get:
+      operationId: listInventory
+      x-service-method: listInventory
+      x-access: coordinator
+      tags: [staff-inventory]
+      summary: List every physical unit, including maintenance units
+      description: Coordinators only (students 403, anonymous 401). Stable creation order.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The inventory.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Asset'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+    post:
+      operationId: addAsset
+      x-service-method: addAsset
+      x-access: coordinator
+      tags: [staff-inventory]
+      summary: Add one physical unit
+      description: |
+        Coordinators only. Only the five `AssetInput` fields are read; `id` and `state` are server-owned, and every
+        new unit starts `active`. Text is trimmed and the inventory code is **stored uppercase**; code uniqueness
+        is case-insensitive and enforced atomically with the insert: the loser of two concurrent creations of the
+        same code gets 409 `CONFLICT` with `fields.inventoryCode` and no duplicate is stored. Limits: name 2-100,
+        code 2-30, location 2-100, description at most 2,000 characters, one of the four categories -> 422 with
+        per-field messages otherwise.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssetInput'}
+            examples:
+              camera: {value: {name: Studio camera, inventoryCode: new-001, category: Cameras, location: Club store, description: A complete fictional kit.}}
+      responses:
+        '201':
+          description: The created asset (id assigned by the server, state `active`, code uppercased).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Asset'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/DuplicateInventoryCode'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/assets/{assetId}:
+    put:
+      operationId: editAsset
+      x-service-method: editAsset
+      x-access: coordinator
+      tags: [staff-inventory]
+      summary: Replace the editable fields of a unit
+      description: |
+        Coordinators only; unknown id is 404 (checked before body validation). Replaces all five editable fields
+        (`AssetInput`); `id` and `state` can only change through `setAssetState`. Same trimming, limits, uppercase
+        code storage and case-insensitive uniqueness as `addAsset` (the unit's own code is not a duplicate). Edits
+        never rewrite existing bookings, their `assetName` snapshots or their events.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/AssetId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssetInput'}
+      responses:
+        '200':
+          description: The updated asset.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Asset'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/AssetNotFound'}
+        '409': {$ref: '#/components/responses/DuplicateInventoryCode'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /api/v1/staff/assets/{assetId}/state:
+    put:
+      operationId: setAssetState
+      x-service-method: setAssetState
+      x-access: coordinator
+      tags: [staff-inventory]
+      summary: Switch a unit between active and maintenance
+      description: |
+        Coordinators only; unknown id is 404 (checked before body validation); a `state` other than `active` or
+        `maintenance` is 422 `fields.state`; setting the state the unit already has is 409.
+
+        **Atomic maintenance rule.** Switching to `maintenance` is rejected with 409 - and nothing changes - while
+        the unit has a checked-out (active loan) booking or any pending/approved booking whose `endDate` is today or
+        later (`Asia/Almaty`). Staff must reject, cancel or return those bookings first. The check and the state
+        change are one step serialized with `requestBooking` on the same asset availability state: when a booking
+        request and a maintenance switch race, exactly one commits and the other observes it (a unit can never end
+        up in maintenance with a newly committed booking). A maintenance unit cannot receive new requests, and its
+        public availability shows every day as `maintenance`. Switching back to `active` re-opens requests.
+        Existing bookings and events are never rewritten.
+      security:
+        - bearerAuth: []
+      parameters:
+        - {$ref: '#/components/parameters/AssetId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AssetStateInput'}
+            examples:
+              maintenance: {value: {state: maintenance}}
+      responses:
+        '200':
+          description: The asset with its new state.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Asset'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/AssetNotFound'}
+        '409':
+          description: The unit already has that state, or maintenance is blocked by an active loan or an unresolved pending/approved booking ending today or later. Nothing changed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+              examples:
+                blocked: {$ref: '#/components/examples/MaintenanceBlocked'}
+        '422': {$ref: '#/components/responses/ValidationFailed'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        Opaque, unpredictable bearer token returned by `login`/`register` (`Authorization: Bearer <token>`).
+        Sessions expire exactly 24 hours after issue (absolute, no sliding renewal) and are revoked by `logout`. The
+        server stores only a hash of the token with the user reference and UTC expiry; passwords, password hashes
+        and token hashes never appear in any response. Absent, malformed, unknown, expired or revoked tokens are
+        401 `UNAUTHENTICATED`. The future HTTP adapter keeps the token in `sessionStorage` and clears it on 401 (except
+        401 `INVALID_CREDENTIALS` from `login`) and on logout. Roles are always read from the server-side user, never
+        from the request.
+  headers:
+    WWWAuthenticate:
+      description: Challenge accompanying a 401.
+      schema: {type: string, examples: ['Bearer']}
+  parameters:
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      description: Opaque identifier of one physical unit.
+      schema: {$ref: '#/components/schemas/Id'}
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      description: Opaque identifier of one booking.
+      schema: {$ref: '#/components/schemas/Id'}
+  responses:
+    Unauthenticated:
+      description: No valid session - the token is absent, malformed, unknown, expired or revoked (`UNAUTHENTICATED`). The client clears its stored token and offers sign-in.
+      headers:
+        WWW-Authenticate: {$ref: '#/components/headers/WWWAuthenticate'}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            expired: {$ref: '#/components/examples/Unauthenticated'}
+    Forbidden:
+      description: The session is valid but the role is not a coordinator (`FORBIDDEN`). Evaluated before any resource lookup, so it reveals nothing about ids.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            student: {$ref: '#/components/examples/Forbidden'}
+    AssetNotFound:
+      description: No asset has this id, or (for `requestBooking`) the requested `assetId` is unknown (`NOT_FOUND`).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            missing: {$ref: '#/components/examples/AssetNotFound'}
+    BookingNotFound:
+      description: |
+        No such booking **or** the booking belongs to someone else and the caller is a student (`NOT_FOUND`). The two
+        cases are indistinguishable (same status, code and message) so private records are never confirmed to exist.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            hidden: {$ref: '#/components/examples/BookingNotFound'}
+    TransitionConflict:
+      description: |
+        `CONFLICT`: the `expectedVersion` is stale (then `fields.expectedVersion` is present), the current state does not
+        allow the action (invalid, repeated or terminal; no `fields`), or a time/custody rule failed (approval after the end
+        date, checkout outside the booked days, unit still on loan). Booking state, `version`, events, reserved days
+        and active loan are unchanged.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            stale: {$ref: '#/components/examples/StaleVersion'}
+            illegal: {$ref: '#/components/examples/IllegalTransition'}
+    VersionInvalid:
+      description: '`VALIDATION_ERROR`: `expectedVersion` is missing or is not an integer from 1 to 2147483647 (`fields.expectedVersion`). Nothing changed.'
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            missing: {$ref: '#/components/examples/VersionMissing'}
+    NoteOrVersionInvalid:
+      description: '`VALIDATION_ERROR`: `expectedVersion` missing/invalid (`fields.expectedVersion`) or the trimmed `note` is not 3-500 characters (`fields.note`). Nothing changed.'
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            note: {$ref: '#/components/examples/NoteInvalid'}
+            version: {$ref: '#/components/examples/VersionMissing'}
+    ValidationFailed:
+      description: '`VALIDATION_ERROR`: the request is syntactically valid JSON but breaks a documented rule; `fields` names each offending field. Nothing was created or changed.'
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            dates: {$ref: '#/components/examples/ValidationDates'}
+    DuplicateInventoryCode:
+      description: '`CONFLICT` with `fields.inventoryCode`: another unit already uses this code (case-insensitive, after trimming and uppercasing). No unit was created or changed.'
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            duplicate: {$ref: '#/components/examples/DuplicateCode'}
+    ServiceUnavailable:
+      description: '`SERVICE_UNAVAILABLE`: the service cannot answer right now (dependency failure or overload). Safe to retry reads; a failed mutation made no change. The frontend also uses this code for network failures.'
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          examples:
+            down: {$ref: '#/components/examples/Unavailable'}
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, const: ok}
+    Id:
+      type: string
+      minLength: 1
+      maxLength: 100
+      description: Opaque server-generated identifier. Clients never parse or construct it.
+    CalendarDate:
+      type: string
+      format: date
+      pattern: '^\d{4}-\d{2}-\d{2}$'
+      description: Calendar date in `Asia/Almaty` (`YYYY-MM-DD`). Not an instant; never derived from a UTC timestamp.
+      examples: ['2026-10-19']
+    UtcTimestamp:
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$'
+      description: Timezone-aware UTC instant (ISO-8601, always `Z`).
+      examples: ['2026-10-19T06:00:00.000Z']
+    Role:
+      type: string
+      enum: [student, coordinator]
+      description: Server-controlled. Registration always yields `student`.
+    Category:
+      type: string
+      enum: [Cameras, Audio, Presentation, Accessories]
+    AssetState:
+      type: string
+      enum: [active, maintenance]
+    AvailabilityState:
+      type: string
+      enum: [available, occupied, maintenance]
+    BookingState:
+      type: string
+      enum: [pending, approved, checked_out, rejected, cancelled, returned]
+      description: |
+        Complete transition table. Every pair not listed is rejected with 409; terminal states (`rejected`,
+        `cancelled`, `returned`) have no outgoing transitions. `overdue` is derived, never a state.
+      x-transitions:
+        - {action: approve, from: [pending], to: approved, actor: coordinator, note: none, condition: endDate has not passed}
+        - {action: reject, from: [pending], to: rejected, actor: coordinator, note: required 3-500, condition: releases reserved days}
+        - {action: cancel, from: [pending, approved], to: cancelled, actor: owner-or-coordinator, note: none, condition: releases reserved days}
+        - {action: checkout, from: [approved], to: checked_out, actor: coordinator, note: required 3-500, condition: today within the inclusive range and no active loan on the asset}
+        - {action: return, from: [checked_out], to: returned, actor: coordinator, note: required 3-500, condition: removes the active loan and releases reserved days}
+    BookingAction:
+      type: string
+      enum: [create, approve, reject, cancel, checkout, return]
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_ERROR
+        - INVALID_CREDENTIALS
+        - USERNAME_TAKEN
+        - SERVICE_UNAVAILABLE
+        - NOT_FOUND
+        - UNAUTHENTICATED
+        - FORBIDDEN
+        - CONFLICT
+      description: |
+        Equals the frontend `ServiceErrorCode`. Status mapping: 422 `VALIDATION_ERROR`; 401 `UNAUTHENTICATED` or
+        `INVALID_CREDENTIALS`; 403 `FORBIDDEN`; 404 `NOT_FOUND`; 409 `CONFLICT` or `USERNAME_TAKEN`; 503
+        `SERVICE_UNAVAILABLE`.
+    User:
+      type: object
+      description: Public user. Never carries a password, password hash or token material.
+      required: [id, username, role]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        username:
+          type: string
+          pattern: '^[a-z0-9_]{3,30}$'
+          description: Normalized (trimmed, lowercase) username.
+        role: {$ref: '#/components/schemas/Role'}
+    Credentials:
+      type: object
+      description: Login and registration body. Only these two properties are read.
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          pattern: '^[A-Za-z0-9_]{3,30}$'
+          x-trimmed: true
+          description: Trimmed first, then 3-30 ASCII letters, digits or underscores; stored and compared lowercase.
+        password:
+          type: string
+          minLength: 10
+          maxLength: 128
+          writeOnly: true
+          format: password
+          description: 10-128 characters, not trimmed. Never returned and never logged.
+    Session:
+      type: object
+      description: |
+        Wire-only response of `login` and `register`; distinct from the public `User`. The HTTP adapter stores
+        `token` in `sessionStorage`, uses `expiresAt` only to drop an expired token early, and returns just `user`
+        from `GearShareService.login/register`. The token is shown exactly once.
+      required: [token, expiresAt, user]
+      properties:
+        token:
+          type: string
+          minLength: 32
+          description: Opaque unpredictable bearer token. Clients must not parse it. The server stores only a hash.
+        expiresAt:
+          $ref: '#/components/schemas/UtcTimestamp'
+          description: Issue time plus exactly 24 hours (UTC). The session is 401 from this instant or after logout.
+        user: {$ref: '#/components/schemas/User'}
+    Asset:
+      type: object
+      description: One physical unit. Contains no booking, borrower or version information.
+      required: [id, inventoryCode, name, category, description, location, state]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        inventoryCode:
+          type: string
+          minLength: 2
+          maxLength: 30
+          x-trimmed: true
+          x-normalization: stored uppercase, unique case-insensitively
+        name: {type: string, minLength: 2, maxLength: 100, x-trimmed: true}
+        category: {$ref: '#/components/schemas/Category'}
+        description: {type: string, maxLength: 2000, x-trimmed: true, description: May be empty.}
+        location: {type: string, minLength: 2, maxLength: 100, x-trimmed: true}
+        state: {$ref: '#/components/schemas/AssetState'}
+    AssetInput:
+      type: object
+      description: The five editable fields. `id` and `state` are server-owned and ignored if sent.
+      required: [name, inventoryCode, category, location, description]
+      properties:
+        name: {type: string, minLength: 2, maxLength: 100, x-trimmed: true}
+        inventoryCode:
+          type: string
+          minLength: 2
+          maxLength: 30
+          x-trimmed: true
+          x-normalization: stored uppercase, unique case-insensitively
+        category: {$ref: '#/components/schemas/Category'}
+        location: {type: string, minLength: 2, maxLength: 100, x-trimmed: true}
+        description: {type: string, maxLength: 2000, x-trimmed: true, description: Required but may be empty.}
+    AssetStateInput:
+      type: object
+      required: [state]
+      properties:
+        state: {$ref: '#/components/schemas/AssetState'}
+    DateRange:
+      type: object
+      required: [startDate, endDate]
+      properties:
+        startDate: {$ref: '#/components/schemas/CalendarDate'}
+        endDate: {$ref: '#/components/schemas/CalendarDate'}
+    CatalogueResult:
+      type: object
+      required: [items, range, today, horizonEnd]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Asset'}
+        range:
+          oneOf:
+            - {$ref: '#/components/schemas/DateRange'}
+            - {type: 'null'}
+          description: The validated date pair the filter used, or `null` when no dates were sent.
+        today: {$ref: '#/components/schemas/CalendarDate'}
+        horizonEnd:
+          $ref: '#/components/schemas/CalendarDate'
+          description: today + 90 days, inclusive.
+    AvailabilityDay:
+      type: object
+      description: Anonymous - exactly these two fields and no booking metadata.
+      required: [date, state]
+      properties:
+        date: {$ref: '#/components/schemas/CalendarDate'}
+        state: {$ref: '#/components/schemas/AvailabilityState'}
+    AssetAvailability:
+      type: object
+      description: Anonymous availability of one unit over the 91-day window.
+      required: [assetId, today, horizonEnd, timeZone, days]
+      properties:
+        assetId: {$ref: '#/components/schemas/Id'}
+        today: {$ref: '#/components/schemas/CalendarDate'}
+        horizonEnd: {$ref: '#/components/schemas/CalendarDate'}
+        timeZone: {type: string, const: Asia/Almaty}
+        days:
+          type: array
+          minItems: 91
+          maxItems: 91
+          items: {$ref: '#/components/schemas/AvailabilityDay'}
+    BookingEvent:
+      type: object
+      description: Immutable audit record. One is written by the creation and by every successful transition.
+      required: [id, bookingId, actorId, action, priorState, newState, timestamp, note]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        bookingId: {$ref: '#/components/schemas/Id'}
+        actorId: {$ref: '#/components/schemas/Id'}
+        action: {$ref: '#/components/schemas/BookingAction'}
+        priorState:
+          oneOf:
+            - {$ref: '#/components/schemas/BookingState'}
+            - {type: 'null'}
+          description: '`null` only for the `create` event.'
+        newState: {$ref: '#/components/schemas/BookingState'}
+        timestamp: {$ref: '#/components/schemas/UtcTimestamp'}
+        note:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: Purpose (create), the trimmed condition/reason (reject, checkout, return) or a fixed system sentence (approve, cancel).
+    Booking:
+      type: object
+      description: |
+        Private booking snapshot, visible only to the owner and coordinators. `version` starts at 1 and increases by
+        exactly 1 on every successful approve, reject, cancel, checkout and return; clients echo the version of the snapshot
+        they acted on as `expectedVersion`. `events` are chronological and contain one entry per version
+        (so `events.length == version`).
+      required: [id, assetId, assetName, userId, purpose, startDate, endDate, state, version, events]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        assetId: {$ref: '#/components/schemas/Id'}
+        assetName:
+          type: string
+          description: The unit's name when the booking was made; later inventory edits never rewrite it.
+        userId: {$ref: '#/components/schemas/Id'}
+        purpose: {type: string, minLength: 5, maxLength: 500, x-trimmed: true}
+        startDate: {$ref: '#/components/schemas/CalendarDate'}
+        endDate: {$ref: '#/components/schemas/CalendarDate'}
+        state: {$ref: '#/components/schemas/BookingState'}
+        version:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        events:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/BookingEvent'}
+    BookingRequest:
+      type: object
+      description: Create-booking body. The owner is the authenticated user; the state is always `pending`.
+      required: [assetId, startDate, endDate, purpose]
+      properties:
+        assetId: {$ref: '#/components/schemas/Id'}
+        startDate: {$ref: '#/components/schemas/CalendarDate'}
+        endDate: {$ref: '#/components/schemas/CalendarDate'}
+        purpose: {type: string, minLength: 5, maxLength: 500, x-trimmed: true}
+    BookingPrecondition:
+      type: object
+      description: Optimistic-concurrency precondition of approve and cancel.
+      required: [expectedVersion]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+          description: |
+            The `version` of the exact Booking snapshot the user acted on. Missing or outside 1-2147483647 (or not
+            an integer) is 422; any other value that differs from the stored version is 409. The server never
+            substitutes the current version and the client never retries a stale request on its own.
+    BookingTransitionInput:
+      type: object
+      description: Body of reject, checkout and return.
+      required: [expectedVersion, note]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+          description: See `BookingPrecondition.expectedVersion`.
+        note:
+          type: string
+          minLength: 3
+          maxLength: 500
+          x-trimmed: true
+          description: Rejection reason (reject), outgoing condition (checkout) or incoming condition (return).
+    StaffBooking:
+      type: object
+      description: A private booking plus coordinator-only desk context. The borrower's username is never exposed outside staff routes.
+      required: [id, assetId, assetName, userId, purpose, startDate, endDate, state, version, events, borrower, inventoryCode, location, currentlyOnLoan, overdue]
+      properties:
+        id: {$ref: '#/components/schemas/Id'}
+        assetId: {$ref: '#/components/schemas/Id'}
+        assetName: {type: string}
+        userId: {$ref: '#/components/schemas/Id'}
+        purpose: {type: string, minLength: 5, maxLength: 500}
+        startDate: {$ref: '#/components/schemas/CalendarDate'}
+        endDate: {$ref: '#/components/schemas/CalendarDate'}
+        state: {$ref: '#/components/schemas/BookingState'}
+        version: {type: integer, format: int32, minimum: 1, maximum: 2147483647}
+        events:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/BookingEvent'}
+        borrower: {type: string, description: The owner's username.}
+        inventoryCode: {type: string, minLength: 2, maxLength: 30}
+        location: {type: string, minLength: 2, maxLength: 100}
+        currentlyOnLoan:
+          type: boolean
+          description: True while any booking of this asset is `checked_out` (physical custody), regardless of dates.
+        overdue:
+          type: boolean
+          description: Derived - `state == checked_out` and `endDate` is before today in `Asia/Almaty`.
+    StaffDesk:
+      type: object
+      required: [bookings, today, timeZone, counts]
+      properties:
+        bookings:
+          type: array
+          items: {$ref: '#/components/schemas/StaffBooking'}
+        today: {$ref: '#/components/schemas/CalendarDate'}
+        timeZone: {type: string, const: Asia/Almaty}
+        counts:
+          type: object
+          required: [pending, dueToday, overdue]
+          properties:
+            pending: {type: integer, minimum: 0}
+            dueToday: {type: integer, minimum: 0}
+            overdue: {type: integer, minimum: 0}
+    FieldErrors:
+      type: object
+      description: Per-field messages. Keys equal the offending request properties (the union of the frontend `ServiceError.fields` keys).
+      properties:
+        username: {type: string}
+        password: {type: string}
+        startDate: {type: string}
+        endDate: {type: string}
+        category: {type: string}
+        purpose: {type: string}
+        note: {type: string}
+        name: {type: string}
+        inventoryCode: {type: string}
+        location: {type: string}
+        description: {type: string}
+        state: {type: string}
+        expectedVersion: {type: string}
+      additionalProperties: false
+    Error:
+      type: object
+      description: |
+        The only error body. It never contains borrower names, purposes, booking ids or other private data of other
+        users. The HTTP status line carries the status; the frontend adapter copies it into `ServiceError.status`.
+      required: [code, message]
+      properties:
+        code: {$ref: '#/components/schemas/ErrorCode'}
+        message: {type: string, description: Human-readable, safe to show to the user.}
+        unavailableDates:
+          type: array
+          items: {$ref: '#/components/schemas/CalendarDate'}
+          description: Only on `requestBooking` 409. The requested days that are already reserved, ascending (empty for a maintenance unit). No identities.
+        fields:
+          $ref: '#/components/schemas/FieldErrors'
+  examples:
+    SessionExample:
+      summary: Session for a fictional student
+      value:
+        token: EXAMPLE-opaque-token-0123456789abcdef0123456789abcdef
+        expiresAt: '2026-10-20T06:00:00.000Z'
+        user: {id: student-demo, username: maya_student, role: student}
+    PendingBooking:
+      summary: A new pending booking at version 1
+      value:
+        id: booking-1
+        assetId: accessory-03
+        assetName: Capture Adapter Kit
+        userId: student-demo
+        purpose: Student club film
+        startDate: '2026-10-19'
+        endDate: '2026-10-19'
+        state: pending
+        version: 1
+        events:
+          - id: booking-1-create
+            bookingId: booking-1
+            actorId: student-demo
+            action: create
+            priorState: null
+            newState: pending
+            timestamp: '2026-10-19T06:00:00.000Z'
+            note: Student club film
+    UsernameTaken:
+      value: {code: USERNAME_TAKEN, message: That username is already in use., fields: {username: Choose a different username.}}
+    InvalidCredentials:
+      value: {code: INVALID_CREDENTIALS, message: Username or password is incorrect.}
+    Unauthenticated:
+      value: {code: UNAUTHENTICATED, message: Sign in to manage your reservations.}
+    Forbidden:
+      value: {code: FORBIDDEN, message: Coordinator access is required for this action.}
+    AssetNotFound:
+      value: {code: NOT_FOUND, message: This equipment could not be found.}
+    BookingNotFound:
+      value: {code: NOT_FOUND, message: Reservation not found or unavailable to this account.}
+    DatesUnavailable:
+      value: {code: CONFLICT, message: These dates were reserved. Review the refreshed calendar and choose another range., unavailableDates: ['2026-10-19', '2026-10-20']}
+    StaleVersion:
+      value: {code: CONFLICT, message: This reservation changed after you opened it. Refresh to review its current state; nothing was changed., fields: {expectedVersion: 'Stale: the reservation is no longer at the version you acted on.'}}
+    IllegalTransition:
+      value: {code: CONFLICT, message: Cannot approve a cancelled reservation. Refresh the desk to review its current state.}
+    VersionMissing:
+      value: {code: VALIDATION_ERROR, message: Check the reservation version before continuing., fields: {expectedVersion: Send the positive integer version of the reservation snapshot you acted on.}}
+    NoteInvalid:
+      value: {code: VALIDATION_ERROR, message: Check the note before continuing., fields: {note: Use 3-500 characters after trimming whitespace.}}
+    ValidationDates:
+      value: {code: VALIDATION_ERROR, message: Check the highlighted request fields., fields: {endDate: Choose at most 14 inclusive days.}}
+    DuplicateCode:
+      value: {code: CONFLICT, message: This inventory code is already in use. Choose a unique code for this physical unit., fields: {inventoryCode: This code is already in use.}}
+    MaintenanceBlocked:
+      value: {code: CONFLICT, message: Maintenance is blocked by an active loan or pending/approved reservation ending today or later. Record active returns and reject or cancel unresolved reservations at the coordinator desk first.}
+    Unavailable:
+      value: {code: SERVICE_UNAVAILABLE, message: The service is unavailable. Try again.}
