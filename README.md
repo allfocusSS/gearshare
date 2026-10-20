@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed #1–5 and the observed bugs #24–28, so the standalone mock frontend gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) adds the versioned root [`openapi.yml`](openapi.yml) (OpenAPI 3.1) and [`_docs/api.md`](_docs/api.md), derived from the completed service, with backend tests that validate and cross-check it; it is an engineer candidate awaiting independent QA. Backend business APIs, the HTTP adapter and persistence remain gated (#7 onward); this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
+Independent QA passed and closed #1–5 and the observed bugs #24–28, so the standalone mock frontend gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) adds the versioned root [`openapi.yml`](openapi.yml) (OpenAPI 3.1) and [`_docs/api.md`](_docs/api.md), derived from the completed service, with backend tests that validate and cross-check it; its first candidate failed independent QA on two authoring defects and the corrected candidate awaits fresh independent QA. Backend business APIs, the HTTP adapter and persistence remain gated (#7 onward); this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 

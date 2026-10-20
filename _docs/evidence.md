@@ -1,8 +1,8 @@
 # Verification evidence
 
-Current stage update (2026-10-20): independent QA passed and closed #1–5 and the observed bugs #24–28, including the [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800), [#27](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6287900059), [#28](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6294272406) and [#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984) PASS verdicts; the standalone mock stage gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) is an engineer candidate: root `openapi.yml` (OpenAPI 3.1) is derived from the completed `GearShareService`, adds private `Booking.version` with a required `expectedVersion` precondition on the five booking mutations, and is checked by `backend/tests/test_openapi_contract.py` (see `_docs/api.md` and evidence.md). #6 stays open for independent QA. #7 and later stages (backend business APIs, persistence, HTTP adapter) remain gated. Historical entries below retain their recorded point-in-time results.
+Current stage update (2026-10-20): independent QA passed and closed #1–5 and the observed bugs #24–28, including the [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800), [#27](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6287900059), [#28](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6294272406) and [#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984) PASS verdicts; the standalone mock stage gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) is an engineer candidate that independent QA [failed](https://github.com/allfocusSS/gearshare/issues/6#issuecomment-6295944514) on `39d1bdd` (two `openapi.yml` authoring defects found by Redocly and Spectral); the correction is a new candidate awaiting fresh independent QA: root `openapi.yml` (OpenAPI 3.1) is derived from the completed `GearShareService`, adds private `Booking.version` with a required `expectedVersion` precondition on the five booking mutations, and is checked by `backend/tests/test_openapi_contract.py` and `backend/tests/test_openapi_guards.py` (see `_docs/api.md` and evidence.md). #6 stays open for independent QA. #7 and later stages (backend business APIs, persistence, HTTP adapter) remain gated. Historical entries below retain their recorded point-in-time results.
 
-Current application status: #1–5 and #24–28 are independently verified and closed; the standalone mock frontend gate passed. The #6 `openapi.yml` contract candidate (below) has passing engineer checks and awaits independent QA. No backend business API, persistence, HTTP adapter or final submission PASS is claimed. Historical records below preserve the actual failures and pending states from their original checkpoints.
+Current application status: #1–5 and #24–28 are independently verified and closed; the standalone mock frontend gate passed. The #6 `openapi.yml` contract candidate (below) failed independent QA once on `39d1bdd` for two authoring defects; the corrected candidate has passing engineer checks and awaits fresh independent QA. No backend business API, persistence, HTTP adapter or final submission PASS is claimed. Historical records below preserve the actual failures and pending states from their original checkpoints.
 
 ## Work actually completed
 
@@ -23,8 +23,8 @@ Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 uniq
 | Check | Result | Command / commit / observation |
 | --- | --- | --- |
 | Bootstrap health test/build | Independent QA PASS, #1 closed | Published `a8ec9b7469b9d1e2f091bc0fdf0369be7e9ba6ad`; [actual QA evidence](https://github.com/allfocusSS/gearshare/issues/1#issuecomment-6261432589); historical engineer details below |
-| Mock frontend browser flows | #1–5 and #24–28 independently verified and closed | Independent QA PASS for the mock stage ([#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984)). The #6 changes (Booking version) were re-run by the engineer on `0486a4e`: all browser suites exit 0 (see the #6 section) |
-| OpenAPI validation | Engineer PASS on `0486a4e`; independent QA pending (#6) | `cd backend && uv run --locked pytest` 22 passed including `tests/test_openapi_contract.py` (21); `uv run --locked openapi-spec-validator ../openapi.yml` reports OK; details in the #6 section |
+| Mock frontend browser flows | #1–5 and #24–28 independently verified and closed | Independent QA PASS for the mock stage ([#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984)). The #6 changes (Booking version) were re-run by the engineer on `0486a4e`, and again on `cd2ff51` after the #6 QA-FAIL correction touched `types.ts` and the mock (`assetId` validation): every browser suite exits 0 (see the #6 sections, including one recorded auth-suite timing failure) |
+| OpenAPI validation | Independent QA FAIL on `39d1bdd` (two authoring defects, Redocly/Spectral); corrected candidate `cd2ff51` plus this evidence commit awaits fresh independent QA (#6) | `cd backend && uv run --locked pytest` 35 passed (28 contract, 6 authoring guards, 1 health); `uv run --locked openapi-spec-validator ../openapi.yml` OK; Redocly 1.34.5 0 errors; Spectral 6.14.3 0 errors; before/after output and the earlier `0486a4e` run are in the #6 sections |
 | In-memory API tests | Not run | Backend currently exposes only health; domain/memory stage follows mock/contract gates |
 | ORM/SQLite tests | Not run | Storage implementation does not exist |
 | Concurrent requests/rollback | Not run | Deferred to actual database stage |
@@ -326,3 +326,102 @@ Mutation check (engineer harness kept in the session scratchpad, not committed; 
 ### Limits of this evidence
 
 These are engineer checks on a non-pinned toolchain. They show the contract is internally valid, consistent with `types.ts` and with the behavior of the memory mock; they do not show that any server implements it, nor database concurrency, persistence, real authentication security or an independent-QA PASS. #6 remains open for fresh independent QA, which alone may close it. #7 and later stages remain gated.
+
+## Iteration 2 — #6 independent-QA FAIL and engineer correction (2026-10-20 UTC)
+
+### The QA FAIL being corrected
+
+Independent QA ran `39d1bdd79d79ff194d002e6852ec221bc6501db7` and posted `QA: FAIL` on #6 ([comment 6295944514](https://github.com/allfocusSS/gearshare/issues/6#issuecomment-6295944514)). The engineer section above remains as the point-in-time record of what the engineer ran on `0486a4e`; it was accurate for those checks but they could not see these two defects:
+
+1. `components.schemas.Error.properties.message` was written as a flow mapping with an unquoted comma (`{type: string, description: Human-readable, safe to show to the user.}`). YAML parsed it as `description: Human-readable` plus a second key `safe to show to the user.` with a null value. `openapi-spec-validator`, the schema-versus-`types.ts` comparison and the 23-mutant check all accepted it.
+2. The `/auth/register` request example used `username: '  New_Member9  '`, which does not match the schema pattern `^[A-Za-z0-9_]{3,30}$`. The old test trimmed the example before validating it, which hid the defect.
+
+QA also reported 14 surviving mutation probes and a list of ambiguities that #7-#10 would settle by accident.
+
+### Reproduction before any change (on `39d1bdd`)
+
+Run from a scratch copy of the file with `npx --yes @redocly/cli@1.34.5 lint openapi.yml` and `npx --yes @stoplight/spectral-cli@6.14.3 lint openapi.yml --ruleset <scratch ruleset containing only extends: ["spectral:oas"]>`. Neither tool is a repository dependency and neither was added.
+
+| Tool | Result before | Result after (`cd2ff51`) |
+| --- | --- | --- |
+| Redocly 1.34.5 | exit 1; 1 error, 3 warnings. Error `struct` at `openapi.yml:1183:62`, "Property `safe to show to the user.` is not expected here"; warning `no-invalid-media-type-examples` at `99:46`, "`username` property must match pattern"; warnings `info-license` and `operation-4xx-response` for `/health` | exit 0; "Your API description is valid"; 0 errors, 2 warnings (`info-license`, `/health` `operation-4xx-response`, both present before) |
+| Spectral 6.14.3 | exit 1; 1 error, 1 warning. Error `oas3-valid-media-example` at `99:46` (same username pattern); warning `info-contact` | exit 0; 0 errors, 1 warning (`info-contact`, present before) |
+
+So the two defects were confirmed before the fix and no error remains after it. The remaining three warnings are about missing `license`, `contact` and a `/health` 4xx response; they are unrelated to this QA finding and were left alone (adding a licence or contact would invent project facts).
+
+A whole-file scan for the same class of defect (flow mappings or sequences with an unquoted comma or colon, accidental null-valued keys, duplicate keys) found exactly one such key, the `Error.message` one, and no duplicate keys. Every `example`/`examples` entry was then validated against its own schema (see the guard below); only the register example failed.
+
+### Correction commits (local until the orchestrator pushes)
+
+| Commit | Subject |
+| --- | --- |
+| `f0cbb02` | Fix openapi.yml mis-quoted Error.message and self-invalid register example; add linter-free authoring guards |
+| `a292232` | Pin the #7-#10 contract decisions QA listed: validation order, Error envelope, ids, events, counts, trimming |
+| `cd2ff51` | Strengthen the contract tests against the surviving mutation probes |
+
+All three messages carry `Refs #6` and no closing keyword. The commit that records this section changes only Markdown, so code and tests on the final commit are byte-identical to `cd2ff516e2204d8ef945cd01c86aced3f91311ff` (tree `c2dbef55bf7ca4f12177fe2975173274c112d85f`). Changed files: `openapi.yml`, `_docs/api.md`, `backend/tests/test_openapi_contract.py`, new `backend/tests/test_openapi_guards.py`, `frontend/src/services/types.ts` (`'assetId'` added to the `ServiceError.fields` keys), `frontend/src/services/mockService.ts` (`requestBooking` now returns `fields.assetId` for a missing, non-string, empty or over-100-character `assetId`), `frontend/tests/contract-samples.mjs`, regenerated `frontend/tests/fixtures/contract-samples.json` (93 samples, was 82) and new `frontend/tests/contract-decisions.test.mjs`. No lock file changed: `uv lock --check` passes and `uv.lock` still starts `version = 1`, `revision = 5`.
+
+### Fix summary per QA finding
+
+| QA finding | Correction |
+| --- | --- |
+| `Error.message` truncated and a null junk key | Description quoted: `'Human-readable, safe to show to the user.'`; a test asserts `Error.message` equals exactly `{type: string, description: ...}` |
+| Register example violates the pattern | Example is `New_Member9`; trimming (`x-trimmed`) is documented in prose; request examples must be valid as written |
+| Linters find what the tests missed | `test_openapi_guards.py` (6 tests): duplicate keys and empty implicit-null values found from the YAML node tree, null values in structural positions, whitespace keys, truncated descriptions, unknown schema keywords, and every `example` and `examples[*].value` (media-type, parameter and header examples, including shared components) validated against its resolved schema with `jsonschema` Draft 2020-12 and the format checker |
+| 14 surviving mutation probes | New wiring tables in `test_openapi_contract.py` for every operation's success status, request schema, response schema and shared 401/403/404/409/422 `$ref`; `listAssets` query parameters compared with `AssetFilters`; frozen limits and formats repeated on shared schemas (`Session.expiresAt` date-time, token length, `events` minItems, `counts` required, asset code length, timestamp formats) |
+| Ambiguities for #7-#10 | Decided and written into `openapi.yml` and `_docs/api.md` (list below); contract tests pin both texts so they cannot drift apart |
+
+### Guard proof (without Redocly or Spectral)
+
+The `39d1bdd` file was copied out with `git show 39d1bdd:openapi.yml` (no stash). The six guard tests run against that copy: 5 failed and 1 passed (the one that passed, `test_format_checking_is_live_so_example_formats_are_really_enforced`, is a self-check that `date-time` format checking is active and does not depend on the file). Failures: duplicate keys/empty values (reports line 1183 `safe to show to the user.` has an empty value), structure (description "looks truncated ... 'Human-readable'", key not a plain token, null in a structural position), unknown schema keyword, known flow-mapping descriptions, and examples valid exactly as written (reports the padded username and that request examples must already be trimmed). On the fixed file the same helpers report 0 problems and all six tests pass. Output is in the session scratchpad (`prove-guards-output.txt`, `pytest-guards-on-old.txt`).
+
+### Mutation check of the new test net
+
+Edits were made only to scratch copies of `openapi.yml`, `api.md`, `types.ts` and the sample fixture; the real tree was never mutated.
+
+* The engineer harness (54 mutants, run on the final tree): the two original defects re-injected as raw text, other authoring-defect classes (a second comma split, a duplicate key, a null description, an unknown keyword, an invalid example), wiring swaps on the five mutations and others, dropped responses and parameters, weakened formats and limits, and documentation drift in `api.md` and `types.ts`. First run: 48 caught, 6 survived. Each survivor was then given a test, and the 6 were re-run and caught; the final full run reports `caught 54 of 54`, `survivors: []`, unmutated baseline passing (34 tests in the two openapi files).
+* QA's 36-mutant harness, which produced the 14 survivors (plus a no-op control) on the original baseline: 35 of the 36 mutants are caught on the final tree, including all of `session_expires_plain`, `session_token_short`, `listassets_param_required`, `listassets_param_removed`, `listassets_cat_string`, `counts_optional`, `asset_code_maxlen`, `events_minitems_removed`, `ts_nodatetime`, `transitionconflict_desc`, `approve_422_ref_wrong`, `reject_422_wrongref` and `cancel_409_to_validation`. The 14th, `maintenance_desc`, still shows SURVIVED, because the probe is `description.replace('atomic', '')` and the `setAssetState` description says "Atomic" with a capital A, so the mutated file is identical to the original (an equivalent mutant that no test can distinguish). The same mutation made case-insensitively is in the engineer harness and is caught by `test_booking_mutations_require_expected_version_and_document_the_precedence`. The unmutated control also reports SURVIVED, as a control should.
+
+### Decisions recorded (no business rule in plan.md or the PM clarification changed)
+
+These make the existing mock-and-QA-passed behavior explicit for the backend stories.
+
+* Evaluation order for the five booking mutations: authentication, then authorization/ownership (404 for a non-owner), then `expectedVersion` shape (422), then version/state conflict (409), then note validation (422). Declarative Pydantic note limits must not pre-empt 409 (verified by experiment: a `constr` note would return 422 before the stale-version 409, so notes are validated by hand after the state checks).
+* Every non-2xx response is the `Error` shape. Each operation has a `default` response; `ErrorCode` maps 405 to `NOT_FOUND` and an unexpected 500 to `SERVICE_UNAVAILABLE`; `_docs/api.md` documents the `RequestValidationError`, `HTTPException` and `Exception` handlers, including malformed JSON and the framework 405 (with an `Allow` header example). Verified by experiment that FastAPI's own defaults are `{"detail": ...}` and need the handlers.
+* Unknown path ids are 404 (never 422); malformed body ids are 422 with `fields`, and `assetId` is now a documented `fields` key (types.ts synchronised, mock returns it).
+* The exact `note` text and event shape for create, approve, reject, cancel, checkout and return are pinned as the mock produces them (`x-events` on `BookingEvent`; for example approve is `Reservation approved.` and cancel is `Reservation cancelled; reserved dates released.`).
+* `StaffDesk.counts.pending` counts pending bookings regardless of dates; `dueToday` counts checked-out bookings whose `endDate` equals today in `Asia/Almaty`; `overdue` counts checked-out bookings whose `endDate` is before today.
+* `x-trimmed` means the server trims before validating; `expectedVersion` is a strict JSON integer (`true`, `"2"`, `2.0` and `null` are 422; FastAPI's lax `int` would accept `true` and `"2"`, so the backend needs strict typing).
+* #13 prerequisites in `api.md`: browser CORS (or a Vite dev proxy) and `tzdata>=2024a` so `Asia/Almaty` resolves to UTC+5.
+
+Product decisions to confirm, chosen as the most conservative reading consistent with the QA-passed mock: the note-after-state order stays as in the mock rather than "validate notes first"; a request for an unknown `assetId` is 404 but a missing or over-long body `assetId` is 422 (the mock previously answered 404 for any value, so it changed by one `fields` key); `pending` is counted regardless of dates (an expired pending request is still counted pending; approving it is 409, as in the mock).
+
+### Commands actually executed on `cd2ff51` (code/tests identical to the final commit)
+
+| Command (directory) | Actual result |
+| --- | --- |
+| `uv lock --check` (`backend/`) | Exit 0; "Resolved 39 packages"; `uv.lock` header `version = 1`, `revision = 5` |
+| `uv run --locked pytest -q` | Exit 0; 35 passed (1 health, 28 in `test_openapi_contract.py`, 6 in `test_openapi_guards.py`) |
+| `uv run --locked openapi-spec-validator ../openapi.yml` | `../openapi.yml: OK` |
+| `npx --yes @redocly/cli@1.34.5 lint openapi.yml` (repo root) | Exit 0; valid, 2 warnings (above) |
+| `npx --yes @stoplight/spectral-cli@6.14.3 lint openapi.yml --ruleset <scratch>` | Exit 0; 0 errors, 1 warning (`info-contact`) |
+| `npm test` (`frontend/`) | Exit 0; 78 passed, 0 failed (was 74; `contract-decisions.test.mjs` adds 4) |
+| `npm run typecheck` | Exit 0 |
+| `npm run build` | Exit 0 |
+| `npm run test:browser` (auth) | 26 checks. **First run failed:** exit 1 with a 30 s Playwright `TimeoutError` at `tests/auth.browser.mjs:59` (`selectOption` on "Response fixture" waiting for the select to be visible and enabled) called from line 223 (`switchFixture('loading')`). It was not reproduced afterwards: 9 further runs passed all 26 checks (1 immediate re-run, 2 on the clean committed `cd2ff51`, 6 in a back-to-back loop). No root cause was established; the mock path changed by this correction (`requestBooking`) is not exercised by this suite, so it is recorded as an unreproduced timing failure, not as a fix or a pass |
+| `npm run test:browser:catalogue` | Exit 0; "All 28 catalogue browser checks passed." |
+| `npm run test:browser:bookings` | Exit 0; #4 request/history/cancellation/conflict/privacy at 390/1440 PASS |
+| `npm run test:browser:staff` | Exit 0; "All 8 staff browser groups passed; no backend/API requests." |
+| `npm run test:browser:labels` | Exit 0; 448 checks, 448 passed, 0 failed; result file records commit `cd2ff516...`. An earlier attempt on the uncommitted working tree exited 1 because the runner refuses to run with a dirty `src` ("QA must run against committed implementation"); it passed after the code was committed |
+| `npm run test:browser:resources` | Exit 0; 18 PASS lines (dev and preview, both widths) |
+| `node tests/qa28.browser.mjs` | Exit 0; 635 checks, 635 passed, 0 failed |
+| `node tests/qa4.browser.mjs` | Exit 0; "independent #4 focused browser: 4 groups, no console/page errors" |
+| `node tests/qa25.browser.mjs` | Exit 0; "independent #25 focused browser: 4 controlled groups, no console/page errors" |
+
+The browser suites were run with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`, one at a time. They were run because the correction touched `types.ts` and the mock. They do not exercise the contract.
+
+### Environment and limits
+
+Linux x86_64. **Node v22.22.0 and npm 10.9.4, not the pinned Node 24.x/npm 11.x; Python 3.12.3 (the pinned 3.12.x line) with uv 0.11.32, not the pinned 0.12.23.** Playwright with the supplied Chromium. Independent QA should repeat the checks on the pinned toolchain. Redocly and Spectral were run through `npx` from the public registry with the versions named above; they remain QA tools, not repository dependencies, and `test_openapi_guards.py` is the repository's own linter-free defence against the same class of defect. Their three warnings (licence, contact, `/health` 4xx) are not addressed. The authoring guards check the cases listed above; they are not a general YAML linter. Nothing in this section shows that a server implements the contract, nor database concurrency, persistence or real authentication security, nor an independent-QA PASS.
+
+#6 stays open. The correction needs fresh independent QA of the new candidate; only QA may close it. #7 and later stages remain gated. The commits are local until the orchestrator pushes.
