@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { createMockService, DEMO_ACCOUNTS } from '../src/services/mockService.ts'
+import { addDays, clubToday } from '../src/services/dates.ts'
+const T='2026-10-19'
+const ok=r=>{assert.equal(r.ok,true,JSON.stringify(r));return r.data}
+const fail=(r,code,status)=>{assert.equal(r.ok,false,JSON.stringify(r));assert.equal(r.error.code,code);if(status)assert.equal(r.error.status,status);return r.error}
+const make=(extra={})=>createMockService({now:()=>new Date(`${T}T06:00:00Z`),sleep:async()=>{},...extra})
+const staff=async s=>ok(await s.login(DEMO_ACCOUNTS.coordinator))
+const request=(extra={})=>({assetId:'accessory-03',startDate:T,endDate:T,purpose:'Staff lifecycle production',...extra})
+const assetInput=(extra={})=>({name:'  Studio camera  ',inventoryCode:'  new-001  ',category:'Cameras',location:'  Club store  ',description:'  A complete fictional kit.  ',...extra})
+const actions=(s,id)=>({approve:()=>s.approveBooking(id),reject:()=>s.rejectBooking(id,{note:'  Shoot rescheduled  '}),checkout:()=>s.checkoutBooking(id,{note:'  Complete outgoing kit  '}),return:()=>s.returnBooking(id,{note:'  Complete incoming kit  '}),cancel:()=>s.cancelBooking(id)})
+const snapshot=async s=>({desk:ok(await s.listStaffBookings()),assets:ok(await s.listInventory()),availability:await Promise.all(ok(await s.listInventory()).map(async a=>ok(await s.getAssetAvailability(a.id))))})
+
+test('staff fixture histories have coherent chronological UTC chains and real-record counts/custody without public leakage',async()=>{
+ const {service:s}=make();await staff(s);const desk=ok(await s.listStaffBookings());assert.deepEqual(desk.counts,{pending:3,dueToday:0,overdue:1});assert.equal(desk.today,T)
+ for(const b of desk.bookings){let state=null,stamp='';for(const e of b.events){assert.equal(e.bookingId,b.id);assert.equal(e.priorState,state);assert.ok(e.timestamp.endsWith('Z'));assert.ok(stamp<=e.timestamp&&e.timestamp<=`${T}T06:00:00.000Z`);if(e.action==='checkout')assert.ok(clubToday(new Date(e.timestamp))>=b.startDate&&clubToday(new Date(e.timestamp))<=b.endDate);state=e.newState;stamp=e.timestamp}assert.equal(state,b.state)}
+ assert.equal(desk.bookings.find(b=>b.id==='fixture-next-pickup').currentlyOnLoan,true);desk.counts.pending=999;desk.bookings[0].events[0].note='tampered';assert.equal(ok(await s.listStaffBookings()).counts.pending,3);assert.notEqual(ok(await s.getBooking('fixture-pending')).events[0].note,'tampered')
+ const publicData=ok(await s.getAssetAvailability('audio-01'));assert.ok(publicData.days.every(d=>Object.keys(d).sort().join(',')==='date,state'));assert.equal(/borrower|purpose|bookingId|student/.test(JSON.stringify(publicData)),false)
+})
+
+test('all staff methods deny visitor/student without changing inventory, history or allocations',async()=>{
+ const {service:s}=make();await staff(s);const before=await snapshot(s)
+ const calls=()=>[...Object.entries(actions(s,'fixture-pending')).filter(([key])=>key!=='cancel').map(([,call])=>call),()=>s.listStaffBookings(),()=>s.listInventory(),()=>s.addAsset(assetInput()),()=>s.editAsset('camera-01',assetInput()),()=>s.setAssetState('camera-01','maintenance')]
+ ok(await s.logout());for(const call of calls())fail(await call(),'UNAUTHENTICATED',401);ok(await s.login(DEMO_ACCOUNTS.student));for(const call of calls())fail(await call(),'FORBIDDEN',403);await staff(s);assert.deepEqual(await snapshot(s),before)
+})
+
+test('allowed lifecycle writes immutable actor/action/prior/new/note events; reject/cancel/return release dates and custody',async()=>{
+ const {service:s}=make();ok(await s.login(DEMO_ACCOUNTS.student));const b=ok(await s.requestBooking({...request(),userId:'attacker',state:'returned',events:[]}));await staff(s)
+ const approved=ok(await s.approveBooking(b.id,{actorId:'attacker',state:'returned'}));assert.deepEqual(approved.events.slice(0,-1),b.events)
+ ok(await s.checkoutBooking(b.id,{note:'  Complete kit  ',actorId:'attacker',state:'returned'}));assert.equal(ok(await s.listStaffBookings()).bookings.find(v=>v.id===b.id).currentlyOnLoan,true)
+ const returned=ok(await s.returnBooking(b.id,{note:'  Clean and complete  ',userId:'attacker',events:[]}));assert.deepEqual(returned.events.map(e=>[e.action,e.priorState,e.newState,e.actorId,e.note]),[['create',null,'pending','student-demo','Staff lifecycle production'],['approve','pending','approved','coordinator-demo','Reservation approved.'],['checkout','approved','checked_out','coordinator-demo','Complete kit'],['return','checked_out','returned','coordinator-demo','Clean and complete']]);assert.equal(returned.userId,'student-demo');returned.events[0].actorId='attacker';assert.equal(ok(await s.getBooking(b.id)).events[0].actorId,'student-demo');assert.equal(ok(await s.getAssetAvailability(b.assetId)).days[0].state,'available');assert.equal(ok(await s.listStaffBookings()).bookings.find(v=>v.id===b.id).currentlyOnLoan,false)
+ ok(await s.rejectBooking('fixture-pending',{note:'  Shoot rescheduled  '}));for(const date of[2,3,4])assert.equal(ok(await s.getAssetAvailability('camera-01')).days[date].state,'available');ok(await s.cancelBooking('fixture-approved'));assert.equal(ok(await s.getAssetAvailability('camera-02')).days[1].state,'available');ok(await s.login(DEMO_ACCOUNTS.student));const own=ok(await s.requestBooking(request()));ok(await s.cancelBooking(own.id))
+})
+
+test('complete invalid/repeated/terminal action matrix returns unchanged 409 results',async()=>{
+ const valid={pending:['approve','reject','cancel'],approved:['checkout','cancel'],checked_out:['return'],rejected:[],cancelled:[],returned:[]}
+ for(const[state,allowed]of Object.entries(valid)){const{service:s}=make();await staff(s);for(const[name,call]of Object.entries(actions(s,`fixture-${state}`)))if(!allowed.includes(name)){const before=await snapshot(s);fail(await call(),'CONFLICT',409);assert.deepEqual(await snapshot(s),before)}}
+ for(const action of['approve','reject','checkout','return','cancel']){const{service:s}=make();await staff(s);const b=ok(await s.requestBooking(request()));if(['checkout','return'].includes(action))ok(await s.approveBooking(b.id));if(action==='return')ok(await s.checkoutBooking(b.id,{note:'All complete'}));ok(await actions(s,b.id)[action]());const before=await snapshot(s);fail(await actions(s,b.id)[action](),'CONFLICT',409);assert.deepEqual(await snapshot(s),before)}
+ const{service:s}=make();await staff(s);const before=await snapshot(s);for(const call of Object.values(actions(s,'unknown')))fail(await call(),'NOT_FOUND',404);assert.deepEqual(await snapshot(s),before)
+})
+
+test('trimmed 3/500 notes pass and blank/2/501 notes fail atomically for rejection, checkout and return',async()=>{
+ for(const action of['reject','checkout','return'])for(const note of['','   ','ab','x'.repeat(501),'  abc  ',`  ${'x'.repeat(500)}  `]){const{service:s}=make();await staff(s);const b=ok(await s.requestBooking(request()));if(action!=='reject')ok(await s.approveBooking(b.id));if(action==='return')ok(await s.checkoutBooking(b.id,{note:'Complete kit'}));const before=await snapshot(s);const result=await s[action==='reject'?'rejectBooking':action==='checkout'?'checkoutBooking':'returnBooking'](b.id,{note});if(note.trim().length<3||note.trim().length>500){assert.ok(fail(result,'VALIDATION_ERROR').fields.note);assert.deepEqual(await snapshot(s),before)}else assert.equal(ok(result).events.at(-1).note,note.trim())}
+})
+
+test('Asia/Almaty inclusive checkout dates, expired approval/checkout, derived overdue and physical custody blocking/late return',async()=>{
+ let instant='2026-12-31T20:00:00Z';const{service:s}=make({now:()=>new Date(instant)});await staff(s);const day='2027-01-01'
+ const b=ok(await s.requestBooking(request({startDate:addDays(day,1),endDate:addDays(day,2)})));ok(await s.approveBooking(b.id));fail(await s.checkoutBooking(b.id,{note:'Complete kit'}),'CONFLICT',409);instant='2027-01-01T20:00:00Z';ok(await s.checkoutBooking(b.id,{note:'Start-day checkout'}));instant='2027-01-02T20:00:00Z';assert.equal(ok(await s.listStaffBookings()).counts.dueToday,1);ok(await s.returnBooking(b.id,{note:'Complete kit'}));const last=ok(await s.requestBooking(request({startDate:'2027-01-03',endDate:'2027-01-03'})));ok(await s.approveBooking(last.id));ok(await s.checkoutBooking(last.id,{note:'End-day checkout'}));instant='2027-01-03T20:00:00Z';const overdue=ok(await s.listStaffBookings()).bookings.find(v=>v.id===last.id);assert.equal(overdue.state,'checked_out');assert.equal(overdue.overdue,true);ok(await s.returnBooking(last.id,{note:'Late but complete'}))
+ const expired=ok(await s.requestBooking(request({startDate:'2027-01-04',endDate:'2027-01-04'})));const approved=ok(await s.requestBooking(request({assetId:'accessory-01',startDate:'2027-01-04',endDate:'2027-01-04'})));ok(await s.approveBooking(approved.id));instant='2027-01-04T20:00:00Z';const before=await snapshot(s);fail(await s.approveBooking(expired.id),'CONFLICT',409);fail(await s.checkoutBooking(approved.id,{note:'Too late'}),'CONFLICT',409);assert.deepEqual(await snapshot(s),before)
+ const clean=make().service;await staff(clean);const blocked=await snapshot(clean);fail(await clean.checkoutBooking('fixture-next-pickup',{note:'Complete kit'}),'CONFLICT',409);assert.deepEqual(await snapshot(clean),blocked);ok(await clean.returnBooking('fixture-checked_out',{note:'Late return complete'}));ok(await clean.checkoutBooking('fixture-next-pickup',{note:'Complete new kit'}))
+})
+
+test('competing mock requests/transitions commit atomically and active custody remains unique; conflict fixture stays idempotent',async()=>{
+ const{service:s,demo}=make();await staff(s);const requests=await Promise.all([s.requestBooking(request()),s.requestBooking(request())]);assert.deepEqual(requests.map(r=>r.ok),[true,false]);fail(requests[1],'CONFLICT',409);const b=ok(requests[0]);const decisions=await Promise.all([s.approveBooking(b.id),s.rejectBooking(b.id,{note:'Not needed'})]);assert.deepEqual(decisions.map(r=>r.ok),[true,false]);const checkouts=await Promise.all([s.checkoutBooking(b.id,{note:'Complete kit'}),s.checkoutBooking(b.id,{note:'Complete kit'})]);assert.deepEqual(checkouts.map(r=>r.ok),[true,false]);fail(checkouts[1],'CONFLICT',409);assert.equal(ok(await s.getBooking(b.id)).events.length,3);demo.simulateConflict();fail(await s.requestBooking(request()),'CONFLICT',409);assert.equal(ok(await s.listStaffBookings()).bookings.filter(v=>v.assetId===b.assetId&&v.startDate===T).length,1)
+})
+
+test('inventory field boundaries/category/normalized unique codes/injection are guarded and edits retain immutable reservations',async()=>{
+ const{service:s}=make();await staff(s);const booking=ok(await s.getBooking('fixture-pending')),original=ok(await s.getAsset('camera-01'))
+ for(const extra of[{name:'a'},{name:'x'.repeat(101)},{inventoryCode:'a'},{inventoryCode:'x'.repeat(31)},{location:'a'},{location:'x'.repeat(101)},{description:'x'.repeat(2001)},{category:'Unknown'}]){const before=await snapshot(s);fail(await s.addAsset(assetInput(extra)),'VALIDATION_ERROR');assert.deepEqual(await snapshot(s),before);fail(await s.editAsset(original.id,assetInput(extra)),'VALIDATION_ERROR');assert.deepEqual(await snapshot(s),before)}
+ const asset=ok(await s.addAsset({...assetInput(),id:'injected',state:'maintenance',userId:'attacker'}));assert.equal(asset.inventoryCode,'NEW-001');assert.equal(asset.name,'Studio camera');assert.equal(asset.state,'active');assert.notEqual(asset.id,'injected');assert.equal(asset.description,'A complete fictional kit.')
+ for(const inventoryCode of['NEW-001',' new-001 ','cam-001'])assert.ok(fail(await s.addAsset(assetInput({inventoryCode})),'CONFLICT',409).fields.inventoryCode)
+ const before=await snapshot(s);fail(await s.editAsset(original.id,assetInput()),'CONFLICT',409);assert.deepEqual(await snapshot(s),before);const edited=ok(await s.editAsset(original.id,{...assetInput({inventoryCode:original.inventoryCode,name:'Renamed unit'}),state:'maintenance',id:'attacker'}));assert.equal(edited.id,original.id);assert.equal(edited.state,original.state);assert.deepEqual(ok(await s.getBooking(booking.id)),booking)
+ ok(await s.addAsset(assetInput({name:'ab',inventoryCode:'ab',location:'ab',description:''})));ok(await s.addAsset(assetInput({name:'x'.repeat(100),inventoryCode:'x'.repeat(30),location:'x'.repeat(100),description:'x'.repeat(2000)})));asset.name='tampered';assert.equal(ok(await s.getAsset(asset.id)).name,'Studio camera')
+})
+
+test('maintenance rejects active/today/future commitments unchanged and permits resolved/past commitments; requests blocked and races coherent',async()=>{
+ const{service:s}=make();await staff(s);for(const id of['camera-01','camera-02','audio-01','audio-02','presentation-01','accessory-02']){const before=await snapshot(s);assert.match(fail(await s.setAssetState(id,'maintenance'),'CONFLICT',409).message,/Record active returns.*reject or cancel/);assert.deepEqual(await snapshot(s),before)}
+ ok(await s.rejectBooking('fixture-pending',{note:'Prepare for maintenance'}));const history=ok(await s.getBooking('fixture-pending'));ok(await s.setAssetState('camera-01','maintenance'));fail(await s.requestBooking(request({assetId:'camera-01'})),'CONFLICT',409);assert.deepEqual(ok(await s.getBooking(history.id)),history);assert.ok(ok(await s.getAssetAvailability('camera-01')).days.every(d=>d.state==='maintenance'));fail(await s.setAssetState('camera-01','maintenance'),'CONFLICT',409);fail(await s.setAssetState('camera-01','deleted'),'VALIDATION_ERROR');ok(await s.setAssetState('camera-01','active'))
+ const race=await Promise.all([s.setAssetState('accessory-03','maintenance'),s.requestBooking(request())]);assert.deepEqual(race.map(r=>r.ok),[true,false]);fail(race[1],'CONFLICT',409)
+ let date=T;const past=make({now:()=>new Date(`${date}T06:00:00Z`)}).service;await staff(past);const expired=ok(await past.requestBooking(request()));date=addDays(T,1);ok(await past.setAssetState(expired.assetId,'maintenance'));assert.equal(ok(await past.getBooking(expired.id)).state,'pending')
+})
+
+test('staff async failures/reset cannot mutate stale state; empty fixture never manufactures coordinator privileges',async()=>{
+ const{service:s,demo}=make();await staff(s);demo.setScenario('error');for(const call of[()=>s.listStaffBookings(),()=>s.listInventory(),()=>s.approveBooking('fixture-pending'),()=>s.addAsset(assetInput()),()=>s.editAsset('camera-01',assetInput()),()=>s.setAssetState('camera-01','maintenance')])fail(await call(),'SERVICE_UNAVAILABLE');demo.setScenario('empty');assert.deepEqual(ok(await s.listAssets()).items,[]);fail(await s.login(DEMO_ACCOUNTS.coordinator),'INVALID_CREDENTIALS')
+ const queue=[],controlled=make({sleep:()=>new Promise(resolve=>queue.push(resolve))});const signin=controlled.service.login(DEMO_ACCOUNTS.coordinator);queue.shift()();ok(await signin);const pending=controlled.service.approveBooking('fixture-pending');controlled.demo.setScenario('normal');queue.shift()();fail(await pending,'SERVICE_UNAVAILABLE');const relogin=controlled.service.login(DEMO_ACCOUNTS.coordinator);queue.shift()();ok(await relogin);const read=controlled.service.getBooking('fixture-pending');queue.shift()();assert.equal(ok(await read).state,'pending')
+})
