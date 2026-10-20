@@ -34,8 +34,8 @@ test('inclusive conflicts, adjacency, other units, cancellation release/rebookin
   }
   ok(await service.requestBooking(input({ startDate: addDays(T,3), endDate: addDays(T,3) })))
   ok(await service.requestBooking(input({ assetId: 'accessory-03' })))
-  const cancelled = ok(await service.cancelBooking(b.id)); assert.equal(cancelled.state, 'cancelled'); assert.equal(cancelled.events.length, 2)
-  fail(await service.cancelBooking(b.id), 'CONFLICT'); assert.deepEqual(ok(await service.getBooking(b.id)), cancelled)
+  const cancelled = ok(await service.cancelBooking(b.id, { expectedVersion: b.version })); assert.equal(cancelled.state, 'cancelled'); assert.equal(cancelled.events.length, 2)
+  fail(await service.cancelBooking(b.id, { expectedVersion: cancelled.version }), 'CONFLICT'); assert.deepEqual(ok(await service.getBooking(b.id)), cancelled)
   ok(await service.requestBooking(input()))
 })
 
@@ -54,9 +54,9 @@ test('seeded active and terminal states enforce transitions, coordinator cancell
   const { service } = make(); await login(service)
   const seeded = ok(await service.listBookings())
   assert.deepEqual(seeded.map(b=>b.state), ['pending','approved','checked_out','rejected','cancelled','returned'])
-  for (const b of seeded.filter(b=>!['pending','approved'].includes(b.state))) { fail(await service.cancelBooking(b.id),'CONFLICT'); assert.deepEqual(ok(await service.getBooking(b.id)),b) }
+  for (const b of seeded.filter(b=>!['pending','approved'].includes(b.state))) { fail(await service.cancelBooking(b.id, { expectedVersion: b.version }),'CONFLICT'); assert.deepEqual(ok(await service.getBooking(b.id)),b) }
   ok(await service.login(DEMO_ACCOUNTS.coordinator))
-  ok(await service.cancelBooking('fixture-approved'))
+  ok(await service.cancelBooking('fixture-approved', { expectedVersion: seeded.find(b => b.id === 'fixture-approved').version }))
   assert.deepEqual(ok(await service.listBookings()), [])
   const availability = ok(await service.getAssetAvailability('camera-02'))
   // Cancellation releases the seeded approved allocation.

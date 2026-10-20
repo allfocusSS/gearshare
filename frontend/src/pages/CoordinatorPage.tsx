@@ -59,7 +59,9 @@ export function CoordinatorPage({ service }: { service: GearShareService }) {
     if (!selected || !action || !desk || busy.current || reading.current) return
     busy.current = true; setPending(true); setError(null); setMessage('')
     const id = request.current
-    const result = action === 'approve' ? await service.approveBooking(selected.id) : action === 'reject' ? await service.rejectBooking(selected.id, { note }) : action === 'checkout' ? await service.checkoutBooking(selected.id, { note }) : action === 'return' ? await service.returnBooking(selected.id, { note }) : await service.cancelBooking(selected.id)
+    // Always the version of the snapshot on screen; a stale result is shown to the user, never silently refreshed or retried.
+    const expectedVersion = selected.version
+    const result = action === 'approve' ? await service.approveBooking(selected.id, { expectedVersion }) : action === 'reject' ? await service.rejectBooking(selected.id, { note, expectedVersion }) : action === 'checkout' ? await service.checkoutBooking(selected.id, { note, expectedVersion }) : action === 'return' ? await service.returnBooking(selected.id, { note, expectedVersion }) : await service.cancelBooking(selected.id, { expectedVersion })
     if (id !== request.current) return
     if (result.ok) {
       // A command confirms this Booking only. Cross-booking custody and counts

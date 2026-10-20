@@ -34,7 +34,7 @@ export function ReservationsPage({ service, user }: { service: GearShareService;
   async function cancel() {
     if (!selected || pending) return
     setPending(true); setError(''); setMessage('')
-    const result = await service.cancelBooking(selected.id)
+    const result = await service.cancelBooking(selected.id, { expectedVersion: selected.version })
     if (result.ok) {
       setSelected(result.data); setItems(values => values.map(b => b.id === result.data.id ? result.data : b)); setMessage('Reservation cancelled. The dates have been released.')
     } else setError(result.error.message)

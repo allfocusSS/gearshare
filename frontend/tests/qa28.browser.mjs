@@ -73,9 +73,9 @@ try {
       if (scenario.name === 'checkout') {
         const first = await s.requestBooking({ assetId: 'accessory-03', startDate: '2026-10-19', endDate: '2026-10-19', purpose: 'QA28 same-day checkout' })
         if (!first.ok) throw new Error(JSON.stringify(first)); id = first.data.id
-        const approval = await s.approveBooking(id); if (!approval.ok) throw new Error(JSON.stringify(approval))
+        const approval = await s.approveBooking(id, { expectedVersion: first.data.version }); if (!approval.ok) throw new Error(JSON.stringify(approval))
         const next = await s.requestBooking({ assetId: 'accessory-03', startDate: '2026-10-20', endDate: '2026-10-20', purpose: 'QA28 adjacent physical pickup' })
-        if (!next.ok) throw new Error(JSON.stringify(next)); const approvedNext = await s.approveBooking(next.data.id); if (!approvedNext.ok) throw new Error(JSON.stringify(approvedNext))
+        if (!next.ok) throw new Error(JSON.stringify(next)); const approvedNext = await s.approveBooking(next.data.id, { expectedVersion: next.data.version }); if (!approvedNext.ok) throw new Error(JSON.stringify(approvedNext))
       }
       const before = await s.getBooking(id); if (!before.ok) throw new Error(JSON.stringify(before))
       window.qa28 = { s, id, before: before.data, originalList: s.listStaffBookings, originalCommand: s[scenario.method], queue: [], readCalls: 0, writeCalls: 0, successfulWrites: 0 }

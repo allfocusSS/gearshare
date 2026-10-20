@@ -53,21 +53,21 @@ test('QA #4 all active states occupy their inclusive days; owner/coordinator pen
   date = T
   for (const booking of seeded.filter(b => ['checked_out', 'cancelled', 'rejected', 'returned'].includes(b.state))) {
     const before = await snapshot(service)
-    fail(await service.cancelBooking(booking.id), 'CONFLICT')
+    fail(await service.cancelBooking(booking.id, { expectedVersion: booking.version }), 'CONFLICT')
     assert.deepEqual(await snapshot(service), before)
   }
   for (const actor of ['student', 'coordinator']) for (const state of ['pending', 'approved']) {
     const clean = make().service; ok(await clean.login(DEMO_ACCOUNTS.student))
     const original = ok(await clean.getBooking(`fixture-${state}`))
     ok(await clean.login(DEMO_ACCOUNTS[actor]))
-    const cancelled = ok(await clean.cancelBooking(original.id))
+    const cancelled = ok(await clean.cancelBooking(original.id, { expectedVersion: original.version }))
     assert.equal(cancelled.state, 'cancelled')
     assert.deepEqual(cancelled.events.slice(0, -1), original.events)
     assert.deepEqual([cancelled.events.at(-1).action, cancelled.events.at(-1).priorState, cancelled.events.at(-1).newState, cancelled.events.at(-1).timestamp], ['cancel', state, 'cancelled', `${T}T06:00:00.000Z`])
     const days = ok(await clean.getAssetAvailability(original.assetId)).days
     for (let day = original.startDate; day <= original.endDate; day = addDays(day, 1)) assert.equal(days.find(d => d.date === day)?.state, 'available')
     const after = ok(await clean.getBooking(original.id))
-    fail(await clean.cancelBooking(original.id), 'CONFLICT')
+    fail(await clean.cancelBooking(original.id, { expectedVersion: cancelled.version }), 'CONFLICT')
     assert.deepEqual(ok(await clean.getBooking(original.id)), after)
   }
 })

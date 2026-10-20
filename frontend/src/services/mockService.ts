@@ -22,6 +22,9 @@ interface MockOptions {
   now?: () => Date
 }
 
+/** Largest accepted `expectedVersion` (signed 32-bit, as frozen in openapi.yml). */
+export const MAX_VERSION = 2_147_483_647
+
 export const normalizeUsername = (username: string) => username.trim().toLowerCase()
 
 function validate(credentials: Credentials): ServiceError | null {
@@ -69,7 +72,7 @@ export function createMockService(options: MockOptions = {}) {
       const seed = (id: string, state: BookingState, assetIndex: number, from: number, through: number, userId = 'student-demo') => {
         const asset = fixture.assets[assetIndex]
         const startDate = addDays(today(), from), endDate = addDays(today(), through)
-        const booking: Booking = { id, assetId: asset.id, assetName: asset.name, userId, purpose: 'Fictional club production', startDate, endDate, state, events: [] }
+        const booking: Booking = { id, assetId: asset.id, assetName: asset.name, userId, purpose: 'Fictional club production', startDate, endDate, state, version: 1, events: [] }
         const event = (action: BookingAction, priorState: BookingState | null, newState: BookingState, date: string, actorId: string, note: string) => booking.events.push({ id: `${id}-${action}`, bookingId: id, actorId, action, priorState, newState, timestamp: `${date}T06:00:00.000Z`, note })
         const created = addDays(today(), Math.min(from - 3, -3))
         event('create', null, 'pending', created, userId, booking.purpose)
@@ -78,6 +81,8 @@ export function createMockService(options: MockOptions = {}) {
         if (state === 'returned') event('return', 'checked_out', 'returned', endDate, 'coordinator-demo', 'Complete kit returned in good condition.')
         if (state === 'rejected') event('reject', 'pending', 'rejected', addDays(created, 1), 'coordinator-demo', 'Equipment inspection required.')
         if (state === 'cancelled') event('cancel', 'pending', 'cancelled', addDays(created, 1), userId, 'Reservation cancelled; reserved dates released.')
+        // Every create/transition writes exactly one event and bumps the version once, so a coherent chain has version === events.length.
+        booking.version = booking.events.length
         bookings.push(booking)
       }
       // Preserve the owner's six-state history and every existing public occupied-date pattern.
@@ -118,22 +123,36 @@ export function createMockService(options: MockOptions = {}) {
   const hidden = { code: 'NOT_FOUND', status: 404, message: 'Reservation not found or unavailable to this account.' } as const
   const staffDenied = (): ServiceError | null => !signedIn ? unauthorized : signedIn.role !== 'coordinator' ? { code: 'FORBIDDEN', status: 403, message: 'Coordinator access is required for this action.' } : null
   const conflict = (message: string): ServiceError => ({ code: 'CONFLICT', status: 409, message })
+  /** Shape check, then compare against the current version. Runs after authorization/privacy (401/403/404) and before any state rule; never mutates. */
+  function versionError(input: unknown, booking: Booking): ServiceError | null {
+    const expected = (input as { expectedVersion?: unknown } | null | undefined)?.expectedVersion
+    if (typeof expected !== 'number' || !Number.isInteger(expected) || expected < 1 || expected > MAX_VERSION) {
+      return { code: 'VALIDATION_ERROR', message: 'Check the reservation version before continuing.', fields: { expectedVersion: 'Send the positive integer version of the reservation snapshot you acted on.' } }
+    }
+    if (expected !== booking.version) {
+      return { ...conflict('This reservation changed after you opened it. Refresh to review its current state; nothing was changed.'), fields: { expectedVersion: 'Stale: the reservation is no longer at the version you acted on.' } }
+    }
+    return null
+  }
   const onLoan = (assetId: string) => bookings.some(b => b.assetId === assetId && b.state === 'checked_out')
-  async function transition(id: string, action: 'approve' | 'reject' | 'checkout' | 'return', rawNote = ''): Promise<ServiceResult<Booking>> {
+  async function transition(id: string, action: 'approve' | 'reject' | 'checkout' | 'return', input: { expectedVersion?: unknown; note?: string } | undefined): Promise<ServiceResult<Booking>> {
     const error = await ready() ?? staffDenied()
     if (error) return failure(error)
     const booking = bookings.find(b => b.id === id)
     if (!booking) return failure(hidden)
+    const stale = versionError(input, booking)
+    if (stale) return failure(stale)
     const rules = { approve: ['pending', 'approved'], reject: ['pending', 'rejected'], checkout: ['approved', 'checked_out'], return: ['checked_out', 'returned'] } as const
     const [required, next] = rules[action]
     if (booking.state !== required) return failure(conflict(`Cannot ${action === 'checkout' ? 'check out' : action} a ${booking.state.replaceAll('_', ' ')} reservation. Refresh the desk to review its current state.`))
-    const note = rawNote.trim()
+    const note = typeof input?.note === 'string' ? input.note.trim() : ''
     if (action !== 'approve' && (note.length < 3 || note.length > 500)) return failure({ code: 'VALIDATION_ERROR', message: 'Check the note before continuing.', fields: { note: 'Use 3–500 characters after trimming whitespace.' } })
     if (action === 'approve' && booking.endDate < today()) return failure(conflict('The booked end date has passed. Reject or cancel this request instead.'))
     if (action === 'checkout' && (today() < booking.startDate || today() > booking.endDate)) return failure(conflict('Check out only within the inclusive booked dates in Asia/Almaty.'))
     if (action === 'checkout' && onLoan(booking.assetId)) return failure(conflict('This physical unit is still on loan. Record its return before checking it out again, including any overdue loan.'))
     // No await between validation and commit; competing mock operations observe committed state.
     booking.state = next
+    booking.version += 1
     booking.events.push({ id: `${id}-${action}`, bookingId: id, actorId: signedIn!.id, action, priorState: required, newState: next, timestamp: (options.now?.() ?? new Date()).toISOString(), note: action === 'approve' ? 'Reservation approved.' : note })
     return success(cloneBooking(booking))
   }
@@ -169,14 +188,14 @@ export function createMockService(options: MockOptions = {}) {
         conflictNext = false
         if (!reserved(asset.id, input.startDate)) {
           const id = `competing-${nextId++}`
-          bookings.push({ id, assetId: asset.id, assetName: asset.name, userId: 'student-other', purpose: 'Another fictional club project', startDate: input.startDate, endDate: input.startDate, state: 'pending', events: [{ id: `${id}-create`, bookingId: id, actorId: 'student-other', action: 'create', priorState: null, newState: 'pending', timestamp: (options.now?.() ?? new Date()).toISOString(), note: 'Another fictional club project' }] })
+          bookings.push({ id, assetId: asset.id, assetName: asset.name, userId: 'student-other', purpose: 'Another fictional club project', startDate: input.startDate, endDate: input.startDate, state: 'pending', version: 1, events: [{ id: `${id}-create`, bookingId: id, actorId: 'student-other', action: 'create', priorState: null, newState: 'pending', timestamp: (options.now?.() ?? new Date()).toISOString(), note: 'Another fictional club project' }] })
         }
       }
       const unavailableDates: string[] = []
       for (let day = input.startDate; day <= input.endDate; day = addDays(day, 1)) if (reserved(asset.id, day)) unavailableDates.push(day)
       if (unavailableDates.length) return failure({ code: 'CONFLICT', status: 409, message: 'These dates were reserved. Review the refreshed calendar and choose another range.', unavailableDates })
       const id = `booking-${nextId++}`
-      const booking: Booking = { id, assetId: asset.id, assetName: asset.name, userId: signedIn.id, purpose, startDate: input.startDate, endDate: input.endDate, state: 'pending', events: [{ id: `${id}-create`, bookingId: id, actorId: signedIn.id, action: 'create', priorState: null, newState: 'pending', timestamp: (options.now?.() ?? new Date()).toISOString(), note: purpose }] }
+      const booking: Booking = { id, assetId: asset.id, assetName: asset.name, userId: signedIn.id, purpose, startDate: input.startDate, endDate: input.endDate, state: 'pending', version: 1, events: [{ id: `${id}-create`, bookingId: id, actorId: signedIn.id, action: 'create', priorState: null, newState: 'pending', timestamp: (options.now?.() ?? new Date()).toISOString(), note: purpose }] }
       bookings.push(booking)
       return success(cloneBooking(booking))
     },
@@ -193,15 +212,18 @@ export function createMockService(options: MockOptions = {}) {
       const booking = privateBooking(id)
       return booking ? success(cloneBooking(booking)) : failure(hidden)
     },
-    async cancelBooking(id) {
+    async cancelBooking(id, input) {
       const error = await ready()
       if (error) return failure(error)
       if (!signedIn) return failure(unauthorized)
       const booking = privateBooking(id)
       if (!booking) return failure(hidden)
+      const stale = versionError(input, booking)
+      if (stale) return failure(stale)
       if (!['pending', 'approved'].includes(booking.state)) return failure({ code: 'CONFLICT', status: 409, message: 'Only pending or approved reservations can be cancelled.' })
       const priorState = booking.state
       booking.state = 'cancelled'
+      booking.version += 1
       booking.events.push({ id: `${id}-cancel`, bookingId: id, actorId: signedIn.id, action: 'cancel', priorState, newState: 'cancelled', timestamp: (options.now?.() ?? new Date()).toISOString(), note: 'Reservation cancelled; reserved dates released.' })
       return success(cloneBooking(booking))
     },
@@ -218,10 +240,10 @@ export function createMockService(options: MockOptions = {}) {
         return { ...cloneBooking(b), borrower: accounts.find(a => a.user.id === b.userId)?.user.username ?? 'sam_student', inventoryCode: asset.inventoryCode, location: asset.location, currentlyOnLoan: onLoan(b.assetId), overdue: b.state === 'checked_out' && b.endDate < current }
       }) })
     },
-    approveBooking: id => transition(id, 'approve'),
-    rejectBooking: (id, input) => transition(id, 'reject', input.note),
-    checkoutBooking: (id, input) => transition(id, 'checkout', input.note),
-    returnBooking: (id, input) => transition(id, 'return', input.note),
+    approveBooking: (id, input) => transition(id, 'approve', input),
+    rejectBooking: (id, input) => transition(id, 'reject', input),
+    checkoutBooking: (id, input) => transition(id, 'checkout', input),
+    returnBooking: (id, input) => transition(id, 'return', input),
     async listInventory() {
       const error = await ready() ?? staffDenied()
       return error ? failure(error) : success(assets.map(publicAsset))
