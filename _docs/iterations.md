@@ -76,3 +76,9 @@ The fresh independent check at `3613944f2d76ce2234ff2d0efa11e53fbe472f73` subseq
 - Corrected implementation local 2bd9b26 was published as f89c963b8b0193d159f74742e126a966a0053bd3, tree87b7f39c81c9814d21dd5b4dc3ba66f98618cb53. Standard engineer checks on that exact commit passed: npm test41/41, typecheck0, build0.
 - Preserved focused results show baseline346 assertions with70 clipping failures; corrected expanded runner448/448 successful assertions and no console/page/request failures. Engineer inspected corrected desk/inventory screenshots390/1440. This is scoped evidence, not an overall independent verdict.
 - Final handoff changes documentation only and explicitly distinguishes pre-fix full functional browser passes from corrected focused results. Fresh independent QA still must run the complete surrounding browser set and verify #5/#27 before closure; the mock-to-contract gate remains blocked.
+
+## 2026-10-20 — #28 staff command/read recovery checkpoint
+
+- Independent QA passed/closed #27, then found the actual #28 async recovery defect and failed #5 on published `e4b4593f5d3235bf0f87a9ff8158fe77097d3a33`. Read the actual issue, PM chosen unavailable-until-read recovery and pre-fix R01–R08 before implementing the correction.
+- Retained command-confirmed Booking/history separately from the untrusted staff desk, withheld queues/counts/derived custody-overdue and dependent actions, and kept a persistent accessible saved-command/read-failure alert with guarded read-only retry and meaningful Back/refresh focus.
+- Standard engineer checks pass (41 tests, typecheck, build). Focused and surrounding browser checks remain pending at this checkpoint; see evidence.md for actual outcomes and limits. Source scope is CoordinatorPage only. #28/#5 stay open for independent QA; no #6/OpenAPI, backend, persistence or version work started.
