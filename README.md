@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1), [#2](https://github.com/allfocusSS/gearshare/issues/2), [#3](https://github.com/allfocusSS/gearshare/issues/3) and the observed focus bug [#24](https://github.com/allfocusSS/gearshare/issues/24). The [#4](https://github.com/allfocusSS/gearshare/issues/4) candidate adds mock student requests, private reservation details/history and permitted cancellation. #4 awaits independent QA. Staff mutation, contract and persistence remain ahead; this is not a finished submission. Actual checks and the real #24 FAIL→fix→QA PASS trail are in [`_docs/evidence.md`](_docs/evidence.md).
+Independent QA passed and closed #1–4 and the observed bugs #24–26. The [#5](https://github.com/allfocusSS/gearshare/issues/5) mock candidate adds the complete coordinator desk and inventory workflows and awaits independent full mock-stage verification. Contract/API/persistence work remains gated; this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -57,7 +57,7 @@ These credentials are fictional, public test fixtures:
 
 The sign-in screen can fill either fixture for you. Registration trims and lowercases a username of 3–30 ASCII letters, digits or underscores (`^[A-Za-z0-9_]{3,30}$` before lowercase normalization), requires a 10–128 character password and always creates a student. Account/session data exists only in this tab's JavaScript memory: reload resets it, logout clears the current session and changing a fixture resets all demo state. Browser storage and a backend are not used. This public client-side mock provides no real authentication security; use fictional details only.
 
-Open **Demo controls** to select Normal, Loading (1.6-second async responses), Empty (no seeded accounts or equipment, registration available) or Error (typed failures for all service calls). Error feedback includes session retry; selecting Normal recovers. The current club date is computed in `Asia/Almaty`; tests inject fixed timestamps. Explore now has ten fictional physical units across Cameras, Audio, Presentation and Accessories. Search/category filters intersect; optional paired dates show only units available for every selected inclusive day. With no dates, no availability is claimed. Detail calendars distinguish occupied, selected and maintenance dates; they reveal no borrower/purpose/booking metadata. Student reservations are implemented in the #4 candidate; staff destinations remain previews for #5.
+Open **Demo controls** to select Normal, Loading (1.6-second async responses), Empty (no seeded accounts or equipment, registration available) or Error (typed failures for all service calls). Error feedback includes session retry; selecting Normal recovers. The current club date is computed in `Asia/Almaty`; tests inject fixed timestamps. Explore now has ten fictional physical units across Cameras, Audio, Presentation and Accessories. Search/category filters intersect; optional paired dates show only units available for every selected inclusive day. With no dates, no availability is claimed. Detail calendars distinguish occupied, selected and maintenance dates; they reveal no borrower/purpose/booking metadata. Student reservations are independently verified. Coordinators can now review queues, approve/reject/cancel, check out and return with condition notes, and manage inventory in the #5 candidate.
 
 From `frontend/`, install the test browser once and run the scoped auth/shell regression suite:
 
@@ -66,9 +66,10 @@ npx playwright install chromium
 npm run test:browser
 npm run test:browser:catalogue
 npm run test:browser:bookings
+npm run test:browser:staff
 ```
 
-The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px. The bookings test uses port 5181. The catalogue test uses port 5179 and a fixed browser date of 2026-10-19 to exercise filter/date boundaries, anonymous calendars, maintenance, empty/missing/error states and both layouts. Ignored results/screenshots are saved under `frontend/test-results/mock-auth/` and `frontend/test-results/catalogue/`; each test stops its server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
+The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-in/registration/focus/roles/fixtures at 390 px and 1440 px. The bookings test uses port 5181. The staff test uses 5182 (`GEARSHARE_STAFF_PORT` overrides) and exercises the full two-role mock lifecycle, custody, inventory and async failures at both widths; screenshots/results are in `frontend/test-results/staff/`. The catalogue test uses port 5179 and a fixed browser date of 2026-10-19 to exercise filter/date boundaries, anonymous calendars, maintenance, empty/missing/error states and both layouts. Ignored results/screenshots are saved under `frontend/test-results/mock-auth/` and `frontend/test-results/catalogue/`; each test stops its server/browser. It never starts a backend. `GEARSHARE_TEST_PORT` overrides the test port. If Chromium is already provisioned, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npm run test:browser` uses that executable. The engineer used the provisioned Chromium 153 binary for the recorded run; browser installation is a separate network/environment prerequisite.
 
 ## Start here
 
@@ -104,10 +105,16 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-`openapi.yml`, staff lending workflows, persistence, CI and final integrated demo evidence remain future deliverables. The current frontend checks establish only mock shell/auth/catalogue/booking/availability behavior; independent QA owns each issue's acceptance and closure.
+`openapi.yml`, persistence, CI and final integrated demo evidence remain future deliverables. Staff lending is a mock candidate pending independent QA. The current frontend checks establish only mock shell/auth/catalogue/booking/availability behavior; independent QA owns each issue's acceptance and closure.
 
-### Mock student reservations (#4 candidate)
+### Mock student reservations (#4 verified)
 
 Sign in as the fictional student, open equipment, select inclusive dates and enter a 5–500 character purpose. Request equipment creates pending approval. My reservations provides Upcoming (including active/overdue loans), History, private details/events and cancellation for pending/approved records. The six student fixture records show all states. Cancellation releases reserved dates. The request panel offers deterministic next-request conflict and failure controls; errors preserve entered values, and a conflict refreshes the anonymous calendar. All state remains memory-only and resets on reload or fixture reset.
 
-Run `npm run test:browser:bookings` from `frontend/` for the scoped student browser journey; use the same Playwright browser setup/executable override as the other browser checks. Staff mutation UI follows #5.
+Run `npm run test:browser:bookings` from `frontend/` for the scoped student browser journey; use the same Playwright browser setup/executable override as the other browser checks. The #5 candidate provides the staff mutation UI.
+
+### Mock coordinator desk and inventory (#5 candidate)
+
+Without reloading, sign out the student and sign in as the coordinator to retain the same memory-only records. Coordinator desk shows Pending requests, Pickups, Active loans and History, with counts for pending, returns due today and overdue. Review a request, approve it, check it out within its inclusive booked dates with outgoing condition, then record its return with incoming condition. Sign back in as the student to inspect the retained history. An overdue microphone fixture demonstrates why its next pickup stays blocked until the previous return is recorded.
+
+Inventory supports search, add/edit and active/maintenance state. Codes are trimmed and stored uppercase; every physical unit needs a unique code. Maintenance errors explain that active returns and unresolved pending/approved commitments must be resolved at the desk first. Existing reservation snapshots and histories stay intact after equipment edits. Reload or changing a demo fixture resets every record. The mock provides no real server authorization or persistence.

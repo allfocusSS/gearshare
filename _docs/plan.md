@@ -1,6 +1,6 @@
 # GearShare product specification
 
-Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
+Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate has passing engineer functional checks; the observed visual defect [#27](https://github.com/allfocusSS/gearshare/issues/27) is open before correction. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
 
 ## Problem and target users
 
@@ -74,7 +74,7 @@ An overdue indicator is derived when a booking is checked out and its end date i
 - Password: 10–128 characters, stored only as a salted password hash. No password or hash in user API responses.
 - Booking purpose: trim whitespace, require 5–500 characters.
 - Condition/rejection notes: trim whitespace, require 3–500 characters.
-- Asset name 2–100 characters; inventory code 2–30; location 2–100; description at most 2,000.
+- Asset name 2–100 characters; inventory code 2–30; location 2–100; description at most 2,000. The mock trims these values, stores codes in uppercase and checks code uniqueness case-insensitively.
 - Loading, empty, error and success states exist for every async screen. Prevent accidental repeated form submission while a request is pending; server constraints still protect against races.
 - On HTTP 401 the frontend clears the session and offers sign-in while preserving navigation context. A failed request must not display a success notification.
 

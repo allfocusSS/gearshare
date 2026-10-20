@@ -16,7 +16,8 @@
     "test:browser:catalogue": "node tests/catalogue.browser.mjs",
     "build": "tsc --noEmit && vite build",
     "test:browser:bookings": "node tests/bookings.browser.mjs",
-    "test:browser:resources": "node tests/resources.browser.mjs"
+    "test:browser:resources": "node tests/resources.browser.mjs",
+    "test:browser:staff": "node tests/staff.browser.mjs"
   },
   "dependencies": {
     "react": "19.3.1",

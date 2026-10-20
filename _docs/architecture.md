@@ -1,6 +1,6 @@
 # Architecture and iteration decisions
 
-Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
+Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate has passing engineer functional checks; the observed visual defect [#27](https://github.com/allfocusSS/gearshare/issues/27) is open before correction. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
 
 ## Stack options considered before code
 
@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface covers current user, login, registration, logout, listAssets(filters), getAsset(id), getAssetAvailability(id), requestBooking, listBookings, getBooking and cancelBooking. The staff mock story extends this same boundary. Public asset types contain identity/specification/state fields only; anonymous availability contains asset ID, club-local window/timezone and date/state pairs, with no private booking records. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
+The frontend now contains components/pages and `services/types.ts`, `mockService.ts`, `dates.ts` and `index.ts`; the async interface covers current user, login, registration, logout, listAssets(filters), getAsset(id), getAssetAvailability(id), requestBooking, listBookings, getBooking and cancelBooking. The #5 mock extends this same boundary with staff desk, transition and inventory operations. Public asset types contain identity/specification/state fields only; anonymous availability contains asset ID, club-local window/timezone and date/state pairs, with no private booking records. The backend contains the API entry point and health test. `httpService.ts`, repository/domain modules, migrations, a Makefile and versioned OpenAPI file do not exist yet.
 
 ## Required stages and concrete verification gates
 
@@ -102,3 +102,11 @@ Add dependency locks, `.env.example` without real secrets, documented seed/migra
 ## #4 mock boundary additions
 
 `requestBooking`, `listBookings`, `getBooking` and `cancelBooking` extend the same async `GearShareService`. Booking results are copied; owners see only their own list, while detail/cancellation allow the owner or coordinator. Active states reserve each inclusive date; terminal states release them. A deterministic next-request conflict adds an anonymous competing allocation and returns only unavailable dates. A next-request failure provides a retryable no-mutation path. This browser memory model is not server authorization or database concurrency evidence.
+
+## #5 mock staff boundary additions
+
+`listStaffBookings()` is coordinator-only and returns actual booking records with borrower, physical code/location, current custody, derived overdue and pending/returns-due-today/overdue counts. `approveBooking`, `rejectBooking`, `checkoutBooking` and `returnBooking` implement the product transition table; existing `cancelBooking` permits owners and coordinators. Notes are trimmed to 3–500 characters; approval rejects expired dates and checkout uses inclusive Asia/Almaty dates plus unique physical custody. Every event includes booking/actor IDs, canonical action, prior/new state, note and UTC timestamp. Returned/rejected/cancelled records retain history and release scheduled dates.
+
+`listInventory`, `addAsset`, `editAsset` and `setAssetState` require a coordinator. Create/edit explicitly copy editable identity/specification fields; new units start active. Codes are trimmed, uppercased and compared case-insensitively for uniqueness. Inventory edits never rewrite Booking snapshots or event histories. Maintenance checks active custody and pending/approved commitments ending today or later before mutation.
+
+All seeded occupied dates now derive from coherent real booking/event chains, including another fictional student's reservations; the owner's six-state fixture and public schedule patterns are preserved. The simulated conflict creates a real competing pending record only when its day is free. Mock validation and commit run synchronously after async readiness. This demonstrates frontend semantics, not server locks, database uniqueness, persistence or a transaction guarantee. No Booking version, HTTP adapter, OpenAPI, backend business route or storage implementation is added in #5.

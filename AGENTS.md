@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
+Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate has passing engineer functional checks; the observed visual defect [#27](https://github.com/allfocusSS/gearshare/issues/27) is open before correction. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
 
 ## Read before working
 
@@ -54,4 +54,4 @@ npm run build
 npm run dev
 ```
 
-The frontend uses the async `GearShareService` and memory-only auth/catalogue adapter; it makes no API calls. The backend still implements only `GET /health`. Remaining lending/staff mock stories, OpenAPI, business APIs and persistence follow their separate stage gates. The scoped running-browser checks are `cd frontend` then `npm run test:browser` and `npm run test:browser:catalogue`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.
+The frontend uses the async `GearShareService` and memory-only identity/catalogue/booking/staff adapter; it makes no API calls. The backend still implements only `GET /health`. The #5 staff candidate still needs independent full mock-stage QA. OpenAPI, business APIs and persistence follow their separate stage gates. The scoped running-browser checks are `cd frontend` then `npm run test:browser` and `npm run test:browser:catalogue`, `npm run test:browser:bookings` and `npm run test:browser:staff`; install its browser using the README instructions first. Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.

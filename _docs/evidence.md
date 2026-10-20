@@ -1,6 +1,6 @@
 # Verification evidence
 
-Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
+Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate has passing engineer functional checks; the observed visual defect [#27](https://github.com/allfocusSS/gearshare/issues/27) is open before correction. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
 
 Current application status: **independent QA passed and closed [#1](https://github.com/allfocusSS/gearshare/issues/1), [#2](https://github.com/allfocusSS/gearshare/issues/2) and [#24](https://github.com/allfocusSS/gearshare/issues/24). The [#3](https://github.com/allfocusSS/gearshare/issues/3) public mock catalogue/detail/calendar candidate awaits independent QA.** Request/staff lending and later stages remain unimplemented. Historical engineer records below retain the actual FAIL and pending states at the time; current QA gates are linked explicitly.
 
@@ -141,7 +141,7 @@ Bug issue, correction commit and retest, when applicable:
 
 Remote: https://github.com/allfocusSS/gearshare.
 
-MVP issues: #1–20 published and PM-groomed; #1, #2, #3 and the observed focus bug #24 are closed after independent QA PASS. #4 remains open for independent QA. Post-MVP: #21–23 published. No final completion count is claimed; full product exploration remains outstanding.
+MVP issues #1–20 are published and PM-groomed. #1–4 and observed bugs #24–26 are independently verified and closed. #5 is a functional engineer candidate; observed #27 is open before correction. Post-MVP #21–23 remain deferred. No final completion count is claimed; full product/integration verification remains outstanding.
 
 Do not report “0 open issues” as completion before the backlog exists. On final submission, record the actual issue counts and links for queries `is:issue is:open label:mvp` and `is:issue is:open label:user-test-bug` in the correct repository.
 
@@ -176,3 +176,36 @@ Independent QA of `3613944f2d76ce2234ff2d0efa11e53fbe472f73` failed the unchange
 The equipment-title wait also matched the departing catalogue card heading, allowing the first date fill to target the catalogue input before detail navigation completed. Added the same unique `Check availability` heading wait already used on the first detail visit, before the mobile date range fill. All functional and diagnostic assertions and all application source remain unchanged; this is a test synchronization repair.
 
 From `frontend/`, with Node 24.19.0/npm 11.9.0 and `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/workspace/scratch/5919f41ce139/studytrack-browser-tools/extracted/chromium` (Chromium 153.0.8010.0), actually ran `GEARSHARE_TEST_PORT=5173 npm run test:browser:catalogue` and `GEARSHARE_TEST_PORT=5196 npm run test:browser:catalogue`. Both exited 0 with all 28 checks passed and empty console/page/request/API-error arrays. Local raw logs and JSON snapshots are `/tmp/engineer26-catalogue-{5173,5196}.log` and `/tmp/engineer26-catalogue-{5173,5196}-results.json`. Unaffected suites were not repeated because the independent run already passed them against the same application source. This commit is the local correction candidate, awaiting fresh independent QA; no issue was closed or external publication performed.
+
+## Iteration 1 — #5 functional checkpoint and observed #27 (2026-10-20 UTC)
+
+Role: software engineer. Prerequisite #4 was independently [passed and closed](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336) after #25/#26. #5 scope is the [actual groomed issue](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6267473702), with no contract/API/storage work. Start `ef8fc476b5821e5405c32136e55ddf9902eb0d25`. The implementation checkpoint local `428883de50dc2c14a72fd70b8e906f09fedcb52c` was published as `ddb1841a4164f86ab6877b3b03fa911d8b7c6840`, identical tree `6a27f9fa48070b7e9f44b012baf7cdd445a06cb6`. The commit containing this record adds runnable tests and handoff documents; it does not claim independent QA.
+
+Environment: Linux x86_64, Node 24.19.0, npm 11.9.0, locked Playwright 1.62.1 and Chromium 153.0.8010.0. Following a scratch-environment reset, dependencies were restored with `npm ci`. The restored browser override is `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/workspace/scratch/e3fbdcf9622e/browser-tools/extracted/chromium`. Every browser script starts Vite and Chromium within the same Node process namespace and stops both. There was no backend process or API/storage usage. Browser Date is fixed to `2026-10-19T06:00:00Z`; async timers run normally.
+
+Actually executed from repository root with `--prefix frontend`, or equivalently from `frontend/` without that option:
+
+| Command | Observed result |
+| --- | --- |
+| `npm ci` | Exit 0; 27 locked packages installed |
+| `npm test` | 41 passed, 0 failed; all 31 predecessor tests retained plus 10 staff/inventory groups |
+| `npm run typecheck` | Exit 0 |
+| `npm run build` | Exit 0; 33 modules, production bundle generated |
+| `npm run test:browser` with Chromium override | Exit 0; all 26 auth/focus/role/fixture/mobile checks passed |
+| `npm run test:browser:catalogue` with override | Exit 0; all 28 catalogue/date/privacy/detail/mobile checks passed |
+| `npm run test:browser:bookings` with override | Exit 0; full existing student request/private history/cancel/conflict/availability checks passed |
+| `npm run test:browser:staff` with override | Exit 0; all 8 functional groups (four at each of 1440/390 px) passed |
+
+The staff service groups exercise every invalid/repeated/terminal transition and unchanged snapshots; every permitted transition; trimmed 0/2/3/500/501 notes; canonical actor/action/prior/new/note/UTC events; booking-ID audit linkage; returned/rejected/cancelled allocation release; inclusive club-local checkout dates including UTC/local year rollover, expired approval and checkout; derived overdue and permitted late return; second physical checkout blocked until return; competing mock operations; every staff-method visitor/student denial; unique normalized inventory codes; exact field/category bounds; injected ownership/state/actor/audit rejection by explicit copying; preserved Booking snapshots/history after inventory edits; maintenance with active/today/future commitments and resolved/past commitments; new-request/maintenance interleavings; immutable result copies and reset-during-pending failures. These JavaScript mock interleavings are not database race or transaction proof.
+
+The new staff browser source uses actual UI sign-in and forms for browse→student request→coordinator approve→checkout with condition→return with condition→student history at both widths. It verifies actual queue/count updates, no duplicate request/event, first-invalid enabled focus, keyboard approval, return focus, terminal history, staff gating and direct mock 401/403 results. It also runs future-date checkout failure, overdue pickup custody conflict, late return, subsequent pickup and return, coordinator cancellation, inventory create/edit/duplicate errors with preserved fields, search empty state, maintenance conflict then rejection/resolution and state recovery. Controlled service-boundary read/write results additionally verify loading, explicit retry, real zero counts/empty responses, disabled pending controls, failed saves without false success, retained entries and successful retry. Root scroll width stays within 390/1440 throughout the tested queue/detail/form/error/empty screens. Console/page errors, failed requests and API requests were all empty.
+
+Two initial new-harness failures were setup/selector errors: an exact success-text locator also contained the nested View my reservations link, and a controlled read test attempted to remount an already-current hash route. The selector now targets the containing success text and the read test first leaves the page. No application source or behavioral assertions were changed for either repair. Preserved ignored diagnostics are `frontend/test-results/staff/harness-text-match-failure.json` and `harness-remount-failure.json`; the final successful functional record is `results.json`.
+
+### Actual visual defect: #27, open before correction
+
+Inspecting the actual desktop screenshots found that `.sr-only` is used by row-action suffixes/table captions but has no CSS definition. Accessibility-only asset/code text and redundant captions were visibly rendered, crowding and wrapping staff actions. Parent filed [#27](https://github.com/allfocusSS/gearshare/issues/27) before correction against published `ddb1841a4164f86ab6877b3b03fa911d8b7c6840`; PM grooming and independent QA regression cases are pending. No correction or visual PASS is claimed in this checkpoint. Functional browser results above do not supersede that defect.
+
+Pre-fix screenshots were generated under ignored `frontend/test-results/staff/`: `desk-1440-prefix.png`, `inventory-1440-prefix.png`, `desk-390.png` and `inventory-390.png`. These local images are transient diagnostics, not published attachments. The durable deliverables are committed test source and the precise reproduction/command evidence here and on #27. The planned correction must preserve accessible action names, table captions, focus and existing student regressions.
+
+Limits: memory-only frontend candidate, not independent QA, server authorization, backend transactions, OpenAPI, persistent storage/restart, final integration or project completion. #5 and #27 remain open; #6 cannot start before the full independent mock-stage PASS.

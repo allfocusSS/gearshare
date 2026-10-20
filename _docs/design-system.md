@@ -1,6 +1,6 @@
 # GearShare design direction and references
 
-Current stage update (2026-10-19): independent QA passed and closed [#3](https://github.com/allfocusSS/gearshare/issues/3#issuecomment-6262112857) at `bdf1e149e87d460e8045c40b2c02be9977de3bb0`. The #4 request/private history/cancellation candidate is implemented and awaits independent QA. Staff workflows (#5) and later stages remain gated. Historical entries below describe their recorded point in time.
+Current stage update (2026-10-20): independent QA passed and closed [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800) and [#26](https://github.com/allfocusSS/gearshare/issues/26), following #1–3/#24. The #5 coordinator/inventory mock candidate has passing engineer functional checks; the observed visual defect [#27](https://github.com/allfocusSS/gearshare/issues/27) is open before correction. Independent QA and the complete mock-stage gate remain pending. #6/OpenAPI and later stages remain gated. Historical entries below retain their recorded point-in-time results.
 
 ## Reference board
 
@@ -45,7 +45,7 @@ At desktop width, show identity/specifications on the left and a bordered bookin
 
 On mobile, use a normal single-column flow. Booking errors appear next to the fields and in an accessible alert. On a race/conflict, preserve purpose and dates and update availability. A request confirmation shows the true server status, which begins as “Pending approval.”
 
-The independently verified #3 scope implements asset identity/specifications, anonymous month calendar, labeled date alternatives, selected inclusive duration and scheduled-availability feedback. The #4 candidate adds request/purpose controls, retained-form conflict/error feedback and private reservations/history/cancellation. Occupied days use a hatch plus × and accessible date/status text; maintenance is explicitly unavailable.
+The independently verified #3 scope implements asset identity/specifications, anonymous month calendar, labeled date alternatives, selected inclusive duration and scheduled-availability feedback. The independently verified #4/#25 behavior adds request/purpose controls, retained-form conflict/error feedback and private reservations/history/cancellation. Occupied days use a hatch plus × and accessible date/status text; maintenance is explicitly unavailable.
 
 ### My reservations
 
@@ -74,3 +74,9 @@ The current auth form shows labels, requirement hints, associated field errors a
 ## Implementation brief for the UI agent
 
 Read `plan.md` and this document. Build all student and coordinator flows using `GearShareService` and `mockService` only. Keep request/response shapes centralized and async. Show the real booking state machine and the specified calendar rules. Include mock error paths so failures can be exercised before a backend exists. Preserve this visual system when swapping the service adapter; changing storage must not redesign the UI.
+
+## #5 implementation
+
+Coordinator desk and inventory use warm canvas, cobalt actions and white bordered surfaces. Queue counts derive from records; Pending requests, Pickups, Active loans and History have explicit row actions. Desktop tables become labeled stacked cards below 720 px. Dedicated reservation/action and equipment form views provide named headings, associated errors, enabled-field focus after validation, disabled pending controls and return focus. There is no modal or focus-trap interaction. Status labels remain text; physical-custody and maintenance conflicts describe the required staff resolution.
+
+Engineer browser verification and the independent QA handoff are recorded in evidence.md. The observed accessibility-text rendering defect follows its separate user-test-bug/PM/QA loop; do not infer a visual PASS from the design tokens.
