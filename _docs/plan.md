@@ -1,6 +1,6 @@
 # GearShare product specification
 
-Current stage update (2026-10-20): independent QA passed and closed #1–5 and the observed bugs #24–28, including the [#4](https://github.com/allfocusSS/gearshare/issues/4#issuecomment-6279522336), [#25](https://github.com/allfocusSS/gearshare/issues/25#issuecomment-6279464800), [#27](https://github.com/allfocusSS/gearshare/issues/27#issuecomment-6287900059), [#28](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6294272406) and [#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984) PASS verdicts; the standalone mock stage gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) is an engineer candidate that independent QA [failed](https://github.com/allfocusSS/gearshare/issues/6#issuecomment-6295944514) on `39d1bdd` (two `openapi.yml` authoring defects found by Redocly and Spectral); the correction is a new candidate awaiting fresh independent QA: root `openapi.yml` (OpenAPI 3.1) is derived from the completed `GearShareService`, adds private `Booking.version` with a required `expectedVersion` precondition on the five booking mutations, and is checked by `backend/tests/test_openapi_contract.py` and `backend/tests/test_openapi_guards.py` (see `_docs/api.md` and evidence.md). #6 stays open for independent QA. #7 and later stages (backend business APIs, persistence, HTTP adapter) remain gated. Historical entries below retain their recorded point-in-time results.
+Current stage: see the [current gate record](iterations.md#current-stage) for #6 independent QA PASS and the #7 memory-auth candidate. Historical entries below retain their point-in-time results.
 
 ## Problem and target users
 
@@ -71,6 +71,8 @@ Stale actions are refused (#6 decision): a private booking has a version (1 when
 An overdue indicator is derived when a booking is checked out and its end date is before the current local date. It is not an extra persisted booking state. Return remains allowed when overdue. An overdue active loan prevents a second physical checkout even when the originally reserved dates no longer overlap. Future availability is scheduled availability, not a guarantee against late returns; staff see that an item is currently on loan.
 
 ### Data quality and feedback
+
+All text limits count Unicode code points (including each combining mark), as JSON Schema does. Passwords are neither trimmed nor Unicode-normalized. Credential strings containing unpaired surrogates fail field validation before hashing. The numeric limits below are unchanged.
 
 - Username: trim outer whitespace; require 3–30 ASCII letters, digits or underscore (`^[A-Za-z0-9_]{3,30}$`), then normalize to lowercase for storage/display and case-insensitive uniqueness. This #2 PM refinement must be used in the mock, eventual OpenAPI and HTTP/backend adapters.
 - Password: 10–128 characters, stored only as a salted password hash. No password or hash in user API responses.

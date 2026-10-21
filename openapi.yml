@@ -34,6 +34,9 @@ info:
       pattern/length limits; the trimmed value is what is stored and returned. So `  New_Member9  ` is a valid
       username that registers `new_member9`. The schemas describe the **trimmed** value, which is why every
       `example` in this file is written already trimmed and is valid exactly as written. `password` is never trimmed.
+      Every text length counts Unicode code points (including combining marks), not UTF-16 units or grapheme
+      clusters. Passwords are otherwise unnormalized; valid supplementary characters are supported. Unpaired
+      surrogates in credential strings are 422 field errors before encoding/hashing. Numeric limits are unchanged.
     * **Authentication**: opaque bearer token from `login`/`register`, absolute 24-hour expiry, revoked by `logout`.
       See `bearerAuth` and `_docs/api.md`.
     * **Concurrency**: private Booking snapshots carry `version`; the five booking mutations require
@@ -982,7 +985,7 @@ components:
         role: {$ref: '#/components/schemas/Role'}
     Credentials:
       type: object
-      description: Login and registration body. Only these two properties are read.
+      description: Login and registration UTF-8 JSON object (application/json, case-insensitive media type with ordinary parameters allowed). Only these two properties are read; unknown properties are ignored. Missing/wrong media type, malformed JSON or a non-object body is 422 without fields.
       required: [username, password]
       properties:
         username:
@@ -996,7 +999,7 @@ components:
           maxLength: 128
           writeOnly: true
           format: password
-          description: 10-128 characters, not trimmed. Never returned and never logged.
+          description: 10-128 Unicode code points, not trimmed or normalized; valid supplementary characters supported, unpaired surrogates rejected with 422 fields.password before hashing. Never truncated, returned or logged.
     Session:
       type: object
       description: |

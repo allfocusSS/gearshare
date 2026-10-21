@@ -2,6 +2,7 @@ import { CATEGORIES } from './types.ts'
 import type { Asset, AssetInput, Booking, BookingAction, BookingRequest, BookingState, Credentials, GearShareService, ServiceError, ServiceResult, User } from './types.ts'
 import { addDays, clubToday, validateDateRange } from './dates.ts'
 import { catalogueFixtures } from './fixtures.ts'
+import { hasUnpairedSurrogate, textLength } from './text.ts'
 
 export type DemoScenario = 'normal' | 'loading' | 'empty' | 'error'
 
@@ -29,10 +30,10 @@ export const normalizeUsername = (username: string) => username.trim().toLowerCa
 
 function validate(credentials: Credentials): ServiceError | null {
   const fields: ServiceError['fields'] = {}
-  if (!/^[A-Za-z0-9_]{3,30}$/.test(credentials.username.trim())) {
+  if (typeof credentials.username !== 'string' || !/^[A-Za-z0-9_]{3,30}$/.test(credentials.username.trim())) {
     fields.username = 'Use 3–30 ASCII letters, digits or underscores.'
   }
-  if (credentials.password.length < 10 || credentials.password.length > 128) {
+  if (typeof credentials.password !== 'string' || hasUnpairedSurrogate(credentials.password) || textLength(credentials.password) < 10 || textLength(credentials.password) > 128) {
     fields.password = 'Use a password with 10–128 characters.'
   }
   return Object.keys(fields).length ? {
@@ -146,7 +147,7 @@ export function createMockService(options: MockOptions = {}) {
     const [required, next] = rules[action]
     if (booking.state !== required) return failure(conflict(`Cannot ${action === 'checkout' ? 'check out' : action} a ${booking.state.replaceAll('_', ' ')} reservation. Refresh the desk to review its current state.`))
     const note = typeof input?.note === 'string' ? input.note.trim() : ''
-    if (action !== 'approve' && (note.length < 3 || note.length > 500)) return failure({ code: 'VALIDATION_ERROR', message: 'Check the note before continuing.', fields: { note: 'Use 3–500 characters after trimming whitespace.' } })
+    if (action !== 'approve' && (textLength(note) < 3 || textLength(note) > 500)) return failure({ code: 'VALIDATION_ERROR', message: 'Check the note before continuing.', fields: { note: 'Use 3–500 characters after trimming whitespace.' } })
     if (action === 'approve' && booking.endDate < today()) return failure(conflict('The booked end date has passed. Reject or cancel this request instead.'))
     if (action === 'checkout' && (today() < booking.startDate || today() > booking.endDate)) return failure(conflict('Check out only within the inclusive booked dates in Asia/Almaty.'))
     if (action === 'checkout' && onLoan(booking.assetId)) return failure(conflict('This physical unit is still on loan. Record its return before checking it out again, including any overdue loan.'))
@@ -162,10 +163,10 @@ export function createMockService(options: MockOptions = {}) {
   }
   function assetError(values: AssetInput, exceptId?: string): ServiceError | null {
     const fields: NonNullable<ServiceError['fields']> = {}
-    if (values.name.length < 2 || values.name.length > 100) fields.name = 'Use 2–100 characters.'
-    if (values.inventoryCode.length < 2 || values.inventoryCode.length > 30) fields.inventoryCode = 'Use 2–30 characters.'
-    if (values.location.length < 2 || values.location.length > 100) fields.location = 'Use 2–100 characters.'
-    if (values.description.length > 2000) fields.description = 'Use at most 2,000 characters.'
+    if (textLength(values.name) < 2 || textLength(values.name) > 100) fields.name = 'Use 2–100 characters.'
+    if (textLength(values.inventoryCode) < 2 || textLength(values.inventoryCode) > 30) fields.inventoryCode = 'Use 2–30 characters.'
+    if (textLength(values.location) < 2 || textLength(values.location) > 100) fields.location = 'Use 2–100 characters.'
+    if (textLength(values.description) > 2000) fields.description = 'Use at most 2,000 characters.'
     if (!CATEGORIES.includes(values.category)) fields.category = 'Choose one of the four listed categories.'
     if (Object.keys(fields).length) return { code: 'VALIDATION_ERROR', message: 'Check the highlighted equipment fields.', fields }
     if (assets.some(a => a.id !== exceptId && a.inventoryCode.toUpperCase() === values.inventoryCode)) return { ...conflict('This inventory code is already in use. Choose a unique code for this physical unit.'), fields: { inventoryCode: 'This code is already in use.' } }
@@ -180,8 +181,8 @@ export function createMockService(options: MockOptions = {}) {
       const dateError = validateDateRange(input.startDate, input.endDate, today())
       const purpose = input.purpose.trim()
       // Contract (openapi.yml `BookingRequest.assetId`): a missing, non-string, empty or over-long id is a field error; only a well-formed unknown id is 404.
-      const assetIdValid = typeof input.assetId === 'string' && input.assetId.length >= 1 && input.assetId.length <= 100
-      const fields = { ...dateError?.fields, ...(!assetIdValid ? { assetId: 'Choose the equipment to reserve.' } : {}), ...(!input.startDate ? { startDate: 'Choose a start date.' } : {}), ...(!input.endDate ? { endDate: 'Choose an end date.' } : {}), ...(purpose.length < 5 || purpose.length > 500 ? { purpose: 'Use 5–500 characters describing your project.' } : {}) }
+      const assetIdValid = typeof input.assetId === 'string' && textLength(input.assetId) >= 1 && textLength(input.assetId) <= 100
+      const fields = { ...dateError?.fields, ...(!assetIdValid ? { assetId: 'Choose the equipment to reserve.' } : {}), ...(!input.startDate ? { startDate: 'Choose a start date.' } : {}), ...(!input.endDate ? { endDate: 'Choose an end date.' } : {}), ...(textLength(purpose) < 5 || textLength(purpose) > 500 ? { purpose: 'Use 5–500 characters describing your project.' } : {}) }
       if (Object.keys(fields).length) return failure({ code: 'VALIDATION_ERROR', message: 'Check the highlighted request fields.', fields })
       const asset = assets.find(a => a.id === input.assetId)
       if (!asset) return failure(missing)

@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed #1–5 and the observed bugs #24–28, so the standalone mock frontend gate is satisfied. [#6](https://github.com/allfocusSS/gearshare/issues/6) adds the versioned root [`openapi.yml`](openapi.yml) (OpenAPI 3.1) and [`_docs/api.md`](_docs/api.md), derived from the completed service, with backend tests that validate and cross-check it; its first candidate failed independent QA on two authoring defects and the corrected candidate awaits fresh independent QA. Backend business APIs, the HTTP adapter and persistence remain gated (#7 onward); this is not a finished submission. Actual results and failure trails remain in [`_docs/evidence.md`](_docs/evidence.md).
+Independent QA passed and closed #1–6 and the observed bugs #24–28, including [#6's corrected contract on `1f4b115`](https://github.com/allfocusSS/gearshare/issues/6#issuecomment-6297151459). The #7 candidate now serves registration, login, current user and logout from real Python process memory; it awaits independent QA. Catalogue/bookings/staff APIs, persistence and the HTTP adapter follow their separate gates. The frontend still runs independently on its explicit mock. See the [current gate record](_docs/iterations.md#current-stage) and [actual evidence](_docs/evidence.md).
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -31,7 +31,9 @@ The API listens at http://127.0.0.1:8000. In a second terminal, this returns HTT
 curl --fail http://127.0.0.1:8000/health
 ```
 
-`uv run --locked pytest` also runs the API contract tests (`backend/tests/test_openapi_contract.py`). They validate [`openapi.yml`](openapi.yml) with `openapi-spec-validator`, check that every `GearShareService` method maps to exactly one operation, and check the schemas against `frontend/src/services/types.ts` and mock-generated samples in `frontend/tests/fixtures/contract-samples.json`. To validate the file alone: `cd backend && uv run --locked openapi-spec-validator ../openapi.yml`. The contract describes the future `/api/v1` server; the backend still serves only `GET /health`.
+`uv run --locked pytest` runs the real ASGI authentication tests and the existing contract/authoring tests. They validate [`openapi.yml`](openapi.yml) with `openapi-spec-validator`, check that every `GearShareService` method maps to exactly one operation, and compare schemas with `frontend/src/services/types.ts` and committed mock samples. To validate the contract alone: `cd backend && uv run --locked openapi-spec-validator ../openapi.yml`.
+
+The backend serves `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`. Register/login require a UTF-8 JSON object with `username` and `password`, returning `{token, expiresAt, user}`; use `Authorization: Bearer <token>` for me/logout. Registration always creates a student. Passwords use salted Argon2id; only password and token hashes are stored. Tokens expire absolutely after 24 hours, and logout revokes only that session. No backend demo accounts are preloaded; the fictional browser fixtures below belong to the mock. Every process restart or development reload discards all backend users and sessions. See [auth implementation notes](_docs/api.md#memory-auth-implementation-7).
 
 In another terminal at the repository root:
 
@@ -57,7 +59,7 @@ These credentials are fictional, public test fixtures:
 | Student | `maya_student` | `StudentDemo42!` |
 | Coordinator | `alex_coordinator` | `CoordinatorDemo42!` |
 
-The sign-in screen can fill either fixture for you. Registration trims and lowercases a username of 3–30 ASCII letters, digits or underscores (`^[A-Za-z0-9_]{3,30}$` before lowercase normalization), requires a 10–128 character password and always creates a student. Account/session data exists only in this tab's JavaScript memory: reload resets it, logout clears the current session and changing a fixture resets all demo state. Browser storage and a backend are not used. This public client-side mock provides no real authentication security; use fictional details only.
+The sign-in screen can fill either fixture for you. Registration trims and lowercases a username of 3–30 ASCII letters, digits or underscores (`^[A-Za-z0-9_]{3,30}$` before lowercase normalization), requires an untrimmed password of 10–128 Unicode code points and always creates a student. Account/session data exists only in this tab's JavaScript memory: reload resets it, logout clears the current session and changing a fixture resets all demo state. Browser storage and a backend are not used. This public client-side mock provides no real authentication security; use fictional details only.
 
 Open **Demo controls** to select Normal, Loading (1.6-second async responses), Empty (no seeded accounts or equipment, registration available) or Error (typed failures for all service calls). Error feedback includes session retry; selecting Normal recovers. The current club date is computed in `Asia/Almaty`; tests inject fixed timestamps. Explore now has ten fictional physical units across Cameras, Audio, Presentation and Accessories. Search/category filters intersect; optional paired dates show only units available for every selected inclusive day. With no dates, no availability is claimed. Detail calendars distinguish occupied, selected and maintenance dates; they reveal no borrower/purpose/booking metadata. Student reservations are independently verified. Coordinators can now review queues, approve/reject/cancel, check out and return with condition notes, and manage inventory in the #5 candidate.
 
@@ -99,7 +101,7 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | File | Purpose |
 | --- | --- |
 | `AGENTS.md` | Entry point and agent instructions |
-| `openapi.yml` | Versioned OpenAPI 3.1 contract for the future `/api/v1` server, one operation per `GearShareService` method |
+| `openapi.yml` | Versioned OpenAPI 3.1 contract; auth is implemented, remaining `/api/v1` operations follow #8–10 |
 | `_docs/api.md` | Method-to-HTTP map, error, authentication, date, concurrency and privacy policy behind the contract |
 | `_docs/plan.md` | Product scope and business rules |
 | `_docs/brainstorming.md` | Actual pre-code conversation and decision record |
@@ -111,7 +113,7 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | `_docs/testing-guidelines.md` | Verification strategy and regression cases |
 | `_docs/submission-checklist.md` | Requirement-to-evidence mapping |
 
-Persistence, CI and final integrated demo evidence remain future deliverables, and the contract in `openapi.yml` is not yet implemented by a server. The current frontend checks establish only mock shell/auth/catalogue/booking/availability/staff/inventory behavior; independent QA owns each issue's acceptance and closure.
+Persistence, CI and final integrated demo evidence remain future deliverables. The backend implements the auth part of `openapi.yml`; the current frontend checks still establish mock behavior. Independent QA owns each issue's acceptance and closure.
 
 ### Mock student reservations (#4 verified)
 

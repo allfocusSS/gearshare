@@ -6,6 +6,7 @@ export interface User {
   role: Role
 }
 
+/** Text limits count Unicode code points; passwords remain untrimmed and unnormalized. */
 export interface Credentials {
   username: string
   password: string

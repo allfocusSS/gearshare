@@ -3,8 +3,8 @@
 They validate the document with the real ``openapi-spec-validator`` and cross-check it against the artifacts it
 was derived from: the ``GearShareService`` interface and DTO types in ``frontend/src/services/types.ts`` and the
 wire-shaped samples generated from the mock service (``frontend/tests/fixtures/contract-samples.json``, kept
-in sync by ``frontend/tests/contract.test.mjs``). No backend business API exists yet; these tests check the
-agreement that later stages (#7-#14) must honour.
+in sync by ``frontend/tests/contract.test.mjs``). Auth now has real ASGI tests in ``test_auth_api.py``;
+these checks preserve the whole agreement that the remaining stages must honour.
 """
 
 from __future__ import annotations
