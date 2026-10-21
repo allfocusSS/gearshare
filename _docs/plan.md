@@ -1,6 +1,6 @@
 # GearShare product specification
 
-Current stage: see the [current gate record](iterations.md#current-stage) for #6 independent QA PASS and the #7 memory-auth candidate. Historical entries below retain their point-in-time results.
+Current stage: see the [current gate record](iterations.md#current-stage). Historical entries below retain their point-in-time results.
 
 ## Problem and target users
 

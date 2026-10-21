@@ -3,27 +3,20 @@
 import hashlib
 import re
 import secrets
-from collections.abc import Callable, Mapping
-from datetime import UTC, datetime, timedelta
+from collections.abc import Mapping
+from datetime import datetime, timedelta
 from typing import Protocol
 from uuid import uuid4
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
+from app.conventions import Clock, ECMASCRIPT_TRIM, clock_instant, utc_now
 from app.domain import Session, User
 from app.errors import ApiError, unauthenticated
 from app.repositories import AuthRepository, AuthTransaction, UsernameTaken
 
-# String.prototype.trim's exact WhiteSpace + LineTerminator set. Python's default
-# strip() additionally removes U+001C..U+001F/U+0085 and misses U+FEFF.
-ECMASCRIPT_TRIM = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 USERNAME = re.compile(r"[A-Za-z0-9_]{3,30}")
-Clock = Callable[[], datetime]
-
-
-def utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class Passwords(Protocol):
@@ -76,10 +69,7 @@ class AuthService:
         self.passwords = passwords if passwords is not None else Argon2Passwords()
 
     def _now(self) -> datetime:
-        value = self.clock()
-        if value.utcoffset() is None:
-            raise ValueError("Clock must return a timezone-aware instant")
-        return value.astimezone(UTC)
+        return clock_instant(self.clock)
 
     def _issue(self, transaction: AuthTransaction, user: User) -> dict:
         token = secrets.token_urlsafe(32)

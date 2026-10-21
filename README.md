@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-Independent QA passed and closed #1–6 and the observed bugs #24–28, including [#6's corrected contract on `1f4b115`](https://github.com/allfocusSS/gearshare/issues/6#issuecomment-6297151459). The #7 candidate now serves registration, login, current user and logout from real Python process memory; it awaits independent QA. Catalogue/bookings/staff APIs, persistence and the HTTP adapter follow their separate gates. The frontend still runs independently on its explicit mock. See the [current gate record](_docs/iterations.md#current-stage) and [actual evidence](_docs/evidence.md).
+See the [current gate record](_docs/iterations.md#current-stage) for independent QA results and the open #8 catalogue candidate. The backend serves auth and public catalogue reads from real Python process memory. Booking/staff APIs, persistence and the HTTP adapter follow their separate gates; the frontend still runs independently on its explicit mock. [Actual checks and limitations](_docs/evidence.md) are recorded separately from QA verdicts.
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -31,9 +31,11 @@ The API listens at http://127.0.0.1:8000. In a second terminal, this returns HTT
 curl --fail http://127.0.0.1:8000/health
 ```
 
-`uv run --locked pytest` runs the real ASGI authentication tests and the existing contract/authoring tests. They validate [`openapi.yml`](openapi.yml) with `openapi-spec-validator`, check that every `GearShareService` method maps to exactly one operation, and compare schemas with `frontend/src/services/types.ts` and committed mock samples. To validate the contract alone: `cd backend && uv run --locked openapi-spec-validator ../openapi.yml`.
+`uv run --locked pytest` runs real ASGI authentication/catalogue tests, domain/repository/date/privacy tests and the existing contract/authoring tests. They validate [`openapi.yml`](openapi.yml) with `openapi-spec-validator`, check that every `GearShareService` method maps to exactly one operation, and compare schemas with `frontend/src/services/types.ts` and committed mock samples. To validate the contract alone: `cd backend && uv run --locked openapi-spec-validator ../openapi.yml`.
 
-The backend serves `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`. Register/login require a UTF-8 JSON object with `username` and `password`, returning `{token, expiresAt, user}`; use `Authorization: Bearer <token>` for me/logout. Registration always creates a student. Passwords use salted Argon2id; only password and token hashes are stored. Tokens expire absolutely after 24 hours, and logout revokes only that session. No backend demo accounts are preloaded; the fictional browser fixtures below belong to the mock. Every process restart or development reload discards all backend users and sessions. See [auth implementation notes](_docs/api.md#memory-auth-implementation-7).
+The backend serves `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me` and `POST /api/v1/auth/logout`. Register/login require a UTF-8 JSON object with `username` and `password`, returning `{token, expiresAt, user}`; use `Authorization: Bearer <token>` for me/logout. Registration always creates a student. Passwords use salted Argon2id; only password and token hashes are stored. Tokens expire absolutely after 24 hours, and logout revokes only that session. No backend demo accounts are preloaded; the fictional browser credentials below belong to the mock. Every process restart or development reload discards backend state. See [auth implementation notes](_docs/api.md#memory-auth-implementation-7).
+
+Public reads are `GET /api/v1/assets`, `GET /api/v1/assets/{assetId}` and `GET /api/v1/assets/{assetId}/availability`. The list accepts intersecting `search`, `category` and optional paired `startDate`/`endDate` query filters. Ten fictional units are seeded once per store; occupied-date fixtures are relative to the startup club-local date. Calendars contain exactly 91 scheduled dates/states with no private booking data. The app reads its locked timezone package, so `Asia/Almaty` uses UTC+5 even on a stale host. For a live example, `curl --fail 'http://127.0.0.1:8000/api/v1/assets?search=CAM-001'`. [Catalogue semantics](_docs/api.md#memory-catalogue-implementation-8) describe date/query boundaries and the distinction between schedules and physical custody.
 
 In another terminal at the repository root:
 
@@ -101,7 +103,7 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | File | Purpose |
 | --- | --- |
 | `AGENTS.md` | Entry point and agent instructions |
-| `openapi.yml` | Versioned OpenAPI 3.1 contract; auth is implemented, remaining `/api/v1` operations follow #8–10 |
+| `openapi.yml` | Versioned OpenAPI 3.1 contract; auth/catalogue are implemented, booking/staff operations follow #9–10 |
 | `_docs/api.md` | Method-to-HTTP map, error, authentication, date, concurrency and privacy policy behind the contract |
 | `_docs/plan.md` | Product scope and business rules |
 | `_docs/brainstorming.md` | Actual pre-code conversation and decision record |

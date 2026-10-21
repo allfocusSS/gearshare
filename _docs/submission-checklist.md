@@ -1,30 +1,30 @@
 # Submission requirement matrix
 
-Current stage: see the [current gate record](iterations.md#current-stage) for #6 independent QA PASS and the #7 memory-auth candidate. Historical entries below retain their point-in-time results.
+Current stage: see the [current gate record](iterations.md#current-stage). Historical entries below retain their point-in-time results.
 
-Current state: #1–6 and #24–28 are independently verified and closed. #6's first FAIL and correction remain recorded in evidence.md; its corrected contract passed independent QA on `1f4b115`. #7 is a memory-auth engineer candidate; #7–20 remain open. **Not ready for submission**.
+The [central gate record](iterations.md#current-stage) lists independent PASS/closures and the open #8 engineer candidate. Remaining APIs, storage and integration are outstanding. **Not ready for submission**.
 
 | Assignment requirement | Planned evidence | Current status |
 | --- | --- | --- |
 | Different nontrivial project from Part I | plan.md; working resource allocation/lending demo | Idea/spec prepared; mock identity/catalogue/calendar implemented; mock student requests/allocation implemented; staff lending implemented and independently verified in #5 |
-| Follow specifications/agent workflow article | AGENTS.md, process, team roles and actual issue handoffs | #1–6/#24–28 independent PASS/closure, including real failure/correction loops; #7 engineer candidate awaits independent QA |
-| Follow full-stack article | Staged commits and runnable iteration gates | Bootstrap, mock and contract gates independently passed; true-memory auth is the #7 candidate; complete memory, persistence and integration gates remain outstanding |
+| Follow specifications/agent workflow article | AGENTS.md, process, team roles and actual issue handoffs | #1–7/#24–28 independent PASS/closure, including real failure/correction loops; #8 engineer candidate awaits independent QA |
+| Follow full-stack article | Staged commits and runnable iteration gates | Bootstrap, mock, contract and memory-auth stories independently passed; #8 catalogue candidate awaits QA; complete memory, persistence and integration gates remain outstanding |
 | Use GitHub Issues | Canonical groomed issues with acceptance/QA evidence | MVP #1–20 and post-MVP #21–23 published |
 | Distinct design agent or good references | design-system.md, exact references, resulting screens | References translated into responsive shell/auth and #3 equipment/calendar screens; mock student requests/history added; staff desk/inventory added and independently verified in #5 |
-| Close MVP issues | QA PASS and QA closure for each mvp issue | #1–6 and #24–28 closed by independent QA after PASS; #7–20 pending |
+| Close MVP issues | QA PASS and QA closure for each mvp issue | #1–7 and #24–28 closed by independent QA after PASS; #8–20 pending |
 | Persistent SQLite | ORM models, migration and restart evidence | Planned |
 | DBMS-agnostic ORM | SQLAlchemy repository/domain separation and standard constraints | Planned; no alternate DBMS testing claimed |
 | Mock frontend first | mockService and a runnable stage commit | Identity, public catalogue/calendar and student reservations implemented without backend; #4 and #5 independently verified; complete mock lending flow passes the standalone mock gate |
 | openapi.yml second | Valid contract derived from mock service | #6 independent PASS on `1f4b115`; prior FAIL/correction history retained |
-| In-memory backend third | True Python memory adapter and tests | #7 auth candidate implemented/tested; catalogue, booking and staff APIs #8–10 remain future work |
+| In-memory backend third | True Python memory adapter and tests | #7 auth independently passed; #8 catalogue implemented/tested and awaits QA; booking/staff mutations #9–10 retain their gates |
 | SQLite backend fourth | File-backed ORM adapter, migration and tests | Not implemented |
 | Final frontend/backend integration | HTTP adapter + actual two-role browser checks | Not implemented |
 | All Markdown in GitHub and improved during work | Committed docs and subsequent revision history | Planning baseline, bootstrap and #2/#24/#3 behavior/status/evidence committed and #4 candidate updates included |
 | Brainstorming chat before app creation | brainstorming.md with actual text/provenance | Included; user review still pending |
-| Actually run and thoroughly test | evidence.md with real commands, logs, commit and browser steps | Independent bootstrap/mock/contract PASS; #7 engineer checks: 137 backend, 84 frontend, typecheck/build, real validator and 26 scoped auth browser checks; remaining APIs/persistence/integration outstanding |
+| Actually run and thoroughly test | evidence.md with real commands, logs, commit and browser steps | Independent bootstrap/mock/contract/auth PASS; #8 engineer API/domain/repository and unchanged-frontend checks are in evidence.md; remaining APIs/persistence/integration outstanding |
 | Real bugs labeled user-test-bug | Observed reproduction, PM grooming, QA regression and retest | Actual defects #24–#28 filed before their fixes; PM groomed, QA reproduced/expanded cases, QA independently passed each correction and closed it |
 | All required issue tags | mvp / post-mvp / user-test-bug labels and meaningful issue use | Published backlog uses mvp/post-mvp; real #24–#28 also have user-test-bug |
-| QA closes all required issues | QA comments and final issue queries/counts | #1–6 and #24–28 closed after QA PASS; #7–20 open; final #20 zero/zero closure postcondition documented |
+| QA closes all required issues | QA comments and final issue queries/counts | #1–7 and #24–28 closed after QA PASS; #8–20 open; final #20 zero/zero closure postcondition documented |
 | Final submission | Correct GitHub URL, source, run guide and complete evidence | Repository and bootstrap guide exist; remaining implementation and QA outstanding |
 
 ## Final demo script after implementation

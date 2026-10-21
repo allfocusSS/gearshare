@@ -223,20 +223,26 @@ paths:
       tags: [catalogue]
       summary: List and filter equipment
       description: |
-        Public. `search` (case-insensitive, trimmed, substring of name, inventory code, category, description or
-        location), `category` and the paired `startDate`/`endDate` combine as an **intersection**. With dates, only
+        Public. `search` uses ECMAScript trim, default Unicode lowercase and literal substring matching against
+        `[name, inventoryCode, category, description, location].join(' ').toLowerCase()`; cross-field phrases match.
+        It has no tokenization, normalization, casefold or length cap. Results preserve creation/seed order.
+        `search`, exact-enum `category` and the paired `startDate`/`endDate` combine as an **intersection**. With dates, only
         units that are active and have no pending/approved/checked-out reservation on any day of the inclusive range
         are returned, and `range` echoes the pair; without dates `range` is `null` and no availability claim is made
         (maintenance units are still listed, with `state: maintenance`). Supplying only one date, a malformed date,
         a past start, a reversed range, more than 14 inclusive days or an end beyond today + 90 days is 422 with
-        `fields.startDate`/`fields.endDate`; an unknown category is 422 with `fields.category`.
+        `fields.startDate`/`fields.endDate`; an unknown or empty category is 422 with `fields.category`.
+        For repeated known scalar query keys, the last occurrence supplies the value before validation. Missing or
+        exactly empty dates mean absence (two absences give `range: null`, one gives 422); whitespace-only dates
+        are malformed. Dates require full-string ASCII `YYYY-MM-DD` plus real-calendar parsing; non-ASCII digits
+        and trailing newlines are 422. Date validation precedes category validation. One club-local date is captured per read.
       security: []
       parameters:
         - name: search
           in: query
           required: false
           schema: {type: string}
-          description: Free-text filter; empty or whitespace-only means no filter.
+          description: Free-text filter with ECMAScript trim and default Unicode lowercase; empty or trim-whitespace means no filter. Last occurrence wins.
         - name: category
           in: query
           required: false
@@ -245,12 +251,12 @@ paths:
           in: query
           required: false
           schema: {$ref: '#/components/schemas/CalendarDate'}
-          description: Inclusive club-local start. Must be sent together with `endDate`.
+          description: Inclusive club-local start. Effective dates must be sent together with `endDate`. Missing/exactly empty means absent; whitespace is malformed. Last occurrence wins.
         - name: endDate
           in: query
           required: false
           schema: {$ref: '#/components/schemas/CalendarDate'}
-          description: Inclusive club-local end. Must be sent together with `startDate`.
+          description: Inclusive club-local end. Effective dates must be sent together with `startDate`. Missing/exactly empty means absent; whitespace is malformed. Last occurrence wins.
       responses:
         '200':
           description: Matching physical units plus the club-local window the server used.

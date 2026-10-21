@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-Current stage: see the [current gate record](_docs/iterations.md#current-stage) for #6 independent QA PASS and the #7 memory-auth candidate. Historical entries below retain their point-in-time results.
+Current stage: see the [current gate record](_docs/iterations.md#current-stage). Historical entries below retain their point-in-time results.
 
 ## Read before working
 
@@ -54,4 +54,4 @@ npm run build
 npm run dev
 ```
 
-The frontend uses the async `GearShareService` and explicit memory-only mock; it makes no API calls. The backend serves health and the #7 process-memory auth candidate. `uv run --locked pytest` runs real ASGI auth/rollback/concurrency cases plus the preserved OpenAPI/schema/sample and authoring checks. #6 has independent QA PASS; #7 remains open for independent verification. Catalogue/bookings/staff, ORM/SQLite and the HTTP adapter follow their own gates. Private bookings carry `version`; five booking mutations require `expectedVersion`. The scoped frontend browser commands are `npm run test:browser` and `npm run test:browser:catalogue`, `:bookings`, `:staff`, `:labels`, `:resources` (see README for full commands/browser setup). Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.
+The frontend uses the async `GearShareService` and explicit memory-only mock; it makes no API calls. The backend serves health, auth and the #8 public catalogue candidate. `uv run --locked pytest` runs real ASGI auth/rollback/concurrency and catalogue/date/privacy cases plus the preserved OpenAPI/schema/sample and authoring checks. Booking/staff mutations, ORM/SQLite and the HTTP adapter follow their gates. Private bookings carry `version`; five booking mutations require `expectedVersion`. The scoped frontend browser commands are `npm run test:browser` and `npm run test:browser:catalogue`, `:bookings`, `:staff`, `:labels`, `:resources` (see README for full commands/browser setup). Exact engineer results are in `_docs/evidence.md`; engineer checks do not establish an independent-QA PASS.

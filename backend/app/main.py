@@ -1,20 +1,30 @@
-"""FastAPI memory-auth stage. Catalogue/booking/storage follow their own gates."""
+"""FastAPI memory auth/catalogue stage; bookings and storage retain their gates."""
 
 from fastapi import FastAPI
 
 from app.api import install_error_handlers, router
-from app.auth import AuthService, Clock, Passwords, utc_now
-from app.memory import MemoryAuthRepository
-from app.repositories import AuthRepository
+from app.auth import AuthService, Passwords
+from app.catalogue import CatalogueService
+from app.catalogue_api import router as catalogue_router
+from app.conventions import Clock, utc_now
+from app.fixtures import seed_catalogue
+from app.memory import MemoryRepository
+from app.repositories import GearShareRepository
 
 
 def create_app(
-    *, repository: AuthRepository | None = None, clock: Clock = utc_now, passwords: Passwords | None = None,
+    *, repository: GearShareRepository | None = None, clock: Clock = utc_now,
+    passwords: Passwords | None = None, seed: bool = True,
 ) -> FastAPI:
+    store = repository if repository is not None else MemoryRepository()
+    if seed:
+        seed_catalogue(store, clock)
     application = FastAPI(title="GearShare", redirect_slashes=False)
-    application.state.auth = AuthService(repository if repository is not None else MemoryAuthRepository(), clock, passwords)
+    application.state.auth = AuthService(store, clock, passwords)
+    application.state.catalogue = CatalogueService(store, clock)
     install_error_handlers(application)
     application.include_router(router)
+    application.include_router(catalogue_router)
 
     @application.get("/health")
     def health() -> dict[str, str]:
