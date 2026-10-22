@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager
 from datetime import date
 from typing import Protocol
 
-from app.domain import Asset, ScheduledReservation, Session, User
+from app.domain import ActiveLoan, Asset, Booking, BookingEvent, ReservationSlot, Session, User
 
 
 class UsernameTaken(Exception):
@@ -36,18 +36,37 @@ class CatalogueTransaction(Protocol):
 
     def occupied_days(self, asset_id: str, start: date, end: date) -> frozenset[date]: ...
 
-    # Trusted setup only; public reads never seed or mutate inventory/schedules.
+    # Trusted setup only; public catalogue reads never seed or mutate inventory.
     def add_asset(self, asset: Asset) -> None: ...
-
-    def add_scheduled_reservation(self, reservation: ScheduledReservation) -> None: ...
 
     def catalogue_seeded_on(self) -> date | None: ...
 
     def mark_catalogue_seeded(self, today: date) -> None: ...
 
 
-class GearShareTransaction(AuthTransaction, CatalogueTransaction, Protocol):
-    """One atomic boundary for identity, inventory and scheduled allocations."""
+class BookingTransaction(AuthTransaction, CatalogueTransaction, Protocol):
+    def bookings(self) -> tuple[Booking, ...]: ...
+
+    def booking_by_id(self, booking_id: str) -> Booking | None: ...
+
+    def add_booking(self, booking: Booking) -> None: ...
+
+    def replace_booking(self, booking: Booking) -> None: ...
+
+    def booking_events(self, booking_id: str) -> tuple[BookingEvent, ...]: ...
+
+    def add_booking_event(self, event: BookingEvent) -> None: ...
+
+    def add_slot(self, slot: ReservationSlot) -> None: ...
+
+    def release_slots(self, booking_id: str) -> None: ...
+
+    # Trusted fixture custody setup only; no public staff operations in #9.
+    def add_active_loan(self, loan: ActiveLoan) -> None: ...
+
+
+class GearShareTransaction(BookingTransaction, Protocol):
+    """One atomic boundary for identity, inventory, history and allocations."""
 
 
 class CatalogueRepository(Protocol):

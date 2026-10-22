@@ -18,7 +18,8 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
 from app.calendar import CLUB_ZONE
-from app.domain import Asset, ScheduledReservation
+from app.domain import Asset
+from app.fixtures import add_fixture_booking, catalogue_assets, fixture_users
 from app.main import create_app
 from app.memory import MemoryRepository
 
@@ -96,7 +97,13 @@ def calendar(app, asset_id="camera-01", **kwargs):
     return validate(request(app, f"/api/v1/assets/{asset_id}/availability", **kwargs), "AssetAvailability")
 
 
-def test_c01_seed_physical_units_four_categories_stable_order_and_exact_public_shapes(app, repository):
+def test_c01_seed_physical_units_four_categories_stable_order_and_exact_public_shapes(repository, clock):
+    # Preserve this public-read test's original empty-identity precondition.
+    # The default app's new private-history fixtures are covered separately.
+    with repository.transaction() as transaction:
+        for asset in catalogue_assets():
+            transaction.add_asset(asset)
+    app = create_app(repository=repository, clock=clock, seed=False)
     body = filtered(app)
     assert set(body) == {"items", "range", "today", "horizonEnd"}
     assert body["range"] is None and body["today"] == day() and body["horizonEnd"] == day(90)
@@ -227,7 +234,7 @@ def test_c03_anonymous_and_other_students_receive_identical_public_data(app, rep
         for path, anonymous in responses.items():
             response = request(app, path, headers=headers, params={"include": "borrower,bookings,version,custody", "userId": sessions[0]["user"]["id"]})
             assert response.status_code == 200 and response.json() == anonymous
-            for private in [*repository._state.schedules, *repository._state.users, *repository._state.sessions, "student_one", "student_two", "PrivatePassword42!"]:
+            for private in [*repository._state.bookings, *repository._state.events, *repository._state.users, *repository._state.sessions, "student_one", "student_two", "PrivatePassword42!"]:
                 assert private not in response.text
     result = calendar(app, "audio-01")
     assert set(result) == {"assetId", "today", "horizonEnd", "timeZone", "days"}
@@ -248,7 +255,8 @@ def test_each_reserving_or_terminal_state_same_day_adjacent_day_and_independent_
     with repository.transaction() as transaction:
         for asset_id in ("first-unit", "second-unit"):
             transaction.add_asset(Asset(asset_id, asset_id.upper(), "Fictional Unit", "Cameras", "Original test equipment", "Test shelf"))
-        transaction.add_scheduled_reservation(ScheduledReservation("private-booking-id", "first-unit", TODAY, TODAY, state))
+        owner, coordinator = fixture_users(transaction)
+        add_fixture_booking(transaction, booking_id="private-booking-id", asset=transaction.asset_by_id("first-unit"), owner=owner, coordinator=coordinator, start=TODAY, end=TODAY, state=state, now=NOW)
     app = create_app(repository=repository, clock=clock, seed=False)
     result = calendar(app, "first-unit")
     assert result["days"][0] == {"date": day(), "state": "occupied" if reserves else "available"}
@@ -355,13 +363,15 @@ def test_naive_read_clock_fails_safely_without_moving_seed(app, clock, repositor
     assert "Clock must" not in caplog.text
 
 
-def test_only_read_catalogue_routes_exist_and_frontend_stays_mock(app):
+def test_catalogue_remains_read_only_staff_routes_gated_and_frontend_stays_mock(app):
     for path in ["/api/v1/assets", "/api/v1/assets/camera-01", "/api/v1/assets/camera-01/availability"]:
         response = request(app, path, method="POST", json={"state": "active"})
         error(response, 405)
         assert "GET" in response.headers["Allow"]
-    for path in ["/api/v1/bookings", "/api/v1/staff/assets", "/api/v1/staff/bookings"]:
+    for path in ["/api/v1/staff/assets", "/api/v1/staff/bookings"]:
         error(request(app, path), 404)
+    # #9 now provides private bookings; this public caller still cannot read them.
+    assert request(app, "/api/v1/bookings").status_code == 401
     assert "createMockService" in (ROOT / "frontend/src/services/index.ts").read_text()
 
 

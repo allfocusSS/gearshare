@@ -10,6 +10,7 @@ class ApiError(Exception):
         *,
         fields: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
+        unavailable_dates: list[str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status = status
@@ -17,11 +18,14 @@ class ApiError(Exception):
         self.message = message
         self.fields = fields
         self.headers = headers
+        self.unavailable_dates = unavailable_dates
 
     def body(self) -> dict:
         body = {"code": self.code, "message": self.message}
         if self.fields:
             body["fields"] = self.fields
+        if self.unavailable_dates is not None:
+            body["unavailableDates"] = self.unavailable_dates
         return body
 
 

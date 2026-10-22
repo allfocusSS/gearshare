@@ -1,9 +1,11 @@
-"""FastAPI memory auth/catalogue stage; bookings and storage retain their gates."""
+"""FastAPI memory auth/catalogue/private bookings; staff/storage retain their gates."""
 
 from fastapi import FastAPI
 
 from app.api import install_error_handlers, router
 from app.auth import AuthService, Passwords
+from app.booking_api import router as booking_router
+from app.bookings import BookingService
 from app.catalogue import CatalogueService
 from app.catalogue_api import router as catalogue_router
 from app.conventions import Clock, utc_now
@@ -22,9 +24,11 @@ def create_app(
     application = FastAPI(title="GearShare", redirect_slashes=False)
     application.state.auth = AuthService(store, clock, passwords)
     application.state.catalogue = CatalogueService(store, clock)
+    application.state.bookings = BookingService(store, application.state.auth, clock)
     install_error_handlers(application)
     application.include_router(router)
     application.include_router(catalogue_router)
+    application.include_router(booking_router)
 
     @application.get("/health")
     def health() -> dict[str, str]:

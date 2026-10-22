@@ -7,12 +7,12 @@ from datetime import timedelta
 import pytest
 
 from app.catalogue import CatalogueService
-from app.domain import Asset, ScheduledReservation, User
-from app.fixtures import seed_catalogue
+from app.domain import Asset, User
+from app.fixtures import add_fixture_booking, seed_catalogue
 from app.main import create_app
 from app.memory import MemoryRepository
 from app.text import default_lower
-from test_catalogue_api import Clock, TODAY, filtered, ids
+from test_catalogue_api import Clock, NOW, TODAY, filtered, ids
 
 
 def test_domain_reads_use_repository_protocol_and_explicit_public_projection():
@@ -73,7 +73,7 @@ def test_one_memory_transaction_rolls_back_auth_inventory_schedule_and_seed_mark
     with pytest.raises(RuntimeError), repository.transaction() as transaction:
         transaction.add_user(user)
         transaction.add_asset(asset)
-        transaction.add_scheduled_reservation(ScheduledReservation("schedule", asset.id, TODAY, TODAY, "pending"))
+        add_fixture_booking(transaction, booking_id="schedule", asset=asset, owner=user, coordinator=user, start=TODAY, end=TODAY, state="pending", now=NOW)
         transaction.mark_catalogue_seeded(TODAY)
         raise RuntimeError("Controlled setup failure")
     with repository.transaction() as transaction:
@@ -103,11 +103,11 @@ def test_failed_seed_rolls_back_all_units_and_can_be_retried():
             with underlying.transaction() as real:
                 class Fault:
                     def __getattr__(self, name):
-                        if name != "add_scheduled_reservation":
+                        if name != "add_slot":
                             return getattr(real, name)
-                        def fail(reservation):
-                            real.add_scheduled_reservation(reservation)
-                            raise RuntimeError("Controlled failure after schedule insertion")
+                        def fail(slot):
+                            real.add_slot(slot)
+                            raise RuntimeError("Controlled failure after slot insertion")
                         return fail
                 yield Fault()
     with pytest.raises(RuntimeError):
@@ -115,6 +115,7 @@ def test_failed_seed_rolls_back_all_units_and_can_be_retried():
     with underlying.transaction() as transaction:
         assert transaction.assets() == () and transaction.catalogue_seeded_on() is None
         assert not transaction.occupied_days("camera-01", TODAY, TODAY + timedelta(days=90))
+        assert not transaction.bookings()
     seed_catalogue(underlying, Clock())
     assert len(CatalogueService(underlying, Clock()).list_assets({})["items"]) == 10
 

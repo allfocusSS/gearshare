@@ -47,7 +47,7 @@ def repository():
 
 @pytest.fixture
 def app(repository, clock):
-    return create_app(repository=repository, clock=clock)
+    return create_app(repository=repository, clock=clock, seed=False)
 
 
 def request(app, method, path, **kwargs):
@@ -300,7 +300,7 @@ def test_a06_absolute_24_hours_boundary_no_sliding_and_other_session_survives(ap
 
 def test_a06_clock_offset_is_converted_to_utc_and_naive_clock_rolls_back(repository):
     clock = Clock(NOW.astimezone(timezone(timedelta(hours=5))))
-    app = create_app(repository=repository, clock=clock)
+    app = create_app(repository=repository, clock=clock, seed=False)
     response = register(app)
     assert datetime.fromisoformat(response.json()["expiresAt"].replace("Z", "+00:00")) == NOW + timedelta(hours=24)
     assert next(iter(state(repository).sessions.values())).expires_at.tzinfo is UTC
@@ -419,7 +419,7 @@ class FailingRepository:
 @pytest.mark.parametrize("operation,fail_after", [("register", "add_user"), ("register", "add_session"), ("login", "add_session"), ("logout", "delete_session")])
 def test_unexpected_failures_roll_back_all_writes_and_never_log_credentials(repository, clock, caplog, operation, fail_after):
     faulty = FailingRepository(repository)
-    app = create_app(repository=faulty, clock=clock)
+    app = create_app(repository=faulty, clock=clock, seed=False)
     session = register(app).json()
     stored = state(repository)
     password_hash = next(iter(stored.users.values())).password_hash
@@ -449,6 +449,6 @@ def test_unexpected_failures_roll_back_all_writes_and_never_log_credentials(repo
 
 def test_fresh_memory_process_state_has_no_previous_accounts_or_sessions(app):
     session = register(app).json()
-    fresh_app = create_app(clock=Clock())
+    fresh_app = create_app(clock=Clock(), seed=False)
     error(login(fresh_app), 401, "INVALID_CREDENTIALS")
     error(request(fresh_app, "GET", "/api/v1/auth/me", headers=authorization(session)), 401, "UNAUTHENTICATED")

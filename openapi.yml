@@ -332,6 +332,9 @@ paths:
         requested days that are taken (ascending, no borrower information) and nothing is written - no booking,
         event or stranded slot. Two simultaneous overlapping requests for one unit yield exactly one 201 and one
         409. Different units, and a range starting the day after another range's inclusive end, never conflict.
+        Purpose limits count Unicode code points after ECMAScript trimming. Unpaired surrogates in purpose or
+        body assetId are 422 field errors before mutation or response encoding. Authentication precedes manual
+        UTF-8 JSON-object parsing; field validation aggregates all offending fields before resource lookup.
       security:
         - bearerAuth: []
       requestBody:

@@ -104,7 +104,7 @@ class AuthService:
                 )
             return self._issue(transaction, user)
 
-    def _identity(self, transaction: AuthTransaction, token: str) -> User:
+    def identity(self, transaction: AuthTransaction, token: str) -> User:
         session = transaction.session_by_hash(token_hash(token))
         if session is None or self._now() >= session.expires_at:
             raise unauthenticated()
@@ -115,9 +115,9 @@ class AuthService:
 
     def current_user(self, token: str) -> dict[str, str]:
         with self.repository.transaction() as transaction:
-            return self._identity(transaction, token).public()
+            return self.identity(transaction, token).public()
 
     def logout(self, token: str) -> None:
         with self.repository.transaction() as transaction:
-            self._identity(transaction, token)
+            self.identity(transaction, token)
             transaction.delete_session(token_hash(token))
