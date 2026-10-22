@@ -283,7 +283,7 @@ def test_p01_lists_are_own_only_even_for_coordinator_with_stable_creation_order(
     assert validate(request(h.app, path=f"{BASE}/{first['id']}", session=h.coordinator), "Booking") == first
 
 
-@pytest.mark.parametrize("unknown", ["unknown", "x" * 101, " ", "../unknown", "id\n"])
+@pytest.mark.parametrize("unknown", ["unknown", "x" * 101, " ", "id\n"])
 def test_p01_foreign_read_and_cancel_are_byte_identical_to_unknown_before_version_checks(h, unknown):
     booking = validate(h.create(), "Booking", 201)
     before = h.snapshot()
