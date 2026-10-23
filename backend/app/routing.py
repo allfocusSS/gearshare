@@ -1,6 +1,6 @@
 """Exact decoded route templates and complete method-denial headers."""
 
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 from starlette._utils import get_route_path
 from starlette.exceptions import HTTPException
 from starlette.routing import Match
@@ -17,8 +17,10 @@ class ExactRoute(APIRoute):
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         if self.methods and scope["method"] not in self.methods:
-            allowed = {method for route in scope["app"].router.routes
-                       if isinstance(route, APIRoute) and route.path == self.path
-                       for method in route.methods}
+            # Included routers are wrappers. Traverse their concrete contexts so
+            # every operation at this exact template contributes its methods.
+            allowed = {method for route in iter_route_contexts(scope["app"].router.routes)
+                       if isinstance(route.original_route, APIRoute) and route.path == self.path
+                       for method in route.methods or ()}
             raise HTTPException(status_code=405, headers={"Allow": ", ".join(sorted(allowed))})
         await super().handle(scope, receive, send)

@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-See the [current gate record](_docs/iterations.md#current-stage) for independent QA results through #9/#29 and the **failing #10 checkpoint**. The backend now also serves coordinator desk, approval/rejection/checkout/return and inventory controls from real Python process memory. Its shared routing refactor regresses 405 `Allow` headers; that observed defect is retained for the bug workflow, so the complete memory gate has not passed. Persistence and the HTTP adapter remain gated; the frontend still runs independently on its explicit mock. [Actual checks and limitations](_docs/evidence.md) are recorded separately from QA verdicts.
+See the [current gate record](_docs/iterations.md#current-stage) for independent QA results through #9/#29 and the #30 routing correction awaiting fresh QA for both #30 and parent #10. The backend also serves coordinator desk, approval/rejection/checkout/return and inventory controls from real Python process memory. Engineer checks pass all 921 backend tests and both focused ASGI/Uvicorn transport matrices. The complete memory gate still requires independent acceptance. Persistence and the HTTP adapter remain gated; the frontend runs independently on its explicit mock. [Actual checks and limitations](_docs/evidence.md) preserve the original failing #10 checkpoint separately from current engineer results.
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -105,7 +105,7 @@ The auth test starts its own Vite server on `127.0.0.1:5178` and exercises sign-
 | File | Purpose |
 | --- | --- |
 | `AGENTS.md` | Entry point and agent instructions |
-| `openapi.yml` | Frozen OpenAPI 3.1 contract; all memory operations implemented in the failing #10 checkpoint; 405 header regression retained |
+| `openapi.yml` | Frozen OpenAPI 3.1 contract; all memory operations implemented; #30 routing correction awaits independent complete-memory QA |
 | `_docs/api.md` | Method-to-HTTP map, error, authentication, date, concurrency and privacy policy behind the contract |
 | `_docs/plan.md` | Product scope and business rules |
 | `_docs/brainstorming.md` | Actual pre-code conversation and decision record |
