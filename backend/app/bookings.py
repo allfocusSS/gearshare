@@ -56,6 +56,15 @@ def _visible(transaction: BookingTransaction, booking_id: str, actor: User) -> B
     return booking
 
 
+def check_version(body: Mapping[str, object], booking: Booking) -> None:
+    version = body.get("expectedVersion")
+    # json.loads preserves a fraction/exponent as float, including 2.0/2e0.
+    if type(version) is not int or not 1 <= version <= 2147483647:
+        raise ApiError(422, "VALIDATION_ERROR", "Check the highlighted fields.", fields={"expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."})
+    if version != booking.version:
+        raise ApiError(409, "CONFLICT", "This reservation changed. Re-read it before continuing.", fields={"expectedVersion": "Use the version of a fresh reservation snapshot."})
+
+
 class BookingService:
     def __init__(self, repository: GearShareRepository, auth: AuthService, clock: Clock = utc_now) -> None:
         self.repository = repository
@@ -100,12 +109,7 @@ class BookingService:
         with self.repository.transaction() as transaction:
             actor = self.auth.identity(transaction, token)
             booking = _visible(transaction, booking_id, actor)
-            version = body.get("expectedVersion")
-            # json.loads preserves a fraction/exponent as float, including 2.0/2e0.
-            if type(version) is not int or not 1 <= version <= 2147483647:
-                raise ApiError(422, "VALIDATION_ERROR", "Check the highlighted fields.", fields={"expectedVersion": "Send the positive integer version of the reservation snapshot you acted on."})
-            if version != booking.version:
-                raise ApiError(409, "CONFLICT", "This reservation changed. Re-read it before continuing.", fields={"expectedVersion": "Use the version of a fresh reservation snapshot."})
+            check_version(body, booking)
             if booking.state not in {"pending", "approved"}:
                 raise ApiError(409, "CONFLICT", "This reservation cannot be cancelled in its current state.")
             instant = clock_instant(self.clock)

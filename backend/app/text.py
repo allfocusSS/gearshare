@@ -1,4 +1,4 @@
-"""Default Unicode lowercase parity with the pinned Node 24 frontend runtime.
+"""Default Unicode casing parity with the pinned Node 24 frontend runtime.
 
 Node 24.19 uses Unicode 17; Python 3.12 uses Unicode 15. These compact deltas
 were compared against Node's toLowerCase/Cased/Case_Ignorable for every scalar.
@@ -14,6 +14,9 @@ _LOWER_ADDITIONS = {
     **{cp: cp + 0x20 for cp in range(0x10D50, 0x10D66)},  # Garay (Unicode 16).
     **{cp: cp + 0x1B for cp in range(0x16EA0, 0x16EB9)},  # Beria Erfe (17).
 }
+# New simple uppercase mappings are the inverses of these new lowercase pairs.
+# Apply before Python upper: older Python leaves the new lowercase scalars alone.
+_UPPER_ADDITIONS = {lower: upper for upper, lower in _LOWER_ADDITIONS.items()}
 _CASED_ADDITIONS = (
     (0x1C89, 0x1C8A), (0xA7CB, 0xA7CF), (0xA7D2, 0xA7D2), (0xA7D4, 0xA7D4),
     (0xA7DA, 0xA7DC), (0xA7F1, 0xA7F1), (0x10D50, 0x10D65), (0x10D70, 0x10D85),
@@ -72,3 +75,7 @@ def default_lower(value: str) -> str:
             cp = ord(character)
             lowered.append(chr(_LOWER_ADDITIONS[cp]) if cp in _LOWER_ADDITIONS else character.lower())
     return "".join(lowered)
+
+
+def default_upper(value: str) -> str:
+    return value.translate(_UPPER_ADDITIONS).upper()

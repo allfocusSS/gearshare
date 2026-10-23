@@ -7,7 +7,8 @@ from datetime import date, timedelta
 from threading import Lock
 
 from app.domain import ActiveLoan, Asset, Booking, BookingEvent, RESERVING_STATES, ReservationSlot, Session, User
-from app.repositories import GearShareTransaction, UsernameTaken
+from app.repositories import GearShareTransaction, InventoryCodeTaken, UsernameTaken
+from app.text import default_upper
 
 
 @dataclass
@@ -76,9 +77,23 @@ class _Transaction:
         return frozenset(day for unit, day in self.state.slots if unit == asset_id and start <= day <= end)
 
     def add_asset(self, asset: Asset) -> None:
-        code = asset.inventory_code.upper()
-        if asset.id in self.state.assets or code in self.state.inventory_codes:
-            raise ValueError("Duplicate asset identity or inventory code")
+        code = default_upper(asset.inventory_code)
+        if code in self.state.inventory_codes:
+            raise InventoryCodeTaken()
+        if asset.id in self.state.assets:
+            raise ValueError("Duplicate asset identity")
+        self.state.assets[asset.id] = asset
+        self.state.inventory_codes[code] = asset.id
+
+    def replace_asset(self, asset: Asset) -> None:
+        previous = self.asset_by_id(asset.id)
+        if previous is None:
+            raise ValueError("Unknown asset identifier")
+        code = default_upper(asset.inventory_code)
+        owner = self.state.inventory_codes.get(code)
+        if owner is not None and owner != asset.id:
+            raise InventoryCodeTaken()
+        del self.state.inventory_codes[default_upper(previous.inventory_code)]
         self.state.assets[asset.id] = asset
         self.state.inventory_codes[code] = asset.id
 
@@ -132,6 +147,9 @@ class _Transaction:
     def release_slots(self, booking_id: str) -> None:
         self.state.slots = {key: slot for key, slot in self.state.slots.items() if slot.booking_id != booking_id}
 
+    def active_loan_by_asset(self, asset_id: str) -> ActiveLoan | None:
+        return self.state.active_loans.get(asset_id)
+
     def add_active_loan(self, loan: ActiveLoan) -> None:
         booking = self.booking_by_id(loan.booking_id)
         if booking is None or booking.asset_id != loan.asset_id or booking.state != "checked_out":
@@ -139,6 +157,12 @@ class _Transaction:
         if loan.asset_id in self.state.active_loans or any(existing.booking_id == loan.booking_id for existing in self.state.active_loans.values()):
             raise ValueError("Duplicate active loan")
         self.state.active_loans[loan.asset_id] = loan
+
+    def remove_active_loan(self, asset_id: str, booking_id: str) -> None:
+        loan = self.active_loan_by_asset(asset_id)
+        if loan is None or loan.booking_id != booking_id:
+            raise ValueError("Invalid active loan release")
+        del self.state.active_loans[asset_id]
 
     def catalogue_seeded_on(self) -> date | None:
         return self.state.seeded_on

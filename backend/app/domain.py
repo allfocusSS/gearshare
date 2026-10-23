@@ -102,7 +102,7 @@ class ReservationSlot:
 
 @dataclass(frozen=True, slots=True)
 class ActiveLoan:
-    """Custody record for coherent trusted history; staff commands follow in #10."""
+    """Unique physical custody, independent of scheduled reservation days."""
 
     asset_id: str
     booking_id: str

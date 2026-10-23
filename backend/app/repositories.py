@@ -11,6 +11,10 @@ class UsernameTaken(Exception):
     """A normalized username already belongs to an account."""
 
 
+class InventoryCodeTaken(ValueError):
+    """A normalized inventory code already identifies another physical unit."""
+
+
 class AuthTransaction(Protocol):
     def user_by_username(self, username: str) -> User | None: ...
 
@@ -36,8 +40,9 @@ class CatalogueTransaction(Protocol):
 
     def occupied_days(self, asset_id: str, start: date, end: date) -> frozenset[date]: ...
 
-    # Trusted setup only; public catalogue reads never seed or mutate inventory.
     def add_asset(self, asset: Asset) -> None: ...
+
+    def replace_asset(self, asset: Asset) -> None: ...
 
     def catalogue_seeded_on(self) -> date | None: ...
 
@@ -61,8 +66,11 @@ class BookingTransaction(AuthTransaction, CatalogueTransaction, Protocol):
 
     def release_slots(self, booking_id: str) -> None: ...
 
-    # Trusted fixture custody setup only; no public staff operations in #9.
+    def active_loan_by_asset(self, asset_id: str) -> ActiveLoan | None: ...
+
     def add_active_loan(self, loan: ActiveLoan) -> None: ...
+
+    def remove_active_loan(self, asset_id: str, booking_id: str) -> None: ...
 
 
 class GearShareTransaction(BookingTransaction, Protocol):

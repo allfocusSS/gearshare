@@ -363,13 +363,13 @@ def test_naive_read_clock_fails_safely_without_moving_seed(app, clock, repositor
     assert "Clock must" not in caplog.text
 
 
-def test_catalogue_remains_read_only_staff_routes_gated_and_frontend_stays_mock(app):
+def test_catalogue_remains_read_only_staff_requires_auth_and_frontend_stays_mock(app):
     for path in ["/api/v1/assets", "/api/v1/assets/camera-01", "/api/v1/assets/camera-01/availability"]:
         response = request(app, path, method="POST", json={"state": "active"})
         error(response, 405)
         assert "GET" in response.headers["Allow"]
     for path in ["/api/v1/staff/assets", "/api/v1/staff/bookings"]:
-        error(request(app, path), 404)
+        assert request(app, path).status_code == 401
     # #9 now provides private bookings; this public caller still cannot read them.
     assert request(app, "/api/v1/bookings").status_code == 401
     assert "createMockService" in (ROOT / "frontend/src/services/index.ts").read_text()

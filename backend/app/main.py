@@ -1,4 +1,4 @@
-"""FastAPI memory auth/catalogue/private bookings; staff/storage retain their gates."""
+"""Complete FastAPI memory API; persistence and frontend HTTP retain their gates."""
 
 from fastapi import FastAPI
 
@@ -12,6 +12,8 @@ from app.conventions import Clock, utc_now
 from app.fixtures import seed_catalogue
 from app.memory import MemoryRepository
 from app.repositories import GearShareRepository
+from app.staff import StaffService
+from app.staff_api import router as staff_router
 
 
 def create_app(
@@ -25,10 +27,12 @@ def create_app(
     application.state.auth = AuthService(store, clock, passwords)
     application.state.catalogue = CatalogueService(store, clock)
     application.state.bookings = BookingService(store, application.state.auth, clock)
+    application.state.staff = StaffService(store, application.state.auth, clock)
     install_error_handlers(application)
     application.include_router(router)
     application.include_router(catalogue_router)
     application.include_router(booking_router)
+    application.include_router(staff_router)
 
     @application.get("/health")
     def health() -> dict[str, str]:
