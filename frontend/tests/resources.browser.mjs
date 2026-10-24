@@ -1,6 +1,6 @@
 /** #26: fresh contexts, unfiltered diagnostics, real icon delivery in dev and preview. */
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -9,13 +9,18 @@ const frontend = fileURLToPath(new URL('../', import.meta.url))
 const output = new URL('../test-results/resources/', import.meta.url)
 const results = []
 await mkdir(output, { recursive: true })
+// This suite checks the local icon in the explicit mock build (HTTP mode would call a backend that is not running here).
+// Build it into an ignored folder so the normal dist/ is untouched.
+const mockEnv = { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' }
+const previewDist = 'test-results/resources/dist'
+execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build', '--outDir', previewDist, '--emptyOutDir'], { cwd: frontend, env: mockEnv, stdio: 'pipe' })
 const browser = await chromium.launch({ headless: true,
   ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}),
   args: ['--no-sandbox', '--disable-dev-shm-usage'] })
 try {
   for (const [mode, port] of [['dev', 5173], ['dev', 5196], ['preview', 5197]]) {
     const base = `http://127.0.0.1:${port}`
-    const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', ...(mode === 'preview' ? ['preview'] : []), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: frontend, stdio: ['ignore', 'pipe', 'pipe'] })
+    const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', ...(mode === 'preview' ? ['preview', '--outDir', previewDist] : []), '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: frontend, stdio: ['ignore', 'pipe', 'pipe'], env: mockEnv })
     let log = ''
     server.stdout.on('data', chunk => { log += chunk })
     server.stderr.on('data', chunk => { log += chunk })

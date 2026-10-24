@@ -9,7 +9,7 @@ import { ReservationsPage } from './pages/ReservationsPage.tsx'
 import { AssetDetailPage } from './pages/AssetDetailPage.tsx'
 import type { WorkspaceRoute } from './pages/ShellPage.tsx'
 import { clubToday } from './services/dates.ts'
-import { demoControls, gearShareService } from './services/index.ts'
+import { demoControls, gearShareService, isMockMode, subscribeToSessionEnd } from './services/index.ts'
 import type { DemoScenario } from './services/mockService.ts'
 import type { User } from './services/types.ts'
 
@@ -33,7 +33,9 @@ export function App() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [sessionNotice, setSessionNotice] = useState<{ reason: 'unauthenticated' | 'logout-unconfirmed'; text: string } | null>(null)
   const requestId = useRef(0)
+  const sessionEnded = useRef(false)
   const mainHeading = useRef<HTMLHeadingElement>(null)
 
   async function refreshSession() {
@@ -52,6 +54,15 @@ export function App() {
     return () => { requestId.current += 1 }
   }, [scenario])
 
+  // A 401 from any request (or a logout the server could not confirm) ends the local session: the adapter has already
+  // cleared its token, so clear the user and say why. Pages then offer sign-in with their own return navigation.
+  useEffect(() => subscribeToSessionEnd((event) => {
+    sessionEnded.current = true
+    setUser(null)
+    setMessage('')
+    setSessionNotice({ reason: event.reason, text: event.message })
+  }), [])
+
   useEffect(() => {
     const changed = () => { setLocation(locationRoute()); mainHeading.current?.focus() }
     window.addEventListener('hashchange', changed)
@@ -61,7 +72,7 @@ export function App() {
   useEffect(() => { document.title = `${titles[location.route]} · GearShare` }, [location.route])
 
   function changeScenario(next: DemoScenario) {
-    demoControls.setScenario(next)
+    demoControls?.setScenario(next)
     setUser(null)
     setMessage('')
     setScenario(next)
@@ -72,17 +83,23 @@ export function App() {
     setPending(true)
     setError('')
     setMessage('')
+    setSessionNotice(null)
+    sessionEnded.current = false
     const result = await gearShareService.logout()
     if (result.ok) {
       setUser(null)
       window.location.hash = '/explore'
-      setMessage('Signed out. Your demo session has ended.')
+      setMessage(isMockMode ? 'Signed out. Your demo session has ended.' : 'Signed out. Your session has ended.')
+    } else if (sessionEnded.current) {
+      // Signed out locally but the server could not confirm it: the notice from the session event says so honestly.
+      window.location.hash = '/explore'
     } else setError(result.error.message)
     setPending(false)
   }
 
   function signedIn(next: User, successMessage: string) {
     setUser(next)
+    setSessionNotice(null)
     const destination = next.role !== 'coordinator' && ['desk', 'inventory'].includes(location.returnTo) ? 'explore' : location.returnTo
     window.location.hash = `/${destination}`
     setMessage(successMessage)
@@ -107,10 +124,11 @@ export function App() {
     <div className="main-column">
       <header className="topbar"><div><span className="topbar-context">WORKSPACE <span>/</span></span><h1 ref={mainHeading} tabIndex={-1} id="main-content">{titles[route]}</h1></div><div className="account-area">{user ? <><span className="avatar" aria-hidden="true">{user.username.slice(0, 1).toUpperCase()}</span><span className="account-name">{user.username}<small>{user.role}</small></span><button type="button" className="button secondary" onClick={() => void logout()} disabled={pending || loading}>{pending ? 'Signing out…' : 'Sign out'}</button></> : <a className="button secondary" href={`#/signin?returnTo=${encodeURIComponent(signInReturn)}`}>Sign in<Icon name="arrow" /></a>}</div></header>
       <main className="main-content" aria-labelledby="main-content">
-        <DemoControls scenario={scenario} onChange={changeScenario} disabled={loading || pending} today={clubToday()} />
+        {isMockMode && <DemoControls scenario={scenario} onChange={changeScenario} disabled={loading || pending} today={clubToday()} />}
+        {sessionNotice && <div className="service-notice" role="alert"><span>{sessionNotice.text}</span>{sessionNotice.reason === 'unauthenticated' && route !== 'signin' && route !== 'register' && <a className="button secondary" href={`#/signin?returnTo=${encodeURIComponent(signInReturn)}`}>Sign in again</a>}</div>}
         {message && <div className="success-notice" role="status"><Icon name="check" />{message}</div>}
         {error && <div className="service-notice" role="alert"><span>{error}</span><button className="button secondary" type="button" disabled={loading || pending} onClick={() => void refreshSession()}>Retry session</button></div>}
-        {loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" /><span>Loading your demo workspace…</span></div> : restricted ? <section className="workspace-placeholder"><span className="placeholder-icon"><Icon name="desk" /></span><p className="eyebrow">Coordinator access</p><h2>Sign in as a coordinator.</h2><p>This workspace is available to the fictional coordinator account.</p><a className="button primary" href={`#/signin?returnTo=${route}`}>Go to sign in<Icon name="arrow" /></a></section> : route === 'signin' || route === 'register' ? <AuthPage key={`${route}-${scenario}`} register={route === 'register'} service={gearShareService} onPending={(value) => { setPending(value); if (value) setMessage('') }} onSuccess={signedIn} returnTo={returnTo} /> : route === 'explore' ? <CataloguePage service={gearShareService} /> : route === 'asset' ? <AssetDetailPage key={assetId} assetId={assetId} service={gearShareService} user={user} /> : route === 'reservations' ? <ReservationsPage service={gearShareService} user={user} /> : route === 'desk' ? <CoordinatorPage service={gearShareService} /> : <InventoryPage service={gearShareService} />}
+        {loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" /><span>{isMockMode ? 'Loading your demo workspace…' : 'Loading your workspace…'}</span></div> : restricted ? <section className="workspace-placeholder"><span className="placeholder-icon"><Icon name="desk" /></span><p className="eyebrow">Coordinator access</p><h2>Sign in as a coordinator.</h2><p>{isMockMode ? 'This workspace is available to the fictional coordinator account.' : 'This workspace is available to coordinator accounts.'}</p><a className="button primary" href={`#/signin?returnTo=${route}`}>Go to sign in<Icon name="arrow" /></a></section> : route === 'signin' || route === 'register' ? <AuthPage key={`${route}-${scenario}`} register={route === 'register'} service={gearShareService} onPending={(value) => { setPending(value); if (value) setMessage('') }} onSuccess={signedIn} returnTo={returnTo} /> : route === 'explore' ? <CataloguePage service={gearShareService} /> : route === 'asset' ? <AssetDetailPage key={assetId} assetId={assetId} service={gearShareService} user={user} /> : route === 'reservations' ? <ReservationsPage service={gearShareService} user={user} /> : route === 'desk' ? <CoordinatorPage service={gearShareService} /> : <InventoryPage service={gearShareService} />}
         <footer className="page-footer"><span>GEARSHARE <span>·</span> CAMPUS EQUIPMENT LENDING</span><span>Made for shared possibilities.</span></footer>
       </main>
     </div>

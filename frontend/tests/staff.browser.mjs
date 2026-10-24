@@ -6,7 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 const cwd=fileURLToPath(new URL('../',import.meta.url)), port=process.env.GEARSHARE_STAFF_PORT??'5182', base=`http://127.0.0.1:${port}`
 const output=`${cwd}/test-results/staff`;await mkdir(output,{recursive:true})
 const commit=execFileSync('git',['rev-parse','HEAD'],{cwd,encoding:'utf8'}).trim()
-const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',port,'--strictPort'],{cwd,stdio:['ignore','pipe','pipe']})
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',port,'--strictPort'],{cwd,stdio:['ignore','pipe','pipe'],env:{...process.env,VITE_GEARSHARE_SERVICE:'mock'}})
 let log='',browser,page;server.stdout.on('data',d=>log+=d);server.stderr.on('data',d=>log+=d)
 const checks=[],errors=[],failedRequests=[],apiRequests=[]
 const record=message=>{checks.push(message);console.log(`PASS ${message}`)}

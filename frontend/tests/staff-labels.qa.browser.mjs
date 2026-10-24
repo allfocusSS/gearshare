@@ -14,7 +14,7 @@ await mkdir(output, { recursive: true })
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim()
 const sourceDiff = execFileSync('git', ['diff', '--', 'src'], { cwd, encoding: 'utf8' }).trim()
 assert.equal(sourceDiff, '', 'QA must run against committed implementation')
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
 let log = '', browser, page
 server.stdout.on('data', d => { log += d })
 server.stderr.on('data', d => { log += d })
