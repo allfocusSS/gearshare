@@ -8,7 +8,7 @@ Author: Zhaksylyk Turadil. Independent student project; no university integratio
 
 ## Current status
 
-See the [current gate record](_docs/iterations.md#current-stage) for independent QA results through #9/#29 and the #30 routing correction awaiting fresh QA for both #30 and parent #10. The backend also serves coordinator desk, approval/rejection/checkout/return and inventory controls from real Python process memory. Engineer checks pass all 921 backend tests and both focused ASGI/Uvicorn transport matrices. The complete memory gate still requires independent acceptance. Persistence and the HTTP adapter remain gated; the frontend runs independently on its explicit mock. [Actual checks and limitations](_docs/evidence.md) preserve the original failing #10 checkpoint separately from current engineer results.
+See the [current gate record](_docs/iterations.md#current-stage). Independent QA passed and closed #1–11, including the [#11 ORM verdict](https://github.com/allfocusSS/gearshare/issues/11#issuecomment-6381631441), and the observed bugs #24–30. The backend serves health, authentication, the public catalogue, private bookings and the coordinator desk/inventory either from real Python process memory (the default) or, with explicit configuration, from the migrated SQLite store. The #12 engineer candidate adds the shared-store verification campaign: one repository contract suite over both stores, an independent invariant auditor, concurrency and fault-injection suites on file-backed SQLite, real server-process restarts and SQLite lock-contention scenarios (see [Persistence verification](#persistence-verification-12-candidate-independent-qa-pending)). It is engineer evidence only; independent QA for #12 is pending. The HTTP adapter and frontend integration (#13–14) remain gated and the frontend runs independently on its explicit mock. [Actual checks and limitations](_docs/evidence.md) are recorded separately from any QA verdict.
 
 Repository: https://github.com/allfocusSS/gearshare. MVP issues #1–20 and post-MVP #21–23 are published. StudyTrack remains the separate Part I project.
 
@@ -52,7 +52,7 @@ npm run dev
 
 Open http://127.0.0.1:5173 to try the GearShare mock catalogue. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/catalogue/booking/date/privacy/staff/version service tests and the contract-file checks using Node's built-in test runner. After an intentional mock change, `node tests/contract-samples.mjs --write` regenerates the committed contract samples; the backend tests then re-validate them. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
 
-No environment file is required for the default memory mode. [`.env.example`](.env.example) documents optional store/database settings and the `UVICORN_HOST`/`UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. The running application still defaults to the true memory repository. The #11 ORM candidate also supports explicit SQLite selection and the migration commands below. Independent QA acceptance is pending.
+No environment file is required for the default memory mode. [`.env.example`](.env.example) documents optional store/database settings and the `UVICORN_HOST`/`UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. The running application still defaults to the true memory repository. The ORM store (independently accepted in #11) is selected explicitly; see the SQLite section below.
 
 ## Mock demo and browser checks
 
@@ -131,7 +131,7 @@ Without reloading, sign out the student and sign in as the coordinator to retain
 
 Inventory supports search, add/edit and active/maintenance state. Codes are trimmed and stored uppercase; every physical unit needs a unique code. Maintenance errors explain that active returns and unresolved pending/approved commitments must be resolved at the desk first. Existing reservation snapshots and histories stay intact after equipment edits. Each private reservation carries a version (1 when created, +1 per successful approve, reject, cancel, checkout or return); the desk and My reservations send the version they last read, and a stale version is rejected with a conflict and no change (see [`_docs/api.md`](_docs/api.md)). Reload or changing a demo fixture resets every record. The mock provides no real server authorization or persistence.
 
-### SQLite ORM mode (#11 candidate, independent QA pending)
+### SQLite ORM mode (#11, independently accepted)
 
 From `backend/`, export `GEARSHARE_DATABASE_URL=sqlite:///./gearshare.sqlite3`, then run
 `uv run --locked alembic upgrade head`. The URL is configurable; SQLite files,
@@ -167,12 +167,22 @@ with 10/20/40 ms backoff; persistent infrastructure contention returns safe 503.
 A rechecked username/code/availability/version/custody conflict returns its
 ordinary documented 409; unexpected database faults remain safe 500.
 SQLite permits one writer at a time and is intended for a local MVP deployment;
-no other database engine has been verified. This #11 candidate does not establish
-independent QA acceptance or #12 full shared-contract/process-restart evidence.
-The frontend remains mocked.
+no other database engine has been verified. The frontend remains mocked.
 
 From `backend/`, `uv run --locked pytest tests/test_sqlalchemy_store.py -q` runs
 targeted ORM API, rollback, CAS, maintenance and contention tests. For a real HTTP
 smoke in one owner process, run `PYTHONPATH=. uv run --locked python scripts/check_sql_store.py --output /tmp/gearshare-sql-smoke.json`.
 That probe uses a disposable migrated SQLite file, real Argon2 and actual Uvicorn;
 it is not a process-restart check.
+
+### Persistence verification (#12 candidate, independent QA pending)
+
+The #12 suites check that the memory and SQLite stores behave identically behind the repository boundary and that the SQLite file survives real process restarts, simultaneous clients, injected faults and database locks. Run them from `backend/` (the default `uv run --locked pytest` includes them; the extra campaign alone is about two to three minutes):
+
+```sh
+cd backend
+uv run --locked pytest -m persistence          # the seven #12 modules: contract, auditor, confinement, races, faults, locks, restarts
+GEARSHARE_RACE_ITERATIONS=50 GEARSHARE_PERSISTENCE_REPORT=/tmp/gearshare-persistence.json uv run --locked pytest -m persistence -s
+```
+
+`make backend-test-persistence` runs the same campaign. Tests start real `uvicorn` child processes on a free port in 6400-6499 against temporary migrated SQLite files and delete them afterwards. SQLite is used in its default rollback-journal mode (no WAL), `synchronous=FULL`, foreign keys on, with a per-attempt busy timeout (default 5 s) and at most four whole-operation attempts; a lock held longer than that yields a safe 503, never a hang. Starting several uvicorn workers on a brand-new unseeded database makes some workers fail once during start-up and be restarted by uvicorn, so seed with one process first. Only SQLite was verified; no claim is made about any other database. [Evidence and limits](_docs/evidence.md#iteration-4--12-persistence-contention-and-storage-parity-engineer-candidate) are exact commands and results.

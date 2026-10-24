@@ -177,3 +177,98 @@ Owned engines close with application lifespan; injected repositories remain the
 caller's responsibility. The frontend service/default mock and frozen wire
 contract are unchanged. Independent #11 acceptance and #12 full parity/restart
 proof are still pending.
+
+## #12 persistence verification and SQLite limits
+
+Independent QA accepted #11. #12 adds no application behaviour; it proves, with
+tests, that the two stores behind `GearShareRepository` are interchangeable and
+that the SQLite file keeps its promises under restarts, concurrency, faults and
+locks. Evidence (commands, counts, outcomes) is in `evidence.md`.
+
+**Verification layers**
+
+- *Shared repository contract* (`test_repository_contract.py`): identical
+  assertions run against the true memory adapter and a FILE-backed SQLite store
+  created through the Alembic migration (never `create_all`, never `:memory:`),
+  at repository level (identity/session, atomic transactions, slot and active-loan
+  uniqueness, references, ordering, timestamps, inventory codes, seed marker) and
+  service level (visibility/privacy, nine allocation shapes, state transitions with
+  events and versions, custody and overdue blocking, maintenance, release of slots
+  on reject/cancel/return, stale versions, rejected inputs). A scripted 23-step
+  transcript is compared across both stores after normalising generated ids and
+  tokens. Documented adapter differences: a duplicate slot/loan/seed marker is a
+  `ValueError` in memory and a `TransactionRetry` (database unique key) in SQL; a
+  dangling foreign key is a `ValueError` versus an `IntegrityError`; a naive
+  timestamp is a `ValueError` versus a `StatementError`. Every observable service
+  result is the same.
+- *Invariant auditor* (`tests/invariants.py`, self-tested in
+  `test_invariant_auditor.py`): reads the physical rows with an independent
+  connection and reports 26 violation classes, among them duplicate (asset, day)
+  slots, slots that do not correspond exactly to pending/approved/checked-out
+  bookings, a missing or misordered create event, a broken event/version chain,
+  more than one or an unmatched active loan, and a maintenance unit that keeps a
+  live commitment. Every class is reproduced by corrupting a scratch database (or
+  memory state) and every test, race, fault and restart scenario ends with an audit.
+- *Concurrency* (`test_concurrency_sqlite.py`): independent engines, repositories
+  and apps (one SQLite connection each) released by a barrier with seeded jitter,
+  repeated on a fresh copy of a migrated template; and eight separate client
+  processes against a real uvicorn server (one worker and three workers). Assertions
+  are invariants, never the identity of the winner.
+- *Fault injection* (`test_fault_injection.py`): a wrapper raises after the k-th call
+  of any repository method (and, for SQLite, a DBAPI statement fault and a real
+  `SQLITE_FULL`), for creation after k of n slots and for every transition, inventory,
+  maintenance and identity operation. The whole request rolls back (row-level
+  before/after snapshot unchanged), the response is the contract `Error` envelope
+  without internals, and the same request then succeeds.
+- *Real process restarts* (`test_process_restart.py`): the actual backend is started
+  with `python -m uvicorn app.main:app` on a port in 6400-6499, driven over HTTP,
+  stopped with SIGTERM and with SIGKILL (idle and under a write burst) and started
+  again on the same file. Opening a second ORM engine is not accepted as a restart.
+- *Lock contention* (`test_sqlite_contention.py`) and a static *dialect-confinement*
+  test (`test_storage_confinement.py`: SQLite, PRAGMA and raw SQL appear only in
+  `database.py` and `sqlalchemy_store.py`; the default memory configuration does not
+  import SQLAlchemy).
+
+**SQLite settings actually in effect** (`app/database.py`, read back by a test): file
+database; rollback journal (`journal_mode=delete`, **no WAL**); `synchronous=FULL`;
+`foreign_keys=ON` on every connection; Python's `timeout` equals the busy timeout
+(default 5 s, `GEARSHARE_SQLITE_BUSY_TIMEOUT`, greater than 0 and at most 30);
+`isolation_level=None` with one explicit deferred `BEGIN` per request transaction.
+There is no application-level writer lock: SQLite's file lock is the single writer.
+Because SQLite serializes writers, the booking version/state compare-and-set and
+the availability-version claim cannot be told apart from the file lock by
+behaviour in this mode. The mutation check confirms it: deleting either predicate
+leaves every #12 race and restart scenario green. The existing adapter-level CAS
+test (#11) and one statement-sequence fault case are what notice it. The unique slot
+key is checked at repository level instead (the contract suite fails a migration that
+lacks it). The #12 race tests therefore prove outcomes (one winner, coherent rows),
+not which mechanism decided, and say nothing about stores without that serialization.
+
+**Observed behaviour under locks** (asserted, SQLite 3.45.1 in the verified
+environment; other versions or journal modes are not claimed):
+
+- A lock-holding writer in RESERVED state (`BEGIN IMMEDIATE`): readers are still
+  served (200); every writer answers the documented 503 `SERVICE_UNAVAILABLE` after
+  roughly 0.1-0.2 s. A read transaction that must upgrade to a write lock gets
+  `SQLITE_BUSY` immediately and the busy timeout is not consulted, so the bounded
+  four attempts with 10/20/40 ms backoff are all that is spent. A holder that
+  releases within the busy timeout therefore does not reliably save such writers.
+- An EXCLUSIVE holder blocks readers and writers: each attempt waits for the busy
+  timeout, so a request answers 503 after about four times the timeout plus backoff
+  (1.3 s with a 0.3 s timeout) and succeeds if the lock is released earlier.
+- Never a hang, a stack trace, the words "locked" or "sqlite" in a response, or a
+  partial row. After release the same requests succeed.
+- Several writers racing on different, non-conflicting assets may see some 503s
+  (bounded retry, no corruption; acknowledged requests always equal persisted rows).
+  Clients are expected to retry a 503.
+
+**Limits.** Single-writer SQLite on one host is the verified deployment. With
+several uvicorn workers started at once on a freshly migrated, unseeded database,
+workers that lose the first-seed race raise the documented 503 during import and
+are restarted by uvicorn (the seed ran once; all workers then serve): seed with one
+process first. A hard kill can leave a rollback journal; SQLite recovers it on the
+next open (observed: no acknowledged booking lost, none half-written). Nothing is
+claimed about PostgreSQL or any other database system, network file systems, WAL
+mode, other Python/SQLite versions or sustained load. Tokens survive a restart
+until their 24-hour expiry because sessions are rows (the design); the memory
+adapter by design loses everything.

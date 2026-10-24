@@ -131,3 +131,26 @@ starts a real Uvicorn server and HTTP clients under one owner, with a migrated
 disposable database and real Argon2. Its sixteen groups are targeted smoke;
 neither those checks nor engine reopen prove actual process-restart persistence.
 The comprehensive shared-contract/concurrency/restart campaign remains #12.
+
+For #12 (storage parity, concurrency, faults, restarts), from `backend/`:
+
+- `uv run --locked pytest` runs everything, including the campaign (about three
+  minutes in total). `uv run --locked pytest -m persistence` (or
+  `make backend-test-persistence`) runs only the seven #12 modules (repository contract,
+  invariant auditor, dialect confinement, concurrency, fault injection, lock contention,
+  process restart); `-m "not persistence"` runs everything else.
+- `GEARSHARE_RACE_ITERATIONS` (default 30) sets how often each race scenario repeats on
+  a fresh migrated database copy; `GEARSHARE_PERSISTENCE_REPORT=<path>.json` writes the
+  per-scenario outcome counts and the restart process lifecycle (pids, ports, signals,
+  exit codes); add `-s` to see the `[race]`, `[process]`, `[burst]` and `[sqlite]` lines.
+- The suites use fixed injected clock/dates (`NOW` 2026-10-21T20:00:00Z, club day
+  2026-10-22), real temporary files created by Alembic, and separate SQLAlchemy
+  engines/sessions for each contender. Race assertions are invariants (one winner, 409
+  with `unavailableDates` and no borrower identity, one booking/create event/slot set,
+  version +1 once, at most one active loan); the winner is not asserted.
+- `tests/invariants.py` is reusable: `audit_store(...)`/`assert_coherent(read_sqlite(url),
+  today)` after any new scenario, `assert_unchanged(before, after)` for failed requests.
+- `uv run --locked python scripts/mutation_sanity.py` (or `make backend-mutation-sanity`)
+  applies 18 deliberate defects one at a time in a scratch copy and reports which test
+  group kills each; survivors are findings, listed in evidence.md, not hidden.
+- Subprocess tests need a free port in 6400-6499 and Linux `/proc` for the worker count.

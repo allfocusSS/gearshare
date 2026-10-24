@@ -732,3 +732,175 @@ not independent QA, a full #12 shared-contract/concurrency campaign, real proces
 restart or frontend HTTP integration. No new unrelated API defect was observed.
 The engineer did not push, post comments or close an issue. No SQLite file,
 WAL/SHM, local environment or secret is committed.
+
+## Iteration 4 — #12 persistence, contention and storage parity engineer candidate
+
+2026-10-24 (container clock), branch `feat/persistence-12` in its own worktree on top of the
+independently accepted #11 commit `966fef5fce651975118d05636b71a0d8fb30f5dc`
+([QA PASS](https://github.com/allfocusSS/gearshare/issues/11#issuecomment-6381631441)). `origin/main`
+did not move during the work (no rebase needed). This is **engineer evidence, not a QA verdict**; #12
+stays open. The work was taken over by this session after no activity from the session first assigned to
+it. Application code is unchanged: the work adds tests, support modules, `backend/scripts/mutation_sanity.py`,
+a root `Makefile` and documentation. The code and tests below were run at `fd016da9752d3563982cda2a4e94a72bfc8cc28a`
+(tree `3a74bd1e876e0cf25a88d017d625ac4f9e2a9a03`); later commits only change Markdown. A parallel branch for
+#13/#14 exists and was neither merged nor used.
+
+### Environment and clock
+
+Linux 6.18 (x86_64, 2 CPUs); Python **3.12.3** in the locked uv environment (`uv 0.11.32`); SQLite **3.45.1**,
+SQLAlchemy 2.0.55, Alembic 1.20.1, FastAPI 0.146.0, Starlette 1.9.0, Pydantic 2.14.1, uvicorn 0.54.0, httpx 0.28.1.
+**Deviation from the documented prerequisites:** the container has Node 22.22.0 and uv 0.11.32, not Node 24.x / uv 0.12.23;
+the frontend is untouched, so no `npm` command was run, and `uv.lock` is unchanged and passes `uv lock --check`. Every
+in-process scenario uses a fixed injected clock (`NOW` = 2026-10-21T20:00:00.123456Z = 2026-10-22 01:00 in Asia/Almaty,
+club day 2026-10-22; midnight scenarios add 23 h). Real-server scenarios use the real clock and the club-local date.
+Databases are fresh temporary files created through `alembic upgrade head` (never `create_all` or `:memory:`) and deleted afterwards.
+
+### Commands actually executed (from `backend/`)
+
+| Command | Result |
+| --- | --- |
+| `git fetch origin && git status -sb` | Branch ahead of unchanged `origin/main` (no rebase). |
+| `uv lock --check` | Exit 0; 49 packages, lock unchanged. |
+| `uv run --locked pytest -q` (everything) | Exit 0; **1262 passed, 7 warnings in 196.30 s** (969 existing + 293 new). The 7 warnings are Pydantic `UnsupportedFieldAttributeWarning` (path-parameter `alias`) emitted the first time threads build certain route models; not failures. |
+| `uv run --locked pytest -m persistence -q -s` run 1 / 2 / 3, consecutive | **293 passed each**; 170.65 s / 168.13 s / 166.28 s. Every `[race]`/`[process]` line identical in invariant outcome; only winners and 503 counts in liveness scenarios vary (below). |
+| `GEARSHARE_RACE_ITERATIONS=50 uv run --locked pytest -m persistence -q -s` | **293 passed in 229.01 s**; every race scenario 50 iterations. |
+| `uv run --locked openapi-spec-validator ../openapi.yml` | `../openapi.yml: OK`. |
+| `uv run --locked python scripts/mutation_sanity.py` | Baseline of every group green, then **18/18 mutations killed** (table below). |
+| `uv run --locked python scripts/mutation_sanity.py --matrix --only sql-no-booking-cas sql-no-availability-claim service-no-create-event` | Kill matrix for the three most informative mutations (below). |
+
+The 293 new tests are: shared repository contract 113 (56 scenarios x memory and file SQLite, plus a 23-step
+differential transcript), invariant auditor 52 (37 corruption classes, memory corruptions, union coverage), dialect
+confinement 19, concurrency 21, fault injection 77, lock contention 6, real process restart 5. Suites needing slow
+processes are marked `persistence` (all seven modules are), `subprocess` for those spawning uvicorn; the default
+`pytest` still runs all of them (3 min 16 s here).
+
+### Races (file SQLite, separate engine/session/app per contender, barrier + seeded jitter, fresh migrated copy per iteration)
+
+The auditor re-read the physical database after every iteration. Counts below are per run of 30 (the 50-iteration
+run had the same shape). Every conflict-shape row had **exactly** the stated outcome in all of the 30 x 3 + 50 iterations.
+
+| Scenario | Outcome observed |
+| --- | --- |
+| 8 clients, same unit and day (also 16 in the exploratory run) | always one 201 and seven 409 with only `unavailableDates` and no borrower identity; one booking, one create event, one allocation set |
+| same-day, identical range, partial overlap, enclosing, enclosed (2 clients each) | always 201 + 409 |
+| adjacent days; different units | always 201 + 201 |
+| 6 clients, one unit, different days (liveness) | 201x6 in 10-16 runs of 30, 201x5 + one 503 in 11-16, 201x4 + 503x2 in 3-6 (50-run: also one 201x3 + 503x3); acknowledged == persisted every time |
+| approve vs cancel | winner approve 9-16, cancel 14-21 of 30; one event, version +1 once |
+| approve x2, cancel, reject; cancel x2 vs checkout; 2 approves + stale/future versions | exactly one winner / one 200 + three 409 each time; winners varied |
+| 5 approvals of different bookings, one unit (liveness) | 200x5 in 19-21 of 30, otherwise 200x4 + one 503 |
+| 3 checkouts of one booking | always one 200 + two 409, one active loan |
+| two bookings, one unit, across midnight | one winner each time (day one 8-18, day two 12-22 of 30), at most one loan |
+| overdue loan blocks next checkout; return vs pickup | serial check always 409; race: pickup 409 in 29/30, 30/30, 29/30, 50/50 (the rest returned first, then pickup 200) |
+| maintenance vs new booking (same unit) | maintenance won 10-17 of 30 (booking 409), booking won 13-20 (maintenance 409); never both |
+| maintenance vs checkout; vs cancel of last commitment; vs booking of another unit | checkout always wins (maintenance 409); cancel wins and maintenance succeeds only afterwards (1-4 of 30); other unit always 200 + 201 |
+| 8 separate client **processes** with a `multiprocessing.Barrier` against a real uvicorn server, one worker and three workers | 30/30 rounds each: one 201 and seven 409, losers carry no username/purpose/booking id; slowest request 0.09 s / 0.12 s; one booking, event and allocation per round |
+
+Non-conflicting bursts can therefore produce the documented bounded 503 (four attempts, 10/20/40 ms backoff) when several
+writers hit the same unit at the same instant; no partial row was ever found.
+
+### Real process restarts (actual `python -m uvicorn app.main:app`, `GEARSHARE_STORE=sqlalchemy`, temp file, ports 6400-6499)
+
+In the main restart test (run 1): `alembic upgrade head` exit 0; process A pid 12862 port 6406 created users
+(registered students; a coordinator inserted by trusted setup with a real Argon2id hash), sessions, a booking lifecycle
+(create, approve, checkout, return), further pending/approved/cancelled bookings and a revoked token, then **SIGTERM -> exit -15,
+graceful shutdown logged**; process B pid 13152 port 6402 (restart 1) returned byte-identical booking details, events, versions,
+desk and 91-day availability, accepted the persisted unexpired tokens, still rejected the revoked token, verified passwords,
+refused a duplicate normalised username and the same overlapping dates, then took stale-version 409 and valid transitions;
+**SIGKILL while idle -> exit -9, no graceful shutdown logged**; process C pid 13298 port 6461 (restart 2) returned everything
+B had saved, authenticated the token created under B, accepted a further transition, **SIGTERM -> -15**. Logs contain no traceback
+and none of the passwords or tokens. By design tokens survive restarts until their absolute 24 h expiry (only the hash is stored)
+and a revoked token stays revoked; the memory adapter loses everything. Whole-run lifecycle (identical in all four persistence runs): 6 migrated databases, 12 server starts, stops SIGTERM -15 x6,
+SIGKILL -9 x4 and SIGTERM 0 x2 (the three-worker supervisor exits 0).
+
+**SIGKILL during a write burst** (four HTTP writers, three rounds): every acknowledged booking existed after restart with one event and
+version 1; rounds persisted 57, 122, 185 bookings (cumulative) against 57, 121, 184 acknowledged, i.e. 0-1 booking per round was
+committed but unacknowledged (kill after commit, before the response), which is correct. Over the four runs (12 kill rounds) the kill left a rollback-journal file in 9 rounds: 8 with an invalid, never-completed header
+(SQLite does not treat it as hot; the next committed write removed it) and 1 hot journal (valid header) that the first reader after
+the restart rolled back and deleted; 3 rounds left none. No half-written booking, orphan slot or missing event was ever found
+(auditor clean after every restart).
+
+### Fault injection (both adapters) and SQLite faults
+
+77 cases inject an exception after the k-th call of each repository method for booking creation (booking, create event, slot 1-4;
+1-7 of 8 slots), all four transitions, maintenance, add/edit asset, register, login and logout, in memory and SQLite, plus 14
+DBAPI statement faults (`disk I/O error` on the n-th statement of a prefix) and a real `SQLITE_FULL` via `PRAGMA max_page_count`
+(19 bookings acknowledged, the next ones returned the safe 500 and the full table snapshot was unchanged; recovery succeeded after the
+cap was lifted). Each case asserts that the fault fired, the response is the contract `Error` envelope (500 `SERVICE_UNAVAILABLE`,
+generic message, no stack trace or SQL), the complete table snapshot is unchanged (no partial booking, create event, orphan slot
+or version change; prior history intact), the auditor is clean and the same valid request then succeeds.
+
+### SQLite settings and lock behaviour (SQLite 3.45.1 only; no claim about any other database)
+
+Read back from a live connection: `journal_mode=delete` (no WAL), `synchronous=2` (FULL), `foreign_keys=1`, `locking_mode=normal`,
+busy timeout = the configured value (2500 ms in the test, default 5000), `isolation_level=None` with an explicit deferred `BEGIN`; the
+timeout setting rejects 0, negatives and values above 30 s. Another connection held the lock while independent clients ran:
+
+| Lock held by another connection | Writers | Readers |
+| --- | --- | --- |
+| RESERVED (`BEGIN IMMEDIATE`) through the race, busy timeout 0.3 s (8 iterations) | 503 in about 0.15 s (busy timeout not used: a read-to-write upgrade fails at once; four attempts + backoff) | 200 |
+| same, released after 0.25 s with 2 s timeout (8 iterations, 4 runs) | still 503 in 28 of 32 iterations over four runs; in the other 4 the writers arrived after the release and got 201 | 200 |
+| EXCLUSIVE through the race, 0.3 s timeout (4 iterations) | 503 after 1.3-1.6 s (4 x timeout + backoff) | 503 after the same time |
+| EXCLUSIVE released after 0.25 s, 2 s timeout (8 iterations) | all four 201 | 200 |
+| real uvicorn process, RESERVED then EXCLUSIVE, timeout 0.3 s | write 503 in 0.09 s, login 503; after EXCLUSIVE write 503 in 1.29 s | RESERVED 200, EXCLUSIVE 503 in 1.29 s; `/health` 200 in both; the process survived and the next request succeeded |
+
+Never a hang, a stack trace or the words "locked"/"sqlite" in a response; the table snapshot was unchanged and the same requests succeeded
+after release. The static test shows SQLite/PRAGMA/raw SQL and OperationalError handling only in `app/database.py` and
+`app/sqlalchemy_store.py`, no SQLAlchemy import outside `database.py`, `sqlalchemy_store.py` and `models.py`, and that the default memory
+configuration never imports SQLAlchemy (the checker is itself tested on eleven synthetic offenders and five allowed homes).
+
+### Invariant auditor
+
+26 violation classes (duplicate (asset, day) slot, orphan/outside-range/missing/terminal slots, missing or misplaced create event,
+broken chain, state or version mismatch, orphan event, duplicate/orphan/wrong-state loan, missing loan, maintenance unit with live
+commitment, dangling references, duplicate username or code, invalid dates), proven by 37 SQL corruptions of a scratch file database
+(foreign keys and checks switched off, constraints dropped where the class needs them), memory-state corruptions, a union-coverage
+test over all codes, and by the mutation script. Rule used for maintenance: a unit in maintenance may not keep a checked-out booking
+or a pending/approved booking ending today or later (the application rule); an old approved booking whose end date has passed is
+not a violation.
+
+### Mutation sanity (scratch copy; each replacement must match exactly once; races at 6 iterations)
+
+| Mutation | Killed first by |
+| --- | --- |
+| memory adapter accepts a duplicate (asset, day) slot | contract (memory) |
+| memory adapter accepts a second active loan per unit | contract (memory) |
+| memory transaction publishes on error | contract (memory) |
+| SQL transaction commits on error | contract (SQLite) |
+| logout no longer deletes the session | contract (SQLite) |
+| migration without the slot primary key | contract (SQLite, via Alembic) |
+| stale `expectedVersion` accepted | contract (both) |
+| any student reads any booking | contract (both) |
+| checkout ignores an active loan | contract (both) |
+| maintenance ignores pending/approved bookings | contract (both) |
+| no create event written | auditor tests; also contract, fault, contention, concurrency and restart tests and at least 3 pre-existing tests (matrix run, stopped at the 3-failure limit) |
+| cancel keeps its slots | auditor tests |
+| locked database no longer recognised as contention | lock-contention suite |
+| seed marker ignored | process-restart suite (server crashes at start on the seeded file) |
+| auditor stops flagging duplicate slots; auditor stops requiring a create event | auditor self-tests |
+| **booking compare-and-set removed** | **only the #11 adapter test `test_cas_predicate_rejects_changed_version_or_state_inside_adapter`; every new #12 suite, including 30-iteration races and restarts, stayed green** |
+| **availability-version claim removed on create** | **only one #12 statement-sequence fault case (`create-UPDATE-ASSETS-1`); races, restarts, contract and contention stayed green** |
+
+No mutation survived the whole suite, but the last two survive every *behavioural* #12 test, which is the honest limit of this
+verification: in SQLite's rollback-journal mode the file lock serializes read-then-write transactions, so these predicates cannot be
+distinguished from it by outcome. They are defence in depth that only adapter-level tests observe. Mutations were also run on the
+test side (the two auditor mutations).
+
+### Observations, defects and limits
+
+* **No application defect was exposed**, so no `user-test-bug` issue was filed and no application code changed.
+* **Cold multi-worker start (limitation, not filed):** `uvicorn --workers 3` on a freshly migrated, still unseeded file makes one or two
+  workers lose the first-seed write race. `seed_catalogue` raises the documented 503 "service is busy" during import, the worker dies
+  and uvicorn's supervisor restarts it (second attempt succeeds). Observed in 13 of 14 exploratory cold starts and in the three pinned test runs (1, 2 and 2 failed imports); 3 workers always ended alive and
+  served every request with 200 (60/60 in the test); the catalogue was seeded exactly once; the only traceback type was that 503). A single process or an
+  already seeded file never showed it (the 3-worker race test runs on a seeded file with no traceback). `test_cold_start_of_three_workers...`
+  pins this as a safety property, not as a guarantee of a quiet start. The documented deployment is one process; if multi-worker start-up
+  is wanted later, seed once before starting workers.
+* Writers that hit one unit simultaneously can receive the documented 503 (see races); clients must retry. A lock held by another writer
+  gives a fast 503 even when it is shorter than the busy timeout (above).
+* Only SQLite 3.45.1 on one Linux host was exercised: no WAL mode, network file system, other database, other Python/SQLite version or
+  sustained load. Docs name Node 24/uv 0.12.23; this container has Node 22/uv 0.11.32, so frontend commands were not run.
+* The kill tests prove behaviour of this machine's file system and SQLite build; power-loss durability is not tested.
+* Shared-contract differences that are documented rather than hidden: duplicate slot/loan/seed marker raise `ValueError` in memory and
+  `TransactionRetry` in SQL; dangling foreign keys `ValueError` versus `IntegrityError`; naive timestamps `ValueError` versus
+  `StatementError`. The service results are identical.
+* The engineer did not push, post a QA verdict or close an issue. No database file, journal, token, password or environment secret is committed.

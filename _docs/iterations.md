@@ -10,6 +10,8 @@ The published #10 checkpoint `cba839e8046e19973b7ce18f2bf6dd2ab44d2d1a` (tree `a
 
 The current `Refs #30` engineer candidate changes only shared method-header traversal, adds 56 fixed-oracle test variants and a reusable focused transport probe, and preserves every original assertion. Actual new results: **921 backend PASS**, **133 PASS per ASGI/Uvicorn transport**, frontend84/typecheck/build, lock44 and frozen OpenAPI validation PASS. Full-store equality holds for all 128 rejected transport requests per transport. Exact commands and recovery limits are in [the correction evidence](evidence.md#iteration-3--30-shared-route-method-header-correction). Independent QA subsequently [passed/closed #30](https://github.com/allfocusSS/gearshare/issues/30#issuecomment-6369839983) at 2026-10-23T16:37:46Z and [#10](https://github.com/allfocusSS/gearshare/issues/10#issuecomment-6369858278) at 16:38:45Z on published `166ca49536137be7790855c092e288297e7200e6` (tree `748b20123c42a26c8e40517b5e659e6e3f8d8f69`). The complete true-memory gate is accepted. #11 now has a complete engineer candidate under its existing PM handoff and awaits independent QA; #12 and subsequent dependent issues remain gated. Unsupported issue-closure flags do not establish a stage gate.
 
+As of 2026-10-24, [#11 passed independent QA](https://github.com/allfocusSS/gearshare/issues/11#issuecomment-6381631441) on `966fef5fce651975118d05636b71a0d8fb30f5dc` and is closed. The [#12 engineer candidate](#2026-10-24--iteration-4-12-persistence-contention-and-storage-parity) (shared repository contract suite, invariant auditor, SQLite concurrency, fault injection, real process restarts, lock contention) awaits fresh independent QA and has no verdict. #13/#14 remain gated behind it.
+
 ## 2026-10-19 — Product and process preparation
 
 - Proposed GearShare, an equipment lending application distinct from StudyTrack.
@@ -179,3 +181,12 @@ shared-contract/restart campaign or subsequent issue implementation is claimed.
 - This is engineer evidence, not independent QA acceptance. #11 stays open.
   #12 full parity/concurrency/restart verification and frontend HTTP integration
   remain gated; no later issue or unchanged browser campaign was pulled forward.
+
+## 2026-10-24 — Iteration 4, #12 persistence, contention and storage parity
+
+- Provenance, stated plainly: this #12 work was taken over by a new engineer session after the earlier session assigned to it showed no activity. The branch is `feat/persistence-12` in its own worktree, based on the accepted #11 commit `966fef5`. A separate branch (`feat/http-adapter-13-14`) is developed in parallel for #13/#14; it was not merged, rebased onto or relied on (only its file list was checked for a `Makefile`), and the two may conflict only in the new root `Makefile` and the status lines of README/AGENTS.md. #13/#14 stay gated behind independent QA of #12.
+- Added only tests, support code, a mutation script and documentation; application behaviour is unchanged. No real defect was found by the campaign (see evidence.md for the one start-up observation, recorded as a limitation).
+- One shared repository contract suite runs identical assertions against the true memory adapter and a migrated file-backed SQLAlchemy/SQLite adapter (Alembic path, never `create_all` or `:memory:`); legitimate adapter differences (exception types for duplicate keys, foreign keys and bad timestamps) are named and the common invariant is asserted.
+- A reusable invariant auditor (26 violation classes) reads the physical store with an independent connection and runs after every race, fault and restart scenario; each class is proved by corrupting a scratch database or memory state.
+- Concurrency (threads with separate engines/sessions plus separate client processes through the real server), fault injection after k of n writes in both adapters, real SIGTERM/SIGKILL restarts of a uvicorn child on the same file, lock-contention scenarios, a static dialect-confinement test and a mutation sanity script were added. Exact commands, iteration counts, outcomes and limits are in evidence.md.
+- This is engineer evidence, not independent QA acceptance; #12 stays open. The commits are local until the orchestrator pushes.
