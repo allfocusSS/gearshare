@@ -52,7 +52,7 @@ npm run dev
 
 Open http://127.0.0.1:5173 to try the GearShare mock catalogue. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/catalogue/booking/date/privacy/staff/version service tests and the contract-file checks using Node's built-in test runner. After an intentional mock change, `node tests/contract-samples.mjs --write` regenerates the committed contract samples; the backend tests then re-validate them. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
 
-No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. The running application still defaults to the true memory repository. The #11 schema checkpoint adds the migration commands below; runtime database selection is the next part of that open issue.
+No environment file is required for the default memory mode. [`.env.example`](.env.example) documents optional store/database settings and the `UVICORN_HOST`/`UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. The running application still defaults to the true memory repository. The #11 ORM candidate also supports explicit SQLite selection and the migration commands below. Independent QA acceptance is pending.
 
 ## Mock demo and browser checks
 
@@ -131,7 +131,7 @@ Without reloading, sign out the student and sign in as the coordinator to retain
 
 Inventory supports search, add/edit and active/maintenance state. Codes are trimmed and stored uppercase; every physical unit needs a unique code. Maintenance errors explain that active returns and unresolved pending/approved commitments must be resolved at the desk first. Existing reservation snapshots and histories stay intact after equipment edits. Each private reservation carries a version (1 when created, +1 per successful approve, reject, cancel, checkout or return); the desk and My reservations send the version they last read, and a stale version is rejected with a conflict and no change (see [`_docs/api.md`](_docs/api.md)). Reload or changing a demo fixture resets every record. The mock provides no real server authorization or persistence.
 
-### SQLite schema checkpoint (#11, implementation in progress)
+### SQLite ORM mode (#11 candidate, independent QA pending)
 
 From `backend/`, export `GEARSHARE_DATABASE_URL=sqlite:///./gearshare.sqlite3`, then run
 `uv run --locked alembic upgrade head`. The URL is configurable; SQLite files,
@@ -141,11 +141,38 @@ tables and their data, and is intended only for disposable databases.
 `uv run --locked pytest tests/test_database_schema.py -q` verifies migrations,
 constraints, rollback and UTC/date round trips on temporary file-backed databases.
 
+After migration, start the same services with the ORM repository:
+
+```sh
+cd backend
+export GEARSHARE_STORE=sqlalchemy
+export GEARSHARE_DATABASE_URL=sqlite:///./gearshare.sqlite3
+uv run --locked alembic upgrade head
+uv run --locked uvicorn app.main:app --reload
+```
+
+Keep `GEARSHARE_STORE=memory` (the default) for the true process-memory mode.
+The application never creates or migrates tables automatically. On startup,
+fictional assets and coherent private fixtures seed once in one transaction;
+a persistent marker prevents repeat seeding and existing accounts/passwords
+are never overwritten. The random fixture credentials are inaccessible and
+provide no public staff login. Real account setup remains a trusted operation.
+
 The schema includes the seven domain entities and a persistent seed marker.
 Booking timestamps, event timestamps and session expiry round-trip as aware UTC;
 reservation dates remain local calendar dates. SQLite busy handling defaults to
-five seconds (`GEARSHARE_SQLITE_BUSY_TIMEOUT`, range greater than 0 through 30).
+five seconds per attempt (`GEARSHARE_SQLITE_BUSY_TIMEOUT`, greater than 0 through
+30). At most four whole-operation attempts recheck a fresh database snapshot,
+with 10/20/40 ms backoff; persistent infrastructure contention returns safe 503.
+A rechecked username/code/availability/version/custody conflict returns its
+ordinary documented 409; unexpected database faults remain safe 500.
 SQLite permits one writer at a time and is intended for a local MVP deployment;
-no other database engine has been verified. This checkpoint does not yet wire
-the ORM repository into the API, and does not establish #11 acceptance or #12
-shared-contract/concurrency/process-restart evidence. The frontend remains mocked.
+no other database engine has been verified. This #11 candidate does not establish
+independent QA acceptance or #12 full shared-contract/process-restart evidence.
+The frontend remains mocked.
+
+From `backend/`, `uv run --locked pytest tests/test_sqlalchemy_store.py -q` runs
+targeted ORM API, rollback, CAS, maintenance and contention tests. For a real HTTP
+smoke in one owner process, run `PYTHONPATH=. uv run --locked python scripts/check_sql_store.py --output /tmp/gearshare-sql-smoke.json`.
+That probe uses a disposable migrated SQLite file, real Argon2 and actual Uvicorn;
+it is not a process-restart check.

@@ -11,7 +11,7 @@ from app.catalogue import missing_asset
 from app.conventions import Clock, ECMASCRIPT_TRIM, clock_instant, utc_now
 from app.domain import Booking, BookingEvent, CANCEL_NOTE, ReservationSlot, User
 from app.errors import ApiError
-from app.repositories import BookingTransaction, GearShareRepository
+from app.repositories import retry_transaction, BookingTransaction, GearShareRepository
 
 
 def missing_booking() -> ApiError:
@@ -71,6 +71,7 @@ class BookingService:
         self.auth = auth
         self.clock = clock
 
+    @retry_transaction
     def request_booking(self, token: str, body: Mapping[str, object]) -> dict:
         with self.repository.transaction() as transaction:
             actor = self.auth.identity(transaction, token)
@@ -94,17 +95,20 @@ class BookingService:
                 transaction.add_slot(ReservationSlot(asset_id, start + timedelta(days=offset), booking.id))
             return booking.private(transaction.booking_events(booking.id))
 
+    @retry_transaction
     def list_bookings(self, token: str) -> list[dict]:
         with self.repository.transaction() as transaction:
             actor = self.auth.identity(transaction, token)
             return [booking.private(transaction.booking_events(booking.id)) for booking in transaction.bookings() if booking.user_id == actor.id]
 
+    @retry_transaction
     def get_booking(self, token: str, booking_id: str) -> dict:
         with self.repository.transaction() as transaction:
             actor = self.auth.identity(transaction, token)
             booking = _visible(transaction, booking_id, actor)
             return booking.private(transaction.booking_events(booking.id))
 
+    @retry_transaction
     def cancel_booking(self, token: str, booking_id: str, body: Mapping[str, object]) -> dict:
         with self.repository.transaction() as transaction:
             actor = self.auth.identity(transaction, token)

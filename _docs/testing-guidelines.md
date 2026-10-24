@@ -2,7 +2,7 @@
 
 Current stage: see the [current gate record](iterations.md#current-stage). Historical entries below retain their point-in-time results.
 
-Independent verdicts, the original failing #10 checkpoint and the #30 correction awaiting fresh QA are listed in [iterations.md](iterations.md#current-stage); exact executed commands are in evidence.md. The matrix below remains a case plan and does not establish an independent PASS for staff/storage behavior.
+Independent verdicts, the original failing #10 checkpoint and the accepted #10/#30 memory gate are listed in [iterations.md](iterations.md#current-stage); exact executed commands are in evidence.md. The #11 ORM candidate awaits independent QA. The matrix below remains a case plan and does not establish an independent storage PASS.
 
 Current scoped frontend commands: `npm test` runs 84 auth/catalogue/booking/staff/inventory/date/privacy/version/contract tests (the original 78 plus six Unicode/code-point cases in `tests/text.test.mjs`); `npm run test:browser` runs the actual mock app's auth/shell checks and the seven independently specified #24 regression groups. Browser setup and the executable override are documented in README. The committed browser script covers first-invalid enabled focus, repeated/delayed validation, error association, stable keyboard use, form-level failures, valid recovery, roles, fixtures and both required widths. `npm run test:browser:catalogue` adds filter intersections, inclusive dates/invalid boundaries, anonymous privacy, maintenance, missing/empty/failure/loading states, concrete detail auth return and 390/1440 layouts, using a fixed browser Date. `npm run test:browser:bookings` exercises the #4 request/private history/cancellation/conflict journey on port 5181 with fixed Date. `npm run test:browser:staff` exercises the full student-to-coordinator lifecycle, staff transitions/custody, inventory, permissions, keyboard/focus, async failures/retries/empty states and 390/1440 layouts. Remaining API/storage cases follow their gates.
 
@@ -119,3 +119,15 @@ upgrade, populated downgrade/reupgrade, model/schema parity, database uniqueness
 foreign keys, positive versions/state/date checks, partial-write rollback and
 UTC/microsecond/local-date round trips after engine reopen. This does not yet
 verify the ORM repository, shared service parity or real process restart (#12).
+
+For the complete #11 candidate, `uv run --locked pytest tests/test_sqlalchemy_store.py -q`
+adds focused FILE-SQLite API/service checks for lifecycle/history/order/privacy,
+normalized conflicts, all five stale-version mutations, failure after each
+record type, once-seeding/account preservation, runtime selection, two independent
+repository engines racing on booking/maintenance/expectedVersion, actual CAS
+predicate rejection and bounded busy versus unexpected DB-error behavior.
+`PYTHONPATH=. uv run --locked python scripts/check_sql_store.py --output PATH`
+starts a real Uvicorn server and HTTP clients under one owner, with a migrated
+disposable database and real Argon2. Its sixteen groups are targeted smoke;
+neither those checks nor engine reopen prove actual process-restart persistence.
+The comprehensive shared-contract/concurrency/restart campaign remains #12.

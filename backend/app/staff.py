@@ -12,7 +12,7 @@ from app.catalogue import missing_asset
 from app.conventions import Clock, ECMASCRIPT_TRIM, clock_instant, utc_now
 from app.domain import ActiveLoan, Asset, BookingEvent, CATEGORIES, User
 from app.errors import ApiError
-from app.repositories import GearShareRepository, InventoryCodeTaken
+from app.repositories import retry_transaction, GearShareRepository, InventoryCodeTaken
 from app.text import default_upper
 
 StaffAction = Literal["approve", "reject", "checkout", "return"]
@@ -67,6 +67,7 @@ class StaffService:
         self.auth = auth
         self.clock = clock
 
+    @retry_transaction
     def list_bookings(self, token: str) -> dict:
         with self.repository.transaction() as transaction:
             require_coordinator(self.auth.identity(transaction, token))
@@ -96,6 +97,7 @@ class StaffService:
                 },
             }
 
+    @retry_transaction
     def transition(self, token: str, booking_id: str, action: StaffAction, body: Mapping[str, object]) -> dict:
         with self.repository.transaction() as transaction:
             actor = self.auth.identity(transaction, token)
@@ -128,11 +130,13 @@ class StaffService:
                 transaction.release_slots(booking.id)
             return updated.private(transaction.booking_events(booking.id))
 
+    @retry_transaction
     def list_inventory(self, token: str) -> list[dict]:
         with self.repository.transaction() as transaction:
             require_coordinator(self.auth.identity(transaction, token))
             return [asset.public() for asset in transaction.assets()]
 
+    @retry_transaction
     def add_asset(self, token: str, body: Mapping[str, object]) -> dict:
         try:
             with self.repository.transaction() as transaction:
@@ -143,6 +147,7 @@ class StaffService:
         except InventoryCodeTaken:
             raise duplicate_code() from None
 
+    @retry_transaction
     def edit_asset(self, token: str, asset_id: str, body: Mapping[str, object]) -> dict:
         try:
             with self.repository.transaction() as transaction:
@@ -156,6 +161,7 @@ class StaffService:
         except InventoryCodeTaken:
             raise duplicate_code() from None
 
+    @retry_transaction
     def set_asset_state(self, token: str, asset_id: str, body: Mapping[str, object]) -> dict:
         with self.repository.transaction() as transaction:
             require_coordinator(self.auth.identity(transaction, token))

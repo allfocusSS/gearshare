@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The frontend contains components/pages and the complete async `GearShareService` with its explicit memory-only mock. Public asset types contain identity/specification/state fields only; anonymous availability has no private booking records. The backend has `domain.py`, `repositories.py` (transaction protocols), `memory.py` (locked dictionary adapter), auth/catalogue/booking/staff services and their HTTP boundaries, plus shared clock/text/calendar/routing conventions. `fixtures.py` seeds original physical units and trusted coherent private booking/event/slot fixtures once at app creation. All memory operations of the QA-passed `openapi.yml` are present. The #30 correction traverses included-route contexts for exact 405 method headers; its engineer checks pass, while #10/#30 still require fresh independent acceptance of the complete memory stage. `httpService.ts`, ORM models and migrations remain gated.
+The frontend contains components/pages and the complete async `GearShareService` with its explicit memory-only mock. Public asset types contain identity/specification/state fields only; anonymous availability has no private booking records. The backend has `domain.py`, `repositories.py` (transaction protocols), `memory.py` (locked dictionary adapter), auth/catalogue/booking/staff services and their HTTP boundaries, plus shared clock/text/calendar/routing conventions. `fixtures.py` seeds original physical units and trusted coherent private booking/event/slot fixtures once at app creation. All memory operations of the QA-passed `openapi.yml` are present. The independently accepted #30 correction traverses included-route contexts for exact 405 method headers; #10/#30 have passed the complete true-memory gate. The #11 candidate now adds ORM models, migrations and a configurable SQLAlchemy adapter, pending independent QA. `httpService.ts` and final frontend integration remain gated.
 
 ## Required stages and concrete verification gates
 
@@ -141,3 +141,39 @@ dates use SQLAlchemy `Date`. SQLite connection/transaction settings live only in
 The initial migration freezes the schema instead of importing mutable model
 metadata at migration execution. Runtime repository wiring remains the next
 phase of open #11; no ORM acceptance or #12 process-restart proof is claimed.
+
+## #11 ORM repository candidate
+
+`SQLAlchemyRepository` projects the same immutable domain records from fresh ORM
+sessions. Each repository context owns a real transaction, including all booking,
+slot, event and custody changes. Internal ordering columns preserve the existing
+creation/event ordering. The transaction context closes its session permanently;
+returned records carry no ORM session or mutable storage reference.
+
+Booking replacement uses a conditional database update on the previously read
+version **and** state. The service keeps the caller's original `expectedVersion`.
+Every booking creation/replacement and inventory replacement conditionally updates
+the same asset availability-version row; a maintenance check cannot commit after
+an unseen new allocation. SQLite stale-snapshot/busy failures and unsuccessful
+CAS invalidate the entire operation. A storage-neutral repository retry signal
+restarts the complete service method against a fresh snapshot, rechecking role,
+privacy, supplied version, maintenance, dates and custody. Four attempts and
+10/20/40 ms backoff bound rechecks; the per-attempt SQLite wait is configurable.
+There is no Python lock in this adapter. SQLite still serializes writers at the
+database level, with unique slot/custody keys as the final allocation arbiters.
+
+Only recognized SQLite unique-key failures are translated; FK/CHECK/NOT NULL or
+unrecognized failures remain unexpected. Rechecks return the existing useful
+409s and anonymous unavailable dates rather than exposing another booking.
+Exhausted infrastructure contention returns the already documented safe 503;
+unexpected faults cross the unchanged safe 500 boundary. Other SQLAlchemy URLs
+are configurable, but their deployment/error behavior has not been verified.
+
+`GEARSHARE_STORE` explicitly selects `memory` (default) or `sqlalchemy`.
+`GEARSHARE_DATABASE_URL` is shared by Alembic and the SQL repository. Migrations
+run explicitly before startup. The persisted seed marker and all fixture rows
+commit together, so repeat startup never resets credentials or rewrites records.
+Owned engines close with application lifespan; injected repositories remain the
+caller's responsibility. The frontend service/default mock and frozen wire
+contract are unchanged. Independent #11 acceptance and #12 full parity/restart
+proof are still pending.

@@ -9,7 +9,7 @@ from app.auth import Argon2Passwords
 from app.calendar import CLUB_ZONE
 from app.conventions import Clock, clock_instant
 from app.domain import ActiveLoan, Asset, Booking, BookingEvent, BookingState, CANCEL_NOTE, RESERVING_STATES, ReservationSlot, User
-from app.repositories import GearShareRepository, GearShareTransaction
+from app.repositories import retry_transaction, GearShareRepository, GearShareTransaction
 
 
 @lru_cache(maxsize=2)
@@ -82,6 +82,7 @@ def catalogue_assets() -> tuple[Asset, ...]:
     )
 
 
+@retry_transaction
 def seed_catalogue(repository: GearShareRepository, clock: Clock) -> None:
     """Seed once per store in one transaction, never as a read side effect."""
     with repository.transaction() as transaction:

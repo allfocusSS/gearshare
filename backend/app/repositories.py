@@ -1,10 +1,13 @@
-"""Atomic repository boundary, shared by the memory stage and future ORM adapter."""
+"""Atomic repository boundary, shared by the memory stage and ORM adapter."""
 
 from contextlib import AbstractContextManager
 from datetime import date
+from functools import wraps
+from time import sleep
 from typing import Protocol
 
 from app.domain import ActiveLoan, Asset, Booking, BookingEvent, ReservationSlot, Session, User
+from app.errors import ApiError
 
 
 class UsernameTaken(Exception):
@@ -83,3 +86,26 @@ class CatalogueRepository(Protocol):
 
 class GearShareRepository(Protocol):
     def transaction(self) -> AbstractContextManager[GearShareTransaction]: ...
+
+
+class TransactionRetry(Exception):
+    """Storage contention invalidated a transaction; retry the whole operation."""
+
+
+def retry_transaction(operation):
+    """Recheck the original inputs on a fresh snapshot; never refresh a version.
+
+    Only the adapter's explicit contention signal is retried. Domain errors and
+    unexpected database failures propagate unchanged. Four attempts are bounded;
+    the short backoff lets the competing transaction commit before rechecking.
+    """
+    @wraps(operation)
+    def run(*args, **kwargs):
+        for attempt in range(4):
+            try:
+                return operation(*args, **kwargs)
+            except TransactionRetry:
+                if attempt == 3:
+                    raise ApiError(503, "SERVICE_UNAVAILABLE", "The service is busy. Try again.") from None
+                sleep(0.01 * 2 ** attempt)
+    return run

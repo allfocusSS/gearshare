@@ -14,7 +14,7 @@ from argon2.exceptions import VerifyMismatchError
 from app.conventions import Clock, ECMASCRIPT_TRIM, clock_instant, utc_now
 from app.domain import Session, User
 from app.errors import ApiError, unauthenticated
-from app.repositories import AuthRepository, AuthTransaction, UsernameTaken
+from app.repositories import retry_transaction, AuthRepository, AuthTransaction, UsernameTaken
 
 USERNAME = re.compile(r"[A-Za-z0-9_]{3,30}")
 
@@ -78,6 +78,7 @@ class AuthService:
         transaction.add_session(Session(token_hash(token), user.id, expiry))
         return result
 
+    @retry_transaction
     def register(self, body: Mapping[str, object]) -> dict:
         username, password = credentials(body)
         try:
@@ -93,6 +94,7 @@ class AuthService:
                 fields={"username": "Choose a different username."},
             ) from None
 
+    @retry_transaction
     def login(self, body: Mapping[str, object]) -> dict:
         username, password = credentials(body)
         with self.repository.transaction() as transaction:
@@ -113,10 +115,12 @@ class AuthService:
             raise unauthenticated()
         return user
 
+    @retry_transaction
     def current_user(self, token: str) -> dict[str, str]:
         with self.repository.transaction() as transaction:
             return self.identity(transaction, token).public()
 
+    @retry_transaction
     def logout(self, token: str) -> None:
         with self.repository.transaction() as transaction:
             self.identity(transaction, token)

@@ -264,3 +264,18 @@ Pagination, rate limiting, deployment hardening (#22), account recovery and SSO,
 * The contract is additionally linted by hand with tools that are **not** repository dependencies: `npx --yes @redocly/cli@1.34.5 lint openapi.yml` and `npx --yes @stoplight/spectral-cli@6.14.3 lint openapi.yml --ruleset <file extending spectral:oas>`. Both must report 0 errors; the exact remaining warnings and results are in `evidence.md`.
 * `cd frontend && npm test` runs `tests/contract.test.mjs`, `tests/versioning.test.mjs` and `tests/contract-decisions.test.mjs` (ids, event shape and system notes, desk counts), including a check that `tests/fixtures/contract-samples.json` equals what the mock produces now.
 * To change the contract: edit `openapi.yml`, this file, `types.ts` and the mock together, regenerate samples with `cd frontend && node tests/contract-samples.mjs --write`, review the diff, and run both suites. Do not weaken a rule in one place only.
+
+## #11 storage implementation notes (wire contract unchanged)
+
+Both repository modes run the same services and exact HTTP/error boundary.
+The ORM adapter compares booking version/state and the shared asset availability
+version in conditional database updates, commits records/events/slots/custody
+together, and rechecks complete operations on a fresh snapshot after recognized
+contention. Rechecks preserve the submitted `expectedVersion`; domain conflicts
+retain their documented 409 details/privacy. At most four attempts use bounded
+SQLite busy handling and 10/20/40 ms backoff. If infrastructure remains too busy
+to obtain a stable outcome, the existing 503 `SERVICE_UNAVAILABLE` response is
+used with no SQL, identifiers or invented unavailable dates. Unexpected database
+errors remain distinguishable as the existing generic 500, with rollback and
+credential-safe logging. No OpenAPI operation, response shape or UI default
+changed. Independent #11 acceptance and #12 restart/full parity remain pending.

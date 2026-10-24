@@ -7,7 +7,7 @@ from app.calendar import HORIZON_DAYS, TIME_ZONE, club_today, date_range
 from app.conventions import Clock, ECMASCRIPT_TRIM, utc_now
 from app.domain import CATEGORIES
 from app.errors import ApiError
-from app.repositories import CatalogueRepository
+from app.repositories import retry_transaction, CatalogueRepository
 from app.text import default_lower
 
 
@@ -20,6 +20,7 @@ class CatalogueService:
         self.repository = repository
         self.clock = clock
 
+    @retry_transaction
     def list_assets(self, filters: Mapping[str, str]) -> dict:
         today = club_today(self.clock)
         selected = date_range(filters.get("startDate"), filters.get("endDate"), today)
@@ -46,6 +47,7 @@ class CatalogueService:
             "today": today.isoformat(), "horizonEnd": (today + timedelta(days=HORIZON_DAYS)).isoformat(),
         }
 
+    @retry_transaction
     def get_asset(self, asset_id: str) -> dict[str, str]:
         with self.repository.transaction() as transaction:
             asset = transaction.asset_by_id(asset_id)
@@ -53,6 +55,7 @@ class CatalogueService:
                 raise missing_asset()
             return asset.public()
 
+    @retry_transaction
     def get_asset_availability(self, asset_id: str) -> dict:
         today = club_today(self.clock)
         horizon = today + timedelta(days=HORIZON_DAYS)

@@ -664,3 +664,71 @@ the engine. That engine-reopen check is deliberately not a real process-restart
 claim. No unrelated real API defect was observed. No browser, full shared-store
 parity, #12 concurrency/restart or frontend HTTP-default check is claimed.
 No database, session token, password, WAL/SHM file or environment secret is committed.
+
+## Iteration 4 — #11 complete ORM engineer candidate
+
+2026-10-24, continuation by the same engineer after publication of phase 1 as
+`05945d2d70548ea18d0b0a0a4e4c5e3f0cefbe7e` (tree
+`b55c510c2749cb046e0cd327d014382bcdfed30e`). This commit completes the groomed
+#11 implementation; independent QA has not yet accepted it and #11 stays open.
+
+The adapter uses fresh permanently closed ORM sessions and real transactions,
+immutable projections and stable insertion order. SQL conditional updates compare
+booking version/state and shared asset availability version. Recognized contention
+rolls back and re-executes the whole service operation, preserving original inputs
+and expectedVersion while rechecking permissions/availability. Known domain
+conflicts retain their useful/private 409. Four attempts, bounded SQLite busy
+wait and 10/20/40 ms backoff limit infrastructure contention; if it persists the
+already documented generic 503 is returned. Unexpected database errors retain the
+unchanged safe 500 boundary. Unique/FK/CHECK constraints remain authoritative;
+no Python process lock or raw SQLite query enters service/domain logic.
+
+`GEARSHARE_STORE=sqlalchemy` selects the same database URL as Alembic; memory is
+still the explicit default and real Python adapter. Migrations are a separate
+command. Startup seed rows/history/allocations/marker commit once together and
+never overwrite existing accounts or credentials. Owned engines close with app
+lifespan. The frontend/mock, root OpenAPI, domain records, MemoryRepository,
+original API/routing tests and dependency lock are unchanged from phase 1.
+
+Python 3.12.14; the following backend commands used isolated **uv 0.12.23**,
+locked SQLAlchemy 2.0.55/Alembic 1.20.1. Frontend check used actual Node 24.22.1/npm 11.9.0 (within declared Node 24.x).
+The first new test run had 10 harness TypeErrors because the existing helper's
+keyword-only `note` was passed positionally (16 tests already passed); only the
+new harness calls were corrected. An injected unexpected DB fault was made into
+a real missing-table SQLAlchemy query, removing an irrelevant cartesian-product
+warning. Neither was an observed application defect; no bug was fabricated.
+
+| Directory | Command actually executed | Actual result |
+| --- | --- | --- |
+| `backend/` | `uv tool run --from uv==0.12.23 uv run --locked pytest tests/test_sqlalchemy_store.py -q` | Exit 0; 28 passed in 2.56 s before the final contract-aligned exhaustion status adjustment. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv run --locked pytest tests/test_sqlalchemy_store.py tests/test_database_schema.py -q` | Exit 0; **48 passed in 3.07 s** on final adapter/retry behavior. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv run --locked pytest -q` | Exit 0; **969 passed in 18.55 s**, retaining every original 921 memory/contract assertion plus phase 1's 20 schema checks and 28 ORM cases. |
+| `backend/` | `PYTHONPATH=. uv tool run --from uv==0.12.23 uv run --locked python scripts/check_sql_store.py --output /workspace/scratch/e3fbdcf9622e/engineer11-sql-live.json` | Exit 0; **16 PASS/0 FAIL**, actual same-owner Uvicorn with migrated temporary FILE-SQLite and real Argon2. Initial source run; final committed-source replay is reported in the handoff. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv lock --check` | Exit 0; 49 packages, lock unchanged. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv run --locked openapi-spec-validator ../openapi.yml` | Exit 0; `../openapi.yml: OK`. |
+| `frontend/` | `npm test` | Exit 0; **84 passed/0 failed**, existing host `http-proxy` warning only. |
+| Repository root | `git diff --check` and targeted unchanged-path comparison against phase 1 | Exit 0; no original frontend/OpenAPI/domain/memory/test/lock changes. |
+
+The 28 ORM cases cover the real lending lifecycle, private404/role ordering,
+normalized username/code conflicts, immutable booking name/history after inventory
+edits, all five stale-version mutations, twelve late-write rollback points across
+record types, seed marker/account preservation after reopening an engine, explicit
+store selection, actual version/state CAS rejection and three targeted two-engine
+races (maintenance/request, approve/cancel, overlapping requests). A held real
+SQLite writer proves bounded safe 503; an injected unexpected missing-table fault
+proves distinct safe 500 without SQL/secret logging. Race rechecks produce stale
+expectedVersion fields, anonymous unavailable dates or the ordinary maintenance
+rule message rather than exposing competing identities. The complete table snapshot
+is compared on rollback/failure cases.
+
+The live smoke checks configured ORM startup/seeding, real auth/normalized duplicate
+rollback, anonymous schedule privacy, create/event/slot, overlap rollback, private404
+and staff403, exact 405 Allow on both original route classes, approve/checkout/return
+with history/version/custody, stale conflicts, rebook/cancel/release, maintenance
+refusal, logout revocation and UTC/local-date restoration. Socket, server and HTTP
+clients share one owner process; all are stopped cleanly. Its JSON reports real
+HEAD/tree/dirty paths and no token/password. These are targeted #11 engineer checks,
+not independent QA, a full #12 shared-contract/concurrency campaign, real process
+restart or frontend HTTP integration. No new unrelated API defect was observed.
+The engineer did not push, post comments or close an issue. No SQLite file,
+WAL/SHM, local environment or secret is committed.

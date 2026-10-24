@@ -1,4 +1,7 @@
-"""Complete FastAPI memory API; persistence and frontend HTTP retain their gates."""
+"""FastAPI services with explicit memory or migrated ORM repository selection."""
+
+import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -20,10 +23,35 @@ def create_app(
     *, repository: GearShareRepository | None = None, clock: Clock = utc_now,
     passwords: Passwords | None = None, seed: bool = True,
 ) -> FastAPI:
-    store = repository if repository is not None else MemoryRepository()
-    if seed:
-        seed_catalogue(store, clock)
-    application = FastAPI(title="GearShare", redirect_slashes=False)
+    if repository is not None:
+        store = repository
+    else:
+        mode = os.environ.get("GEARSHARE_STORE", "memory")
+        if mode == "memory":
+            store = MemoryRepository()
+        elif mode == "sqlalchemy":
+            from app.sqlalchemy_store import SQLAlchemyRepository
+            store = SQLAlchemyRepository()
+        else:
+            raise ValueError("GEARSHARE_STORE must be memory or sqlalchemy")
+    try:
+        if seed:
+            seed_catalogue(store, clock)
+    except Exception:
+        if repository is None and hasattr(store, "close"):
+            store.close()
+        raise
+
+    @asynccontextmanager
+    async def lifespan(_application):
+        try:
+            yield
+        finally:
+            # Injected repositories are owned by the caller/test harness.
+            if repository is None and hasattr(store, "close"):
+                store.close()
+
+    application = FastAPI(title="GearShare", redirect_slashes=False, lifespan=lifespan)
     application.state.auth = AuthService(store, clock, passwords)
     application.state.catalogue = CatalogueService(store, clock)
     application.state.bookings = BookingService(store, application.state.auth, clock)
