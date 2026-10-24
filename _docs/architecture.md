@@ -41,7 +41,7 @@ AGENTS.md
 Makefile
 ```
 
-The frontend contains components/pages and the complete async `GearShareService` with its explicit memory-only mock. Public asset types contain identity/specification/state fields only; anonymous availability has no private booking records. The backend has `domain.py`, `repositories.py` (transaction protocols), `memory.py` (locked dictionary adapter), auth/catalogue/booking/staff services and their HTTP boundaries, plus shared clock/text/calendar/routing conventions. `fixtures.py` seeds original physical units and trusted coherent private booking/event/slot fixtures once at app creation. All memory operations of the QA-passed `openapi.yml` are present. The independently accepted #30 correction traverses included-route contexts for exact 405 method headers; #10/#30 have passed the complete true-memory gate. The #11 candidate now adds ORM models, migrations and a configurable SQLAlchemy adapter, pending independent QA. `httpService.ts` and final frontend integration remain gated.
+The frontend contains components/pages and the complete async `GearShareService` with its explicit memory-only mock. Public asset types contain identity/specification/state fields only; anonymous availability has no private booking records. The backend has `domain.py`, `repositories.py` (transaction protocols), `memory.py` (locked dictionary adapter), auth/catalogue/booking/staff services and their HTTP boundaries, plus shared clock/text/calendar/routing conventions. `fixtures.py` seeds original physical units and trusted coherent private booking/event/slot fixtures once at app creation. All memory operations of the QA-passed `openapi.yml` are present. The independently accepted #30 correction traverses included-route contexts for exact 405 method headers; #10/#30 have passed the complete true-memory gate. The #11 candidate now adds ORM models, migrations and a configurable SQLAlchemy adapter, pending independent QA. `httpService.ts` and the default HTTP integration are the Iteration 5 engineer candidates #13/#14 (see "#13/#14 HTTP adapter" below); their closure is gated on independent QA of #12.
 
 ## Required stages and concrete verification gates
 
@@ -58,7 +58,7 @@ This combines the issue/agent workflow from the specifications article with the 
 
 ## Frontend boundary
 
-All pages depend on a single `GearShareService` async interface. UI components never call `fetch` directly. The mock implements the same data shapes, validation and error codes as the eventual HTTP adapter. Mock data lives only in memory and is clearly marked as demo mode. An environment selector will switch adapters when the HTTP adapter exists; HTTP becomes the default in iteration 5. Current Demo controls select deterministic Normal/Loading/Empty/Error memory fixtures only.
+All pages depend on a single `GearShareService` async interface. UI components never call `fetch` directly. The mock implements the same data shapes, validation and error codes as the eventual HTTP adapter. Mock data lives only in memory and is clearly marked as demo mode. `VITE_GEARSHARE_SERVICE` selects the adapter once at start-up: `http` (the default since iteration 5) or `mock` (explicit); there is no runtime fallback from one to the other. Current Demo controls select deterministic Normal/Loading/Empty/Error memory fixtures only.
 
 Operations needed before OpenAPI authoring: register, login, logout, current user, list/get assets, get asset availability, create/list/get booking and events, cancel booking, staff list bookings, staff transition booking, staff create/update asset and staff inventory-state update. The route names and schemas were fixed in iteration 2 (#6) by inspecting the completed mock service and are recorded in `openapi.yml` and [`api.md`](api.md); see "#6 contract decisions" below.
 
@@ -177,3 +177,27 @@ Owned engines close with application lifespan; injected repositories remain the
 caller's responsibility. The frontend service/default mock and frozen wire
 contract are unchanged. Independent #11 acceptance and #12 full parity/restart
 proof are still pending.
+
+## #13/#14 HTTP adapter (Iteration 5)
+
+The default `GearShareService` is now an HTTP adapter over the persisted API. It implements all 20 operations of `openapi.yml` (the `x-service-method` map in [`api.md`](api.md)) with the unchanged interface, so no page changed shape.
+
+```text
+frontend/src/services/
+  types.ts          DTOs and the GearShareService interface (unchanged)
+  mockService.ts    explicit in-memory mock (VITE_GEARSHARE_SERVICE=mock)
+  serviceConfig.ts  pure parsing of VITE_GEARSHARE_SERVICE / VITE_API_BASE_URL (importable by Node tests)
+  wire.ts           defensive parsers: project only contract fields, return null on a wrong shape
+  httpClient.ts     token store, one request function, failure mapping, 401 handling, session-end events
+  httpService.ts    the 20 operations on top of the client; Session -> User mapping; logout/currentUser rules
+  index.ts          selects the adapter once; exports gearShareService, demoControls (mock only), subscribeToSessionEnd
+```
+
+* **Single boundary.** Pages and components never call `fetch`, `sessionStorage` or the API; they receive `gearShareService` from `index.ts`. `demoControls`, the demo banner, fictional credentials and the simulate-conflict/failure buttons exist only when `VITE_GEARSHARE_SERVICE=mock`. An invalid selector value is a start-up error; HTTP failures are shown as errors and never replaced by mock data.
+* **Origin and CORS (decision).** The browser calls same-origin `/api/v1`; the Vite dev server and `vite preview` proxy `/api` to `GEARSHARE_API_PROXY_TARGET` (default `http://127.0.0.1:8000`). That removes the cross-origin, non-simple `Authorization` preflight problem without touching the backend, so the backend gained no CORS middleware. `VITE_API_BASE_URL` can point at another origin, but then the backend must allow exactly that origin (not implemented; deployment hardening, #22).
+* **Session.** `register`/`login` store the bearer token in `sessionStorage` (key `gearshare.session-token`; memory fallback if storage throws) and return only the mapped `User`; the token is never put in a URL, cookie or `localStorage`. On start-up the app calls `currentUser`, which returns `null` without a request when no token exists. `logout` calls the server, then always clears the local token; if the server could not be told it says so and states that the session stays valid for up to 24 hours.
+* **401 handling.** Any 401 on a bearer request clears the token it used (only if it is still the current token, so a late reply for an old token cannot sign out a newer login) and emits a session-end event. `App` subscribes: it drops the user, shows "Your session has ended. Sign in again to continue." with a link to `#/signin?returnTo=<current page>`, and the staff pages fall back to the sign-in gate. A 401 `INVALID_CREDENTIALS` from `login` is a wrong password and ends nothing. Network, timeout and 5xx errors keep the token and are retryable; a reload during an outage shows "Retry session" instead of pretending to be signed out.
+* **Failure mapping.** Network errors, the 15-second timeout, 5xx, non-JSON or wrong-shape 2xx bodies, and undecodable error bodies become a retryable `SERVICE_UNAVAILABLE`; documented 4xx envelopes keep their code, message, `fields` and `unavailableDates`. There are no automatic retries and no optimistic updates.
+* **Optimistic concurrency.** Booking commands send the `version` of the snapshot on screen as `expectedVersion`. A stale answer (409) is shown with the server message and a refresh action (Refresh desk / Retry reservations); the adapter and pages never refresh and resend on their own.
+* **Test seams.** `createHttpService({fetch, tokens, timeoutMs, baseUrl})` takes an injected fetch and token store, which is how the Node adapter and contract-conformance tests run without a network. The real-stack browser suites start the real backend and Vite instead (see [testing-guidelines.md](testing-guidelines.md)).
+

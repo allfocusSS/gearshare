@@ -179,3 +179,11 @@ shared-contract/restart campaign or subsequent issue implementation is claimed.
 - This is engineer evidence, not independent QA acceptance. #11 stays open.
   #12 full parity/concurrency/restart verification and frontend HTTP integration
   remain gated; no later issue or unchanged browser campaign was pulled forward.
+
+## 2026-10-24 — Iteration 5, #13 HTTP adapter for identity and catalogue (engineer candidate)
+
+- A software-engineer session implemented groomed [#13](https://github.com/allfocusSS/gearshare/issues/13) while a separate session works on #12; the two sessions share the repository, so this one changed no backend source or `backend/tests/*`, made no backend behaviour change and checks `origin/main` for movement before handoff (see the handoff comment for the result).
+- `httpService.ts` implements all 20 operations of `openapi.yml` over a shared `httpClient.ts` and defensive `wire.ts` parsers; HTTP is now the default, `VITE_GEARSHARE_SERVICE=mock` the explicit alternative, and there is no silent fallback. Token in `sessionStorage` (memory fallback), a 401 anywhere ends the session with a sign-in notice and return navigation, logout is honest when the server cannot be reached. Same-origin `/api` through the Vite dev/preview proxy replaced a CORS change, so the backend is untouched.
+- Evidence: 130 new node tests (34 adapter, 96 openapi.yml conformance over all 93 mock samples and every documented error status), all pre-existing suites unchanged and passing in mock mode, 969 backend tests, and the new real-stack `npm run test:browser:http` (19 checks at 1440/390 against a real backend and temp SQLite database). Exact results and the Node 22/npm 10/uv 0.11 deviation from the pinned toolchain are in [evidence.md](evidence.md#iteration-5--13-http-adapter-engineer-candidate-identity-and-catalogue).
+- Engineer evidence only. **#13 closure is gated on independent QA PASS of #12**; QA owns the verdict and closure. The booking/staff/inventory half of the adapter and its UI evidence belong to #14 below.
+
