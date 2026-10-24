@@ -630,3 +630,37 @@ The transport matrix reconstructs the published C01–C13 requirements, then add
 The initial engineer helper sent malformed JSON on the two original requests; it was corrected to literally no body, then both red originals and the corrected full matrix were rerun into separate files. The temporary baseline replay restored only the unchanged checkpoint routing file and was immediately followed by the same minimal correction; it created no alternate commit or issue. This was a harness correction, not another application defect. Final full backend and transport results above use that corrected oracle. Logs/results are scratch `/workspace/scratch/e3fbdcf9622e/engineer30-recovery-{before-final-oracle,originals-before-no-body,focused,backend-final,transport-final,frontend-test}.log` and the two JSON paths in the table. The probe records actual HEAD/tree/dirty paths rather than borrowing lost baseline metadata; an exact complete-commit output is reported separately in the handoff.
 
 `git diff --check` passed. A targeted diff also confirms every original routing/private/staff test, domain/service/repository source, frontend, lock and frozen contract is unchanged. No new unrelated runtime defect was observed. These are engineer checks only; #30/#10 remain open pending fresh independent QA of every #30 checkbox and every parent #10 criterion. This engineer did not push commits or comment on/close issues. No unchanged frontend browser campaign or large Unicode/security campaign was repeated. ORM/SQLite, process-restart persistence, shared-database concurrency, frontend HTTP integration and final submission remain gated and unclaimed.
+
+## Iteration 4 — #11 phase 1 schema checkpoint
+
+2026-10-24, new engineer after the independently accepted #10/#30 memory gate.
+This checkpoint adds ORM schema/migration infrastructure, not a complete #11
+repository candidate. The running API, service/domain protocols, memory adapter,
+original 921 assertions, frontend and frozen OpenAPI are unchanged. The next
+phase remains ORM transactions/repository/runtime selection and targeted API,
+CAS and maintenance checks; independent QA will assess the complete #11 candidate.
+
+Python 3.12.14. The host `uv` is 0.13.4; dependency resolution installed locked
+SQLAlchemy 2.0.55 and Alembic 1.20.1 (plus greenlet 3.5.6, Mako 1.4.3 and
+MarkupSafe 3.0.4). To verify the declared toolchain rather than merely assume
+lock compatibility, an isolated **uv 0.12.23** was installed and used for all
+final checks below. Existing locked package versions were retained.
+
+| Directory | Command actually executed | Actual result |
+| --- | --- | --- |
+| `backend/` | `uv tool run --from uv==0.12.23 uv --version` | Exit 0; uv 0.12.23. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv lock --check` | Exit 0; resolved 49 packages. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv sync --locked` | Exit 0; resolved 49, checked 47 installed packages. |
+| `backend/` | `uv run --locked pytest tests/test_database_schema.py -q` | Exit 0; 20 passed in 0.68 s, no warnings on final schema/config. |
+| `backend/` | `uv tool run --from uv==0.12.23 uv run --locked pytest -q` | Exit 0; **941 passed in 17.43 s**, including all 921 unchanged memory/contract assertions and the 20 new file-backed schema checks. |
+| Repository root | `git diff --check` | Exit 0. |
+
+The schema tests create a fresh temporary SQLite file using Alembic, compare the
+migrated schema with ORM metadata, populate it, downgrade to base and re-upgrade.
+They verify unique username/token/code/asset-day/custody/event/seed constraints,
+foreign-key consistency, positive versions, date/state validity, complete rollback
+on a late slot conflict, and exact UTC microseconds/local dates after reopening
+the engine. That engine-reopen check is deliberately not a real process-restart
+claim. No unrelated real API defect was observed. No browser, full shared-store
+parity, #12 concurrency/restart or frontend HTTP-default check is claimed.
+No database, session token, password, WAL/SHM file or environment secret is committed.

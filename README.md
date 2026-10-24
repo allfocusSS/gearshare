@@ -52,7 +52,7 @@ npm run dev
 
 Open http://127.0.0.1:5173 to try the GearShare mock catalogue. The frontend starts independently of the backend; no API calls occur. `npm test` runs the auth/catalogue/booking/date/privacy/staff/version service tests and the contract-file checks using Node's built-in test runner. After an intentional mock change, `node tests/contract-samples.mjs --write` regenerates the committed contract samples; the backend tests then re-validate them. `npm run build` checks TypeScript and writes the production bundle to `frontend/dist/`. Stop either development server with Ctrl+C.
 
-No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. There are no secrets, database, seed or migration commands at this stage.
+No environment file is required. [`.env.example`](.env.example) documents the optional `UVICORN_HOST` and `UVICORN_PORT` shell variables, whose defaults are `127.0.0.1` and `8000`. The app does not automatically load a root `.env`; export an override before starting Uvicorn if needed. The frontend development command uses `127.0.0.1:5173` and fails clearly when that port is occupied; choose another port with `npm run dev -- --port 5174`. The running application still defaults to the true memory repository. The #11 schema checkpoint adds the migration commands below; runtime database selection is the next part of that open issue.
 
 ## Mock demo and browser checks
 
@@ -130,3 +130,22 @@ Run `npm run test:browser:bookings` from `frontend/` for the scoped student brow
 Without reloading, sign out the student and sign in as the coordinator to retain the same memory-only records. Coordinator desk shows Pending requests, Pickups, Active loans and History, with counts for pending, returns due today and overdue. Review a request, approve it, check it out within its inclusive booked dates with outgoing condition, then record its return with incoming condition. Sign back in as the student to inspect the retained history. An overdue microphone fixture demonstrates why its next pickup stays blocked until the previous return is recorded.
 
 Inventory supports search, add/edit and active/maintenance state. Codes are trimmed and stored uppercase; every physical unit needs a unique code. Maintenance errors explain that active returns and unresolved pending/approved commitments must be resolved at the desk first. Existing reservation snapshots and histories stay intact after equipment edits. Each private reservation carries a version (1 when created, +1 per successful approve, reject, cancel, checkout or return); the desk and My reservations send the version they last read, and a stale version is rejected with a conflict and no change (see [`_docs/api.md`](_docs/api.md)). Reload or changing a demo fixture resets every record. The mock provides no real server authorization or persistence.
+
+### SQLite schema checkpoint (#11, implementation in progress)
+
+From `backend/`, export `GEARSHARE_DATABASE_URL=sqlite:///./gearshare.sqlite3`, then run
+`uv run --locked alembic upgrade head`. The URL is configurable; SQLite files,
+WAL/SHM files and `.env` are ignored by Git. `uv run --locked alembic current`
+shows the revision; `uv run --locked alembic downgrade base` removes all application
+tables and their data, and is intended only for disposable databases.
+`uv run --locked pytest tests/test_database_schema.py -q` verifies migrations,
+constraints, rollback and UTC/date round trips on temporary file-backed databases.
+
+The schema includes the seven domain entities and a persistent seed marker.
+Booking timestamps, event timestamps and session expiry round-trip as aware UTC;
+reservation dates remain local calendar dates. SQLite busy handling defaults to
+five seconds (`GEARSHARE_SQLITE_BUSY_TIMEOUT`, range greater than 0 through 30).
+SQLite permits one writer at a time and is intended for a local MVP deployment;
+no other database engine has been verified. This checkpoint does not yet wire
+the ORM repository into the API, and does not establish #11 acceptance or #12
+shared-contract/concurrency/process-restart evidence. The frontend remains mocked.

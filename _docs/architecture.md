@@ -123,3 +123,21 @@ All seeded occupied dates now derive from coherent real booking/event chains, in
 - **Decisions added after the first QA FAIL** (details in `api.md`): every non-2xx body, including framework-generated ones, is the `Error` shape (the backend installs exception handlers); validation order is authentication, authorization/ownership (404 for non-owners), `expectedVersion` shape (422), version/state conflict (409), then `note` (422), so `note` limits are checked by hand rather than declaratively; unknown path ids are 404 and a malformed body `assetId` is 422 `fields.assetId`; `x-trimmed` means trim first, then validate (examples are written already trimmed); `expectedVersion` is a strict integer; the approve/cancel event notes and `StaffDesk.counts` are pinned. CORS and `tzdata>=2024a` are prerequisites for #13, not wire rules.
 - **Deliberate mock-versus-wire differences** (`currentUser` resolving `null` for 401, `logout` always succeeding, `login`/`register` returning `User`) are absorbed by the HTTP adapter, so the UI-facing service shape does not change.
 - **Change control.** The mock and `types.ts` remain the executable reference until a backend exists. A contract defect found later is corrected in `openapi.yml`, `api.md`, `types.ts`, the mock and the committed samples together.
+
+## #11 phase 1 schema checkpoint
+
+The independently accepted #10/#30 memory gate permits iteration 4 work.
+`backend/app/models.py` and migration `0001` add all seven domain tables plus a
+singleton seed marker. Internal integer insertion order preserves deterministic
+catalogue, booking and event ordering even with equal timestamps. Unique keys
+cover stored normalized usernames, token hashes, normalized inventory-code keys,
+asset/day allocations and both active-loan references; composite foreign keys
+also prevent an allocation or custody row referencing a booking of another unit.
+Positive version/state/date checks complement the service rules.
+
+`UTCDateTime` requires aware UTC input and restores UTC on read while calendar
+dates use SQLAlchemy `Date`. SQLite connection/transaction settings live only in
+`database.py`; busy wait is bounded and foreign keys are enabled per connection.
+The initial migration freezes the schema instead of importing mutable model
+metadata at migration execution. Runtime repository wiring remains the next
+phase of open #11; no ORM acceptance or #12 process-restart proof is claimed.

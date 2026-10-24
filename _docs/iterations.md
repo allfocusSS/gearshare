@@ -8,7 +8,7 @@ Only after those prerequisite closures did a new engineer implement [#10](https:
 
 The published #10 checkpoint `cba839e8046e19973b7ce18f2bf6dd2ab44d2d1a` (tree `ab959257805f5d49a53a385d0e71499b7463627b`) failed on empty exact-route `Allow` headers: **814 backend PASS / 51 preserved FAIL**, with the same two original failures through actual Uvicorn. That history remains in [evidence.md](evidence.md#iteration-3--10-memory-staff-failing-engineer-checkpoint). The actual bug became [#30](https://github.com/allfocusSS/gearshare/issues/30), followed by [PM grooming](https://github.com/allfocusSS/gearshare/issues/30#issuecomment-6360070589) and [fresh independent pre-fix QA](https://github.com/allfocusSS/gearshare/issues/30#issuecomment-6360130194), which recorded 28 PASS / 99 FAIL per transport before correction.
 
-The current `Refs #30` engineer candidate changes only shared method-header traversal, adds 56 fixed-oracle test variants and a reusable focused transport probe, and preserves every original assertion. Actual new results: **921 backend PASS**, **133 PASS per ASGI/Uvicorn transport**, frontend84/typecheck/build, lock44 and frozen OpenAPI validation PASS. Full-store equality holds for all 128 rejected transport requests per transport. Exact commands and recovery limits are in [the correction evidence](evidence.md#iteration-3--30-shared-route-method-header-correction). These are engineer checks. #30 and #10 remain **OPEN** for fresh independent QA of both #30 and every #10 criterion; the complete memory gate has not passed, so #11 and later stages remain blocked. Unsupported issue-closure flags do not establish a stage gate.
+The current `Refs #30` engineer candidate changes only shared method-header traversal, adds 56 fixed-oracle test variants and a reusable focused transport probe, and preserves every original assertion. Actual new results: **921 backend PASS**, **133 PASS per ASGI/Uvicorn transport**, frontend84/typecheck/build, lock44 and frozen OpenAPI validation PASS. Full-store equality holds for all 128 rejected transport requests per transport. Exact commands and recovery limits are in [the correction evidence](evidence.md#iteration-3--30-shared-route-method-header-correction). Independent QA subsequently [passed/closed #30](https://github.com/allfocusSS/gearshare/issues/30#issuecomment-6369839983) at 2026-10-23T16:37:46Z and [#10](https://github.com/allfocusSS/gearshare/issues/10#issuecomment-6369858278) at 16:38:45Z on published `166ca49536137be7790855c092e288297e7200e6` (tree `748b20123c42a26c8e40517b5e659e6e3f8d8f69`). The complete true-memory gate is accepted. #11 is now in progress under its existing PM handoff; #12 and subsequent dependent issues remain gated. Unsupported issue-closure flags do not establish a stage gate.
 
 ## 2026-10-19 — Product and process preparation
 
@@ -147,3 +147,14 @@ The fresh independent check at `3613944f2d76ce2234ff2d0efa11e53fbe472f73` subseq
 - Added and ran 153 durable regressions before changing runtime: 127 failures/26 passes. Corrected only the booking router to match complete decoded templates, retain malformed single-component IDs unmodified and produce complete same-template Allow headers. Kept the original LF byte-equality case; split `../unknown` into explicit generic-404 extra-component cases and separate decoded exact-action tests under PM's topology decision.
 - Final runtime/test source passes 604 backend cases, 181 focused ASGI cases and 181 actual same-owner Uvicorn cases with no rejected-request mutation, plus frontend 84/typecheck/build, OpenAPI validation and lock check. See evidence.md for exact commands, metadata distinction and limits. The focused harness is repeated on the exact complete commit for handoff.
 - Updated only affected API/testing/current-gate/evidence documents. This single `Refs #29` candidate requires publication and fresh independent QA for both #29 and #9; neither issue is closed here. Staff APIs, persistence and frontend HTTP integration remain gated.
+
+## 2026-10-24 — Iteration 4, #11 phase 1 schema checkpoint
+
+After the independent #10/#30 gate, the new #11 engineer added locked
+SQLAlchemy/Alembic dependencies, ORM models, explicit database infrastructure,
+a reversible initial migration, a safe configuration example and 20 file-backed
+schema tests. Runtime still uses the unchanged memory adapter; the next phase
+implements the ORM repository and API configuration. This is a working schema
+checkpoint, not a complete #11 candidate or independent QA verdict. See the
+corresponding evidence entry for actual checks. No frontend HTTP switch,
+shared-contract/restart campaign or subsequent issue implementation is claimed.

@@ -112,3 +112,10 @@ For #27, `npm run test:browser:labels` runs the QA-authored focused regression f
 For #28, the [PM recovery decision](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6287892873) and [independent pre-fix R01–R08](https://github.com/allfocusSS/gearshare/issues/28#issuecomment-6287925097) require successful-command/failed-read coverage for approve, reject, cancellation from pending and approved, checkout and overdue return. Verify retained committed history/trimmed notes, hidden untrusted queues/counts/derived custody, persistent accessible read recovery after Back, disabled pending/repeated controls, read-only delayed/repeated retries and one coherent restored snapshot. Exercise actual command failures separately, along with both widths, keyboard/focus and the complete surrounding staff/auth/catalogue/bookings/#27 label regressions. Independent QA owns the focused runner and verdict; engineer results alone do not close #28 or satisfy the #5 mock-stage gate.
 
 Run the handed-off independent focused script with `node tests/qa28.browser.mjs` from frontend, using the usual Chromium override. The strict default port is 5194 (`GEARSHARE_QA28_PORT` overrides); it starts Vite and the browser in one process and writes ignored `test-results/qa28-after/` screenshots/results. `BASELINE=1` records the uncorrected behavior in `qa28-before/` without treating expected recovery failures as a corrected PASS. The runner requires committed implementation and verifies that HEAD stays unchanged during execution.
+
+For the #11 phase 1 schema checkpoint, `uv run --locked pytest tests/test_database_schema.py -q` (from `backend/`) runs 20
+checks against fresh file-backed migrated SQLite databases. It exercises initial
+upgrade, populated downgrade/reupgrade, model/schema parity, database uniqueness,
+foreign keys, positive versions/state/date checks, partial-write rollback and
+UTC/microsecond/local-date round trips after engine reopen. This does not yet
+verify the ORM repository, shared service parity or real process restart (#12).
