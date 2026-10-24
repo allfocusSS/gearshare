@@ -25,6 +25,10 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "persistence: #12 persistence, parity, contention and restart campaign (part of the default run)",
+    "subprocess: starts the real backend as an operating-system process on a port in 6400-6499",
+]
 
 [[tool.uv.index]]
 url = "https://pypi.org/simple"
