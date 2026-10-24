@@ -1039,3 +1039,18 @@ All 24 screenshots in ignored `frontend/test-results/http-staff/` were opened an
 
 No application defect was found, so no `user-test-bug` issue was filed. Observations that are the same in the QA-passed mock and were not filed: the green "Signed in as ..." notice persists across navigation and can sit above a red error; the student-side stale-version refresh is labelled "Retry reservations". Limits: the two contexts are two contexts of one Chromium, and "another user acted first" uses direct HTTP calls to the real backend rather than a second browser; dates come from the real clock, so a run that crosses midnight Asia/Almaty could fail its date assertions (the seeded fixtures are relative to backend start-up); the backend's multi-writer contention behaviour is #12's and #16's subject, not this suite's; Chromium only.
 
+
+## Iteration 5 — merged `main` engineer verification before QA (2026-10-25)
+
+Candidate: merge commit `7a70ca13017e10a7cadf22594cac3f6dfa8f7a2c` (parents `7c73fcd`, the independently accepted #12 commit, and `7cafe3c`, the #13/#14 branch tip). Only documentation conflicts occurred (AGENTS.md, README.md, `_docs/architecture.md`, `_docs/evidence.md`, `_docs/iterations.md`, `_docs/testing-guidelines.md`); they were resolved additively and the stale "#11/#12 pending" status text was replaced by the factual record. These are engineer checks, not a QA verdict.
+
+| Check (run from the repository root, Python 3.12 / Node 24, Chromium via `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`) | Actual result |
+| --- | --- |
+| `cd backend && uv lock --check && uv run --locked pytest -q` | 1262 passed, 5 warnings (third-party Pydantic deprecation text), 244.52 s |
+| `cd frontend && npm ci && npm test` | 214 tests, 214 pass, 0 fail |
+| `npm run typecheck`, `npm run build` | no errors; build 306.10 kB JS / 34.70 kB CSS |
+| `npm run test:browser`, `:catalogue`, `:bookings`, `:resources`, `:staff`, `:labels` (mock adapter) | all exit 0 (26, 28 checks and the bookings, resources, staff and labels groups) |
+| `npm run test:browser:http` (real Vite + real FastAPI + temp SQLite) | all 19 checks passed |
+| `npm run test:browser:http:staff` (same real stack) | all 21 checks passed |
+
+Limits: the merged state has not yet been verified by an independent QA session; #13 and #14 remain open until it is. The earlier branch-tip verdicts do not transfer automatically because the base now contains the #12 harness changes and the merged documentation.
