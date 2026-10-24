@@ -128,7 +128,7 @@ def run_group(root: Path, name: str, args: list[str], timeout: int) -> dict:
         output, code = result.stdout + result.stderr, result.returncode
     except subprocess.TimeoutExpired as error:
         output, code = "TIMEOUT after %ss\n%s" % (timeout, (error.stdout or b"").decode(errors="replace")[-1500:] if isinstance(error.stdout, bytes) else (error.stdout or "")[-1500:]), 124
-    failures = re.findall(r"^FAILED (\S+)", output, re.MULTILINE)
+    failures = re.findall(r"^(?:FAILED|ERROR) (\S+)", output, re.MULTILINE)
     summary = (output.strip().splitlines() or [""])[-1]
     return {"group": name, "exit": code, "failed": failures, "summary": summary, "seconds": round(time.monotonic() - started, 1)}
 
@@ -139,6 +139,7 @@ def main() -> int:
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--report")
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--matrix", action="store_true", help="run every group even after one fails (kill matrix; slower)")
     options = parser.parse_args()
     chosen = [m for m in MUTATIONS if not options.only or m.id in options.only]
     if options.list:
@@ -171,12 +172,17 @@ def main() -> int:
                 outcome = run_group(root, name, args, options.timeout)
                 entry["runs"].append(outcome)
                 if outcome["exit"] != 0:
-                    entry["killed_by"] = name
-                    entry["first_failures"] = outcome["failed"][:3]
-                    break
+                    if entry["killed_by"] is None:
+                        entry["killed_by"] = name
+                        entry["first_failures"] = outcome["failed"][:3]
+                    if not options.matrix:
+                        break
             shutil.rmtree(root)
             results.append(entry)
+            failing = [run["group"] for run in entry["runs"] if run["exit"] != 0]
             verdict = f"KILLED by {entry['killed_by']}: {entry['first_failures'][:2]}" if entry["killed_by"] else "SURVIVED every group (including the pre-existing suite)"
+            if options.matrix:
+                verdict += f"\n{'':45} failing groups: {failing or 'none'}"
             print(f"{mutation.id:45} {verdict}", flush=True)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)

@@ -36,6 +36,8 @@ from test_booking_api import BASE, NOW, TODAY, Harness, body, day, error, reques
 from test_catalogue_api import validate
 from test_staff_api import ACTIONS, RULES, STAFF, action, asset_input, desk, expect_error, fixture, inventory
 
+pytestmark = pytest.mark.persistence
+
 KINDS = ["memory", "sqlite"]
 STAMP = datetime(2026, 10, 23, 12, 0, 0, 123456, UTC)
 

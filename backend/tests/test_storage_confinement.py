@@ -23,6 +23,7 @@ RAW_SQL = re.compile(r"^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA
 DIALECT_NAMES = re.compile(r"sqlite|pragma|sqlite_errorcode|sqlite_errorname|exec_driver_sql|OperationalError", re.IGNORECASE)
 ORM_IMPORTS = {"sqlalchemy", "alembic", "sqlite3"}
 ADAPTER_MODULES = {"app.sqlalchemy_store", "app.models", "app.database"}
+pytestmark = pytest.mark.persistence
 
 
 def violations(filename: str, source: str) -> list[str]:

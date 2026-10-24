@@ -26,6 +26,8 @@ from test_booking_api import BASE, NOW, TODAY, Harness, body, day
 from test_catalogue_api import validate
 from test_staff_api import action, inventory
 
+pytestmark = pytest.mark.persistence
+
 
 def populate(h):
     """One booking in every state, an overdue-free loan, sessions and a maintenance unit."""
