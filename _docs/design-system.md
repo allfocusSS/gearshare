@@ -71,6 +71,34 @@ The current auth form shows labels, requirement hints, associated field errors a
 - Member/private information is not rendered in public cards or availability responses.
 - Use original CSS/SVG line illustrations or a clearly documented permissively licensed local icon set; do not hotlink arbitrary equipment photographs.
 
+## Integrated hardening rules (#15)
+
+PM decisions from the #15 integrated audit (defects #31–#38 and the related issues listed on #15). They derive from the #24 rule, the #5/#28 desk behavior and the wrapping already used on several screens. They are PM design decisions, not owner approvals; if the owner changes a threshold, the criteria of the open issues change with it.
+
+### Focus after in-place actions
+
+A browser drops focus when the focused control is disabled (a pending form) or removed. After any async action started from a control settles, `document.activeElement` is a deliberate, enabled, mounted control or heading of the current view, never `body`:
+
+1. Field failure (a response with `fields`): the first invalid enabled control in DOM order, in every form including booking (Start date, End date, then purpose). This is the #24 rule, generalised.
+2. Any other failure while the form or row stays on screen (409, network, server error, form-level auth error): the control that started the action, once re-enabled. A form-level auth failure therefore focuses the submit button and never a field, consistent with #24 (no field is marked invalid or force-focused).
+3. Success: the initiating control keeps focus when it survives (a unit's maintenance toggle, "Request equipment"). When it is removed or its content changes, focus moves to the heading of the resulting panel or view: the reservation details heading, "Manage reservation", or the page `h1#main-content` when the route does not change (Sign out or Clear all filters on Explore).
+4. Opening a panel, editor or action form in place moves focus to its heading (`tabIndex=-1`), as the coordinator desk and inventory editor already do.
+5. A 401 removes the form: focus goes to "Sign in again" in the session-ended alert, or to `h1#main-content` if the alert has no such link.
+
+Focus is restored once per settled action. It is not reclaimed on later renders or typing, nor when the user has already moved to another enabled control or navigated to another route. Messages keep `role="status"` or `role="alert"`; focus never replaces them.
+
+### User-entered text wrapping
+
+Names, descriptions, locations, purposes, notes, usernames, inventory codes and borrower names are typed by people and can be one long unbroken string. They wrap at any character inside their container (`overflow-wrap: anywhere`; flex and grid children also need `min-width: 0`) on every screen. Never truncate with an ellipsis, clip, shrink the text or let the page or a card scroll sideways. This extends what the staff tables, account name, specs and reservation details already do. Worst case to hold at 390 px and 1,440 px: the plan.md maximums made of wide unbroken characters (a 100 × `W` name, a 100-character location, a 2,000-character description without spaces).
+
+### Minimum size for informational text
+
+The type scale above fixes body text at 15–16 px but states no floor for secondary text, and the shipped stylesheet sets validation hints, status notices, badges, legends and identity lines at 8–11 px. Floor: text a user needs to complete a task, understand a state or identify a record computes to at least 12 px at 390 px and 1,440 px. 12 px is already the size of the labels, alerts and notices that passed QA. The floor covers field labels, hints and errors, form alerts and notices, pending and status text, status badges and pills, queue counts and their labels, date, time-zone and duration text, calendar legend and instructions, event times, and account, borrower, code and location text. Decorative or brand micro-copy may stay smaller: `aria-hidden` art text, `.brand small`, the sidebar note and foot, `.topbar-context`, `.page-footer`, `.catalogue-stamp`, and kicker `.eyebrow` lines that hold no data value (an eyebrow that shows a code, category or borrower is informational). The mock-only demo controls are exempt. The body and heading scale is unchanged, and the floor never justifies overflow: wrap, do not shrink.
+
+### Calendar view after an availability refresh
+
+Refreshing availability after a request, conflict or retry keeps the calendar on the month it was showing and shows the new data in place; it does not return to the current month. A different asset or a new page visit starts on the current month.
+
 ## Implementation brief for the UI agent
 
 Read `plan.md` and this document. Build all student and coordinator flows using `GearShareService` and `mockService` only. Keep request/response shapes centralized and async. Show the real booking state machine and the specified calendar rules. Include mock error paths so failures can be exercised before a backend exists. Preserve this visual system when swapping the service adapter; changing storage must not redesign the UI.
