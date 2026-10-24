@@ -762,6 +762,7 @@ Databases are fresh temporary files created through `alembic upgrade head` (neve
 | `git fetch origin && git status -sb` | Branch ahead of unchanged `origin/main` (no rebase). |
 | `uv lock --check` | Exit 0; 49 packages, lock unchanged. |
 | `uv run --locked pytest -q` (everything) | Exit 0; **1262 passed, 7 warnings in 196.30 s** (969 existing + 293 new). The 7 warnings are Pydantic `UnsupportedFieldAttributeWarning` (path-parameter `alias`) emitted the first time threads build certain route models; not failures. |
+| Same full command re-run on the final code head `c5ffce8` (adds only the lifecycle-flush fix and Markdown) | Exit 0; **1262 passed, 9 warnings in 201.31 s** (same Pydantic warning family). |
 | `uv run --locked pytest -m persistence -q -s` run 1 / 2 / 3, consecutive | **293 passed each**; 170.65 s / 168.13 s / 166.28 s. Every `[race]`/`[process]` line identical in invariant outcome; only winners and 503 counts in liveness scenarios vary (below). |
 | `GEARSHARE_RACE_ITERATIONS=50 uv run --locked pytest -m persistence -q -s` | **293 passed in 229.01 s**; every race scenario 50 iterations. |
 | `uv run --locked openapi-spec-validator ../openapi.yml` | `../openapi.yml: OK`. |
