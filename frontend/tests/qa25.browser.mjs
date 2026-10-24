@@ -7,7 +7,7 @@ import { chromium } from 'playwright'
 const cwd = fileURLToPath(new URL('../', import.meta.url))
 const port = process.env.GEARSHARE_QA25_PORT ?? '5210'
 const base = `http://127.0.0.1:${port}`
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd, stdio: 'pipe' })
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd, stdio: 'pipe', env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
 let serverOutput = '', browser
 server.stdout.on('data', text => { serverOutput += text })
 server.stderr.on('data', text => { serverOutput += text })

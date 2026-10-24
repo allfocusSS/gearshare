@@ -7,7 +7,7 @@ import { chromium } from 'playwright'
 const cwd = fileURLToPath(new URL('../', import.meta.url))
 const port = process.env.GEARSHARE_QA4_PORT ?? '5211'
 const base = `http://127.0.0.1:${port}`
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd, stdio: 'ignore' })
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd, stdio: 'ignore', env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
 const ok = result => { assert.equal(result.ok, true, JSON.stringify(result)); return result.data }
 const errors = [], passed = []
 const record = message => { passed.push(message); console.log(`PASS ${message}`) }

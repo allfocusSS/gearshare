@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Credentials, GearShareService, ServiceError, User } from '../services/types.ts'
 import { DEMO_ACCOUNTS } from '../services/mockService.ts'
 import { Icon } from '../components/Icon.tsx'
+import { isMockMode } from '../services/index.ts'
 
 export function AuthPage({ register, service, onSuccess, onPending, returnTo }: {
   register: boolean
@@ -33,12 +34,12 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
     setError(null)
     try {
       const result = await (register ? service.register(credentials) : service.login(credentials))
-      if (result.ok) onSuccess(result.data, register ? 'Demo account created. You are signed in as a student.' : `Signed in as ${result.data.username}.`)
+      if (result.ok) onSuccess(result.data, register ? (isMockMode ? 'Demo account created. You are signed in as a student.' : 'Account created. You are signed in as a student.') : `Signed in as ${result.data.username}.`)
       else {
         setError(result.error)
       }
     } catch {
-      setError({ code: 'SERVICE_UNAVAILABLE', message: 'The demo service is unavailable. Please try again.' })
+      setError({ code: 'SERVICE_UNAVAILABLE', message: isMockMode ? 'The demo service is unavailable. Please try again.' : 'The GearShare server is unavailable. Please try again.' })
     } finally {
       submitting.current = false
       setPending(false)
@@ -58,12 +59,12 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
       <h2>Make something<br />worth sharing.</h2>
       <p>One club, a shared equipment desk and room for your next idea.</p>
       <div className="auth-art" aria-hidden="true"><Icon name="camera" /><span className="art-cross one">+</span><span className="art-cross two">+</span><span className="art-tag">READY WHEN YOU ARE</span></div>
-      <p className="small muted">This is a frontend demo. Use fictional details only; accounts disappear when this page reloads.</p>
+      <p className="small muted">{isMockMode ? 'This is a frontend demo. Use fictional details only; accounts disappear when this page reloads.' : 'Accounts are stored by the GearShare server. A session ends when you sign out or after 24 hours.'}</p>
     </section>
     <section className="auth-card" aria-labelledby="auth-title">
       <span className="eyebrow">{register ? 'Join the club' : 'Welcome back'}</span>
       <h2 id="auth-title">{register ? 'Create your account' : 'Sign in to GearShare'}</h2>
-      <p className="muted">{register ? 'Every new account starts as a student.' : 'Try the student view or visit the coordinator desk.'}</p>
+      <p className="muted">{register ? 'Every new account starts as a student.' : isMockMode ? 'Try the student view or visit the coordinator desk.' : 'Use the username and password you registered with.'}</p>
       <form onSubmit={submit} noValidate aria-busy={pending}>
         {error && <div className="form-alert" role="alert">{error.message}</div>}
         <div className="field">
@@ -79,10 +80,10 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
           {error?.fields?.password && <span id="password-error" className="field-error">{error.fields.password}</span>}
         </div>
         <button className="button primary full" type="submit" disabled={pending}>{pending ? <><span className="spinner" aria-hidden="true" />{register ? 'Creating account…' : 'Signing in…'}</> : <>{register ? 'Create student account' : 'Sign in'}<Icon name="arrow" /></>}</button>
-        <p className="pending-text" role="status">{pending ? 'Waiting for the demo service. Please keep this form open.' : ''}</p>
+        <p className="pending-text" role="status">{pending ? `Waiting for the ${isMockMode ? 'demo service' : 'GearShare server'}. Please keep this form open.` : ''}</p>
       </form>
       <p className="auth-switch">{register ? 'Already have an account?' : 'New to GearShare?'} <a href={`#/${register ? 'signin' : 'register'}?returnTo=${encodeURIComponent(returnTo)}`}>{register ? 'Sign in' : 'Create an account'}</a></p>
-      {!register && <div className="credentials">
+      {!register && isMockMode && <div className="credentials">
         <p className="eyebrow">Fictional demo accounts</p>
         {(['student', 'coordinator'] as const).map((role) => <div className="credential-row" key={role}>
           <div><strong>{role === 'student' ? 'Student' : 'Coordinator'}</strong><code>{DEMO_ACCOUNTS[role].username}</code><code>{DEMO_ACCOUNTS[role].password}</code></div>

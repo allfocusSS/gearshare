@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 const cwd = fileURLToPath(new URL('../', import.meta.url))
 const base = 'http://127.0.0.1:5181'
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5181','--strictPort'], {cwd,stdio:'ignore'})
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5181','--strictPort'], {cwd,stdio:'ignore',env:{...process.env,VITE_GEARSHARE_SERVICE:'mock'}})
 let browser
 try {
   for(let i=0;i<80;i++) { try { if((await fetch(base)).ok) break } catch{}; await new Promise(r=>setTimeout(r,100)) }

@@ -11,7 +11,7 @@ const port = process.env.GEARSHARE_TEST_PORT || '5178'
 const base = `http://127.0.0.1:${port}`
 await mkdir(output, { recursive: true })
 const checks = [], consoleErrors = [], pageErrors = [], failedRequests = [], apiRequests = []
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd: frontend, stdio: ['ignore', 'pipe', 'pipe'] })
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', port, '--strictPort'], { cwd: frontend, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
 let serverLog = ''
 server.stdout.on('data', (chunk) => { serverLog += chunk })
 server.stderr.on('data', (chunk) => { serverLog += chunk })
