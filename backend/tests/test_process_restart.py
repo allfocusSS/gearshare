@@ -368,3 +368,54 @@ def test_simultaneous_conflicting_reservations_from_separate_client_processes_th
     server.stop(signal.SIGTERM)
     assert "Traceback" not in server.log_text(), "no worker failed while serving the race"
     print(f"[race] real server pid {last_pid}, workers={workers}: {rounds} rounds x {clients} processes, outcomes {set(outcomes)}")
+
+
+def live_children(pid: int) -> list[int]:
+    """Direct child processes of ``pid`` (Linux /proc); uvicorn's supervisor owns its workers."""
+    children = []
+    for entry in Path("/proc").iterdir():
+        if entry.name.isdigit():
+            try:
+                fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+            except (OSError, IndexError):
+                continue
+            if int(fields[1]) == pid and fields[0] != "Z":
+                children.append(int(entry.name))
+    return children
+
+
+@pytest.mark.skipif(not Path("/proc/self/stat").exists(), reason="needs Linux /proc to count worker processes")
+def test_cold_start_of_three_workers_on_an_unseeded_database_self_heals_and_seeds_exactly_once(workspace):
+    """OBSERVED LIMITATION, pinned as a safety property rather than a guarantee of a quiet start.
+
+    ``create_app()`` seeds the catalogue at import. Three workers importing the app at the same instant
+    on a freshly migrated, still empty file race for the write lock; the losers hit the bounded retry,
+    raise the contract 503 "The service is busy" from ``seed_catalogue`` and die at import, and
+    uvicorn's supervisor restarts them (on the second attempt the seed marker exists). The documented
+    deployment is one process or a database seeded by a first start; this test asserts what must hold
+    either way: only that one, controlled error appears, three workers end up serving, and the seed ran once.
+    """
+    path, directory, servers = workspace
+    url = f"sqlite:///{path}"
+    server = ServerProcess(path, directory / "cold.log", workers=3)
+    servers.append(server)
+    server.start()
+    deadline = time.monotonic() + 30
+    while len(live_children(server.pid)) < 3 and time.monotonic() < deadline:
+        time.sleep(0.2)
+    time.sleep(1.5)  # allow a restarted worker to finish importing
+    with server.client() as client:
+        statuses = [call(client, "GET", "/api/v1/assets").status_code for _ in range(60)]
+        assert statuses == [200] * 60
+        assert len(call(client, "GET", "/api/v1/assets", status=200).json()["items"]) == 10
+    workers_alive = len(live_children(server.pid))
+    code = server.stop(signal.SIGTERM)
+    log = server.log_text()
+    tracebacks, busy = log.count("Traceback"), log.count("app.errors.ApiError: The service is busy. Try again.")
+    assert tracebacks == busy, "the only failure allowed during a cold start is the contract 503 'service is busy'"
+    assert workers_alive >= 3 and log.count("Application startup complete") >= 3
+    state = inv.assert_coherent(inv.read_sqlite(url), club_today(), "after cold multi-worker start")
+    assert len(state.assets) == 10 and state.seeded_on is not None
+    record_cold = {"event": "cold-start-3-workers", "worker_import_failures_503": busy, "child_processes_alive_after_start": workers_alive, "exit_code": code}
+    LIFECYCLE.append(record_cold)
+    print("[process]", json.dumps(record_cold, sort_keys=True))

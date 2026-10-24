@@ -221,3 +221,38 @@ def cancel_call(label, session, booking_id, version, clock=None):
 
 def maintenance_call(label, template, asset_id, state="maintenance", clock=None):
     return Call(label, "PUT", f"{STAFF}/assets/{asset_id}/state", template.coordinator, {"state": state}, clock)
+
+
+class LockHolder:
+    """An independent raw connection that holds a SQLite write lock, like a long write transaction.
+
+    ``mode`` is ``IMMEDIATE`` (RESERVED lock: other connections may still read) or ``EXCLUSIVE``
+    (nobody may read or write). It performs a real no-op write so the lock is genuine, never commits
+    a change (it rolls back), and releases itself after ``seconds`` when given.
+    """
+
+    def __init__(self, path, mode="IMMEDIATE", seconds=None):
+        import sqlite3
+        self.connection = sqlite3.connect(path, isolation_level=None, timeout=1, check_same_thread=False)
+        self.connection.execute(f"BEGIN {mode}")
+        self.connection.execute("UPDATE assets SET name = name WHERE id = (SELECT min(id) FROM assets)")
+        self._lock, self.released = threading.Lock(), False
+        self.timer = None
+        if seconds is not None:
+            self.timer = threading.Timer(seconds, self.release)
+            self.timer.start()
+
+    def release(self):
+        with self._lock:
+            if not self.released:
+                self.released = True
+                self.connection.execute("ROLLBACK")
+                self.connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        if self.timer is not None:
+            self.timer.cancel()
+        self.release()
