@@ -32,11 +32,18 @@ def record(entry: dict) -> None:
     print("[process]", json.dumps(entry, sort_keys=True))
 
 
+_FLUSHED = 0
+
+
 def flush_lifecycle() -> None:
-    if REPORT_PATH and LIFECYCLE:
+    """Append lifecycle entries not yet written (several test modules share this process-wide list)."""
+    global _FLUSHED
+    pending = LIFECYCLE[_FLUSHED:]
+    _FLUSHED = len(LIFECYCLE)
+    if REPORT_PATH and pending:
         path = Path(REPORT_PATH)
         existing = json.loads(path.read_text()) if path.exists() else {}
-        existing["process_lifecycle"] = existing.get("process_lifecycle", []) + LIFECYCLE
+        existing["process_lifecycle"] = existing.get("process_lifecycle", []) + pending
         path.write_text(json.dumps(existing, indent=2, sort_keys=True) + "\n")
 
 
