@@ -19,7 +19,8 @@
     "test:browser:resources": "node tests/resources.browser.mjs",
     "test:browser:staff": "node tests/staff.browser.mjs",
     "test:browser:labels": "node tests/staff-labels.qa.browser.mjs",
-    "test:browser:http": "node tests/http.browser.mjs"
+    "test:browser:http": "node tests/http.browser.mjs",
+    "test:browser:http:staff": "node tests/http.staff.browser.mjs"
   },
   "dependencies": {
     "react": "19.3.1",
