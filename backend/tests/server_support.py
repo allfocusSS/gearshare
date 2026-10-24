@@ -78,6 +78,42 @@ def free_port() -> int:
     raise RuntimeError("no free port in 6400-6499")
 
 
+def live_children(pid: int) -> list[int]:
+    """Live direct children, returning PIDs in the caller's Linux PID namespace.
+
+    A host-mounted /proc reports host Pid/PPid even when Popen returns a container
+    PID. Resolve the parent using NSpid plus its namespace identity before comparing
+    PPid; matching a namespace-local number to a host PPid can silently count zero
+    children (or children of an unrelated process).
+    """
+    namespace = Path("/proc/self/ns/pid").readlink()
+    identities = []
+    parent = None
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            status = dict(line.split(":", 1) for line in (entry / "status").read_text().splitlines())
+            namespace_pids = [int(value) for value in status.get("NSpid", status["Pid"]).split()]
+            local_pid = namespace_pids[-1]
+            if local_pid == pid and (entry / "ns/pid").readlink() == namespace:
+                parent = int(status["Pid"])
+            identities.append((local_pid, int(status["PPid"]), status["State"].split()[0], entry))
+        except (OSError, KeyError, ValueError):
+            continue  # A process can exit while /proc is being read.
+    if parent is None:
+        return []
+    children = []
+    for local_pid, parent_pid, state, entry in identities:
+        if parent_pid == parent and state not in {"Z", "X"}:
+            try:
+                if (entry / "ns/pid").readlink() == namespace:
+                    children.append(local_pid)
+            except OSError:
+                continue
+    return sorted(children)
+
+
 class ServerProcess:
     def __init__(self, database_path: Path, log_path: Path, *, workers: int = 1, busy_timeout: str = "5"):
         self.database_path, self.log_path, self.workers, self.busy_timeout = Path(database_path), Path(log_path), workers, busy_timeout

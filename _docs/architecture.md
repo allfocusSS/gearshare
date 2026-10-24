@@ -224,6 +224,18 @@ locks. Evidence (commands, counts, outcomes) is in `evidence.md`.
   with `python -m uvicorn app.main:app` on a port in 6400-6499, driven over HTTP,
   stopped with SIGTERM and with SIGKILL (idle and under a write burst) and started
   again on the same file. Opening a second ORM engine is not accepted as a restart.
+  The corrected burst is bounded independently of machine throughput: four writers
+  attempt twelve distinct unit/date cases each in each of three rounds; recovery
+  probes use separate dates. Their final HTTP bodies synchronize after actual socket
+  transmission, with response reads held at the clients while the controller sends
+  SIGKILL. No application code or SQLite execution is paused. Every acknowledged
+  booking, event/version, complete physical invariant audit and recovery-write check
+  remains required. Synchronization and cleanup have bounded waits. The cold-start
+  worker check resolves namespace-local PIDs against `/proc` using `NSpid` and PID
+  namespace identity, then intersects live direct children with logged ASGI worker
+  identities; the resource tracker cannot stand in for a worker. These are harness
+  portability corrections after independent #12 QA FAIL, not a storage-behavior change
+  or independent acceptance of #12.
 - *Lock contention* (`test_sqlite_contention.py`) and a static *dialect-confinement*
   test (`test_storage_confinement.py`: SQLite, PRAGMA and raw SQL appear only in
   `database.py` and `sqlalchemy_store.py`; the default memory configuration does not

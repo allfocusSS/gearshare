@@ -14,7 +14,7 @@ with a real Argon2id hash before the first start. No public route grants a role.
 
 import json
 import multiprocessing
-import random
+import re
 import signal
 import threading
 import time
@@ -29,7 +29,7 @@ from app.database import DatabaseSettings
 from app.domain import User
 from app.sqlalchemy_store import SQLAlchemyRepository
 from persistence_support import ITERATIONS, REPORTER
-from server_support import LIFECYCLE, ServerProcess, bearer, club_today, flush_lifecycle, migrate_with_cli, race_worker
+from server_support import LIFECYCLE, ServerProcess, bearer, club_today, flush_lifecycle, live_children, migrate_with_cli, race_worker
 
 pytestmark = [pytest.mark.persistence, pytest.mark.subprocess]
 COORDINATOR_PASSWORD = "CoordinatorPassword42!"
@@ -242,47 +242,71 @@ def test_sigkill_during_a_burst_of_writes_keeps_every_acknowledged_booking_and_n
     url = f"sqlite:///{path}"
     server = ServerProcess(path, directory / "burst.log")
     servers.append(server)
-    rng = random.Random(12)
     server.start()
     with server.client() as client:
         students = [register(client, f"burst{n}") for n in range(4)]
     seeded_bookings = len(inv.read_sqlite(url).bookings)
-    combos = iter([(unit, offset) for offset in range(20, 91) for unit in ("presentation-02", "accessory-03", "audio-02", "camera-02")])
+    units = ("presentation-02", "accessory-03", "audio-02", "camera-02")
+    attempts_per_writer = 12
     guard = threading.Lock()
     acknowledged: dict[str, dict] = {}
     rounds = []
     for round_number in range(3):
-        stopping = threading.Event()
+        killed = threading.Event()
+        sent = threading.Barrier(len(students) + 1)
         unclear = []
+        failures = []
+        acknowledged_before_round = len(acknowledged)
 
-        def writer(student):
+        def wait_after_body_sent(event, info):
+            # All four final HTTP bodies have reached the socket before the kill.
+            # Hold only the clients' response reads, never the application/SQLite.
+            if event == "http11.send_request_body.complete":
+                sent.wait(timeout=30)
+                assert killed.wait(30), "controller did not stop the server"
+
+        def writer(index, student):
             import httpx
-            with httpx.Client(base_url=server.base_url, timeout=5, trust_env=False) as client:
-                while not stopping.is_set():
-                    with guard:
-                        unit, offset = next(combos)
-                    payload = booking_payload(unit, offset, offset, f"Burst write {unit} {offset}")
-                    try:
-                        response = client.post("/api/v1/bookings", json=payload, headers=bearer(student))
-                    except httpx.HTTPError:
-                        unclear.append(payload)
-                        return
-                    if response.status_code == 201:
-                        with guard:
-                            acknowledged[response.json()["id"]] = {"token": student["token"], "version": 1}
-                    else:
-                        unclear.append((payload, response.status_code))
+            try:
+                with httpx.Client(base_url=server.base_url, timeout=5, trust_env=False) as client:
+                    for attempt in range(attempts_per_writer):
+                        # Disjoint, bounded dates for each round; probes own separate dates.
+                        unit, offset = units[index], 20 + round_number * attempts_per_writer + attempt
+                        payload = booking_payload(unit, offset, offset, f"Burst write {unit} {offset}")
+                        extensions = {"trace": wait_after_body_sent} if attempt == attempts_per_writer - 1 else {}
+                        try:
+                            response = client.post("/api/v1/bookings", json=payload, headers=bearer(student), extensions=extensions)
+                        except httpx.HTTPError:
+                            unclear.append(payload)
+                            return
+                        if response.status_code == 201:
+                            with guard:
+                                acknowledged[response.json()["id"]] = {"token": student["token"], "version": 1}
+                        else:
+                            unclear.append((payload, response.status_code))
+            except Exception as error:
+                failures.append(repr(error))
+                sent.abort()
 
-        threads = [threading.Thread(target=writer, args=(student,), daemon=True) for student in students]
+        threads = [threading.Thread(target=writer, args=(index, student), daemon=True) for index, student in enumerate(students)]
         for thread in threads:
             thread.start()
-        time.sleep(rng.uniform(0.4, 1.2))
-        killed_after = len(acknowledged)
-        code = server.stop(signal.SIGKILL)
-        stopping.set()
-        for thread in threads:
-            thread.join(30)
-        assert code == -signal.SIGKILL and killed_after > 0
+        all_sent = False
+        try:
+            sent.wait(timeout=30)
+            all_sent = True
+            killed_after = len(acknowledged)
+            code = server.stop(signal.SIGKILL)
+        finally:
+            server.kill_if_running()
+            killed.set()
+            if not all_sent:
+                sent.abort()
+            for thread in threads:
+                thread.join(30)
+        assert not any(thread.is_alive() for thread in threads), "burst writer did not finish"
+        assert not failures, failures
+        assert code == -signal.SIGKILL and killed_after > acknowledged_before_round
         journal_left_by_kill = journal_state(path)
         server.start()
         with server.client() as client:
@@ -299,12 +323,14 @@ def test_sigkill_during_a_burst_of_writes_keeps_every_acknowledged_booking_and_n
         journal_after_reads = journal_state(path)
         assert not journal_after_reads.startswith("present, valid"), journal_after_reads
         with server.client() as client:
-            unit, offset = next(combos)
+            unit, offset = units[0], 80 + round_number
             probe = call(client, "POST", "/api/v1/bookings", token=students[0]["token"], status=201, json=booking_payload(unit, offset, offset, "Probe write after crash recovery"))
             acknowledged[probe.json()["id"]] = {"token": students[0]["token"], "version": 1}
         assert journal_state(path) == "absent", "the next committed write leaves no journal behind"
         rounds.append({
             "round": round_number, "acknowledged_before_kill": killed_after,
+            "bounded_write_attempts": len(students) * attempts_per_writer,
+            "request_bodies_sent_with_responses_outstanding_at_kill": len(students),
             "persisted_bookings_beyond_seed": len(state.bookings) - seeded_bookings,
             "committed_but_unacknowledged": committed_but_unacknowledged,
             "journal_right_after_kill": journal_left_by_kill, "journal_after_recovery_reads": journal_after_reads,
@@ -370,20 +396,6 @@ def test_simultaneous_conflicting_reservations_from_separate_client_processes_th
     print(f"[race] real server pid {last_pid}, workers={workers}: {rounds} rounds x {clients} processes, outcomes {set(outcomes)}")
 
 
-def live_children(pid: int) -> list[int]:
-    """Direct child processes of ``pid`` (Linux /proc); uvicorn's supervisor owns its workers."""
-    children = []
-    for entry in Path("/proc").iterdir():
-        if entry.name.isdigit():
-            try:
-                fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
-            except (OSError, IndexError):
-                continue
-            if int(fields[1]) == pid and fields[0] != "Z":
-                children.append(int(entry.name))
-    return children
-
-
 @pytest.mark.skipif(not Path("/proc/self/stat").exists(), reason="needs Linux /proc to count worker processes")
 def test_cold_start_of_three_workers_on_an_unseeded_database_self_heals_and_seeds_exactly_once(workspace):
     """OBSERVED LIMITATION, pinned as a safety property rather than a guarantee of a quiet start.
@@ -400,15 +412,23 @@ def test_cold_start_of_three_workers_on_an_unseeded_database_self_heals_and_seed
     server = ServerProcess(path, directory / "cold.log", workers=3)
     servers.append(server)
     server.start()
+
+    def live_workers():
+        # The supervisor also owns a resource tracker: only count actual ASGI workers
+        # that logged their own PID and are still its live direct children.
+        started = {int(pid) for pid in re.findall(r"Started server process \[(\d+)\]", server.log_text(since_start=True))}
+        return sorted(started.intersection(live_children(server.pid)))
+
     deadline = time.monotonic() + 30
-    while len(live_children(server.pid)) < 3 and time.monotonic() < deadline:
+    while len(live_workers()) < 3 and time.monotonic() < deadline:
         time.sleep(0.2)
     time.sleep(1.5)  # allow a restarted worker to finish importing
     with server.client() as client:
         statuses = [call(client, "GET", "/api/v1/assets").status_code for _ in range(60)]
         assert statuses == [200] * 60
         assert len(call(client, "GET", "/api/v1/assets", status=200).json()["items"]) == 10
-    workers_alive = len(live_children(server.pid))
+    worker_pids = live_workers()
+    workers_alive = len(worker_pids)
     code = server.stop(signal.SIGTERM)
     log = server.log_text()
     tracebacks, busy = log.count("Traceback"), log.count("app.errors.ApiError: The service is busy. Try again.")
@@ -416,6 +436,6 @@ def test_cold_start_of_three_workers_on_an_unseeded_database_self_heals_and_seed
     assert workers_alive >= 3 and log.count("Application startup complete") >= 3
     state = inv.assert_coherent(inv.read_sqlite(url), club_today(), "after cold multi-worker start")
     assert len(state.assets) == 10 and state.seeded_on is not None
-    record_cold = {"event": "cold-start-3-workers", "worker_import_failures_503": busy, "child_processes_alive_after_start": workers_alive, "exit_code": code}
+    record_cold = {"event": "cold-start-3-workers", "worker_import_failures_503": busy, "child_processes_alive_after_start": workers_alive, "live_worker_pids": worker_pids, "exit_code": code}
     LIFECYCLE.append(record_cold)
     print("[process]", json.dumps(record_cold, sort_keys=True))

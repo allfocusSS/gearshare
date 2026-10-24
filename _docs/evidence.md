@@ -25,10 +25,10 @@ Planning-document checks completed on 2026-10-19: 24 Markdown documents, 20 uniq
 | Bootstrap health test/build | Independent QA PASS, #1 closed | Published `a8ec9b7469b9d1e2f091bc0fdf0369be7e9ba6ad`; [actual QA evidence](https://github.com/allfocusSS/gearshare/issues/1#issuecomment-6261432589); historical engineer details below |
 | Mock frontend browser flows | #1–5 and #24–28 independently verified and closed | Independent QA PASS for the mock stage ([#5](https://github.com/allfocusSS/gearshare/issues/5#issuecomment-6294295984)). The #6 changes (Booking version) were re-run by the engineer on `0486a4e`, and again on `cd2ff51` after the #6 QA-FAIL correction touched `types.ts` and the mock (`assetId` validation): every browser suite exits 0 (see the #6 sections, including one recorded auth-suite timing failure) |
 | OpenAPI validation | Independent QA PASS/closure on `1f4b115` after the recorded `39d1bdd` FAIL | [Actual QA evidence](https://github.com/allfocusSS/gearshare/issues/6#issuecomment-6297151459); #7 retains all 35 baseline health/contract/authoring tests; real validator remains OK |
-| In-memory API tests | #7–9/#29 independent PASS; #10/#30 fresh independent QA pending | Current engineer correction: 921 backend PASS and 133 PASS per focused ASGI/Uvicorn transport; prior 814 PASS/51 FAIL checkpoint remains below |
-| ORM/SQLite tests | Not run | Storage implementation does not exist |
-| Concurrent requests/rollback | Auth and booking memory checks pass; database allocation remains unimplemented | Real conflicting create/cancel races and partial allocation/cancellation rollback; no database concurrency claim |
-| Process-restart persistence | Not run | Current backend is process memory; requires the later storage stage |
+| In-memory API tests | #7–10/#29/#30 independent PASS | The complete true-memory gate is accepted; original 814 PASS/51 FAIL and subsequent 921 PASS correction remain below |
+| ORM/SQLite tests | #11 independent PASS; #12 awaits corrected-candidate QA | Accepted #11 `966fef5`; published #12 `b5edd58` independent run: 1260 passed / two harness failures / four warnings; see correction evidence below |
+| Concurrent requests/rollback | #12 engineer and independent checks executed; overall #12 gate remains open | Full-store, safe conflict, rollback and recovery assertions remain intact; no other DBMS claim |
+| Process-restart persistence | Actual SIGTERM/SIGKILL process checks executed; #12 QA blocked on harness portability | Published candidate failed finite burst-case exhaustion and host `/proc` PID comparison; correction and exact results follow below |
 | Two-role browser integration | Not run | Requires implemented frontend/backend |
 | Exploratory user testing | Mock auth/catalogue/student/staff screens exercised | Real #24–#28 defects were each filed before correction and independently verified and closed. Final integrated exploration remains outstanding |
 | Final CI / clean checkout | Not run | Bootstrap locks were installed into a clean source copy; independent committed-checkout QA and final CI remain separate checks |
@@ -905,3 +905,86 @@ test side (the two auditor mutations).
   `TransactionRetry` in SQL; dangling foreign keys `ValueError` versus `IntegrityError`; naive timestamps `ValueError` versus
   `StatementError`. The service results are identical.
 * The engineer did not push, post a QA verdict or close an issue. No database file, journal, token, password or environment secret is committed.
+
+## Iteration 4 — #12 process harness portability correction (2026-10-24)
+
+New engineer session after [independent QA FAIL](https://github.com/allfocusSS/gearshare/issues/12#issuecomment-6388998999).
+Baseline is published `b5edd58329bc135fe8e7c25bda96f53da5b3052f`, tree
+`6ecbadf1e22f8abe682c12b1c6a7bf4cb4ab335e`. All nine preceding #12 commits are
+preserved; the candidate is the single `Refs #12` commit carrying this record, whose
+exact SHA/tree are supplied in the handoff. Main remains at accepted #11 `966fef5`.
+This is engineer evidence only; fresh independent QA must verify the correction.
+
+The published candidate's independent result was **1260 passed / 2 failed / 4
+warnings in 185.08s**. A focused engineer reproduction on that unchanged candidate
+also failed both cases, with four unhandled `StopIteration` thread warnings in
+43.69s. The burst consumed its 284 unit/date cases before its final recovery probe;
+the cold-start observer compared namespace-local Popen PIDs with host `/proc` PPid,
+reporting zero despite three real worker lifecycles and 60 successful reads. Neither
+was an application failure. QA additionally verified fixed-clock actual-process
+identity/session/revocation/state/four-event survival with a complete SQLite
+snapshot, independent HTTP 201/409 and exact three-slot deltas, and full rollback
+after the second slot in both adapters. Those independent results remain attached
+to the failing checkpoint; they do not override the reproducibility failure.
+
+Only `tests/test_process_restart.py` and `tests/server_support.py` change executable
+code. The bounded burst makes four writers attempt twelve distinct cases each per
+round, for 144 possible writes over three rounds; the three recovery probes have
+separate dates. The final request per writer synchronizes on the locked HTTP
+transport's `http11.send_request_body.complete` trace: all four bodies have been
+sent and client response reads are outstanding when the controller SIGKILLs the
+real Uvicorn process. Application/SQLite execution is not paused or slowed. Barrier
+and event waits are bounded; failure cleanup kills the server and joins writers.
+All acknowledged-booking, event/version, physical-auditor, journal recovery and
+post-restart write assertions remain. Each round now requires new acknowledged
+bookings, rather than merely a nonzero cumulative total.
+
+The child observer resolves `NSpid` together with the actual PID namespace before
+matching host PPid, returning namespace-local child identities. The cold-start
+check counts only live direct children whose own logged ASGI worker PID matches;
+the supervisor's resource tracker does not count. Existing three-worker, 60-read,
+seed-once and full-audit assertions remain mandatory, without a new skip.
+
+Environment: Linux with a host-mounted `/proc` and nested PID namespace; Python
+3.12.14, SQLite 3.53.1, SQLAlchemy 2.0.55, Uvicorn 0.54.0. All commands use actual
+**uv 0.12.23** via `uv tool run --from uv==0.12.23 uv` (host uv is 0.13.4).
+Node 24.22.1 / npm 11.9.0 are available; unchanged frontend commands were not rerun.
+Commands below run from `backend/`:
+
+| Exact command | Actual result |
+| --- | --- |
+| `uv tool run --from uv==0.12.23 uv run --locked pytest -q tests/test_process_restart.py -k 'burst_of_writes or cold_start'` on baseline | 2 failed, 3 deselected, 4 warnings in 43.69s |
+| `GEARSHARE_PERSISTENCE_REPORT=/workspace/scratch/e3fbdcf9622e/engineer12-portability/focused.json uv tool run --from uv==0.12.23 uv run --locked pytest -q -s tests/test_process_restart.py -k 'burst_of_writes or cold_start'` | 2 passed, 3 deselected in 17.83s; zero warnings |
+| `GEARSHARE_PERSISTENCE_REPORT=/workspace/scratch/e3fbdcf9622e/engineer12-portability/full.json uv tool run --from uv==0.12.23 uv run --locked pytest -q -s` | 1262 passed in 142.78s; zero failures/warnings; exit 0 |
+| `uv tool run --from uv==0.12.23 uv lock --check` | Exit 0; 49 locked packages |
+| `uv tool run --from uv==0.12.23 uv run --locked openapi-spec-validator ../openapi.yml` | Exit 0; OK; frozen contract unchanged |
+
+Focused corrected observations: three SIGKILL stops exited -9; before each kill
+41, 86 and 131 bookings were acknowledged (cumulative, including prior probes),
+with four final bodies transmitted per kill. Every acknowledgement, including
+responses processed after the kill, survived; complete audits and recovery writes
+passed. Cold start identified actual live worker PIDs 533, 634 and 636, with two
+controlled seed-race import failures; all 60 catalogue reads succeeded and the
+three-worker supervisor stopped with exit 0. Logs/evidence are outside Git at
+`/workspace/scratch/e3fbdcf9622e/engineer12-portability/` (`baseline.log`, `focused.log`,
+`focused.json`, `full.log`, `full.json`, `lock.log`, `openapi.log`).
+
+The complete corrected run retained six successful CLI migrations and twelve real
+server starts/stops: SIGTERM -15 six times, SIGKILL -9 four times, and multiworker
+SIGTERM exit 0 twice. The main persistence process changed PID 11033 → 11323 →
+11469 across SIGTERM then idle SIGKILL, preserving the original identity, sessions,
+revocation, booking/state/event/version, desk and availability assertions. The
+three burst rounds had 41, 86 and 132 acknowledgements before the kill; every
+acknowledgement processed before or after each kill survived with coherent state,
+and all three separate recovery probes succeeded. No rollback journal remained
+after these kills; this run does not claim to have observed a hot journal. Both
+real-server reservation races (one and three workers, eight independent client
+processes) gave exactly one 201 and seven private 409s in all thirty rounds. The
+cold-start check positively observed live workers 13056, 13157 and 13158, all sixty
+reads returned 200, seeding ran once and the complete physical audit passed.
+
+No application code, models, SQL adapter, API, OpenAPI, dependency configuration or
+frontend behavior changes. Existing SQLite limitations, original assertions,
+mutation-campaign evidence and the published failed checkpoint are retained. No
+new product defect was observed; no fabricated `user-test-bug`, independent verdict,
+issue closure or later-stage acceptance is claimed. The engineer does not push.
