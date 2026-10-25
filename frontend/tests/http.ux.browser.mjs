@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -45,12 +45,19 @@ suite.revoke = async t => {
   const result = await api(stack, '/api/v1/auth/logout', { method: 'POST', token: t.token })
   assert.ok([200, 204].includes(result.status), `logout status ${result.status}`)
 }
-suite.conflict = async t => {
+suite.conflict = async (t, day = t.day) => {
   const other = await api(stack, '/api/v1/auth/register', { method: 'POST', body: newStudent('ux31_race') })
   assert.equal(other.status, 201)
-  const booked = await api(stack, '/api/v1/bookings', { method: 'POST', token: other.json.token, body: { assetId: t.assetId, startDate: t.day, endDate: t.day, purpose: 'Competing future reservation' } })
+  const booked = await api(stack, '/api/v1/bookings', { method: 'POST', token: other.json.token, body: { assetId: t.assetId, startDate: day, endDate: day, purpose: 'Competing future reservation' } })
   assert.equal(booked.status, 201)
+}
+/** Another unit to open from the same page (returns its id). */
+suite.otherAsset = async t => {
+  const unit = await api(stack, '/api/v1/staff/assets', { method: 'POST', token: coordinatorToken, body: { name: `UX other ${++serial}`, inventoryCode: `UX-O${serial}`, category: 'Cameras', location: 'Club desk', description: 'Second unit for the scope guards.' } })
+  assert.equal(unit.status, 201)
+  return unit.json.id
 }
 suite.fail = async (t, kind) => t.page.route('**/api/v1/bookings', route => kind === 'network' ? route.abort('connectionreset') : route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'INTERNAL_ERROR', message: 'Internal server error.' }) }))
 describe('issue #31 — associated server date validation', { skip: !selectedIssue(31), concurrency: false }, () => issue31(suite))
 describe('issue #32 — focus after the booking request settles', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))
+describe('issue #36 — calendar month across the availability refresh', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))

@@ -432,6 +432,9 @@ export async function assertFocus(page, expected, label) {
   return info
 }
 
+/** Keyboard submit of the booking form without the response oracle of `t.submit` (401, navigation, delayed or failing refresh cases). */
+export const pressRequest = async t => { await t.button().focus(); await t.page.keyboard.press('Enter') }
+
 export const overflowInfo = (page) => page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, innerWidth }))
 
 /** Strict QA form: `scrollWidth === clientWidth` (not merely <=). */
@@ -532,7 +535,7 @@ export function issue32(suite) {
     assert.equal(await t.page.getByText('Pending approval', { exact: false }).count(), 0, 'no "Pending approval"')
   }
   /** Presses Enter on the focused request button without the submit helper's response oracle (401, navigation, delay cases). */
-  const press = async t => { await t.button().focus(); await t.page.keyboard.press('Enter') }
+  const press = pressRequest
   const delayPosts = (t, ms) => t.page.route('**/api/v1/bookings', async route => {
     if (route.request().method() !== 'POST') return route.fallback()
     await pause(ms)
@@ -681,6 +684,169 @@ export function issue32(suite) {
       await t.submit({ injected: true })
       await landed(t, REQUEST_BUTTON, 'mock failure')
     }, { modes: ['mock'], maya: true }],
+  ]
+  defineCases(suite, cases)
+}
+
+// ---- #36: the calendar keeps its month across an availability refresh -----------------------------------------------------
+
+export function issue36(suite) {
+  const http = suite.mode === 'http'
+  const header = t => t.page.locator('.calendar-header h3')
+  const dayButton = (t, date, state) => t.page.getByRole('button', { name: `${date}: ${state}`, exact: true })
+  const arrow = (t, direction) => t.page.getByRole('button', { name: `${direction} month`, exact: true })
+  const press = async (t, locator) => { await locator.focus(); await t.page.keyboard.press('Enter') }
+  /** Keyboard navigation to the planned month, asserting the heading before anything is submitted. */
+  const toMonth = async (t, plan) => {
+    for (let step = 0; step < plan.steps; step++) await press(t, arrow(t, 'Next'))
+    assert.equal(await header(t).innerText(), plan.label, 'the calendar shows the planned month before the submit')
+  }
+  const fill = async (t, day) => { await t.dates(day, day); await t.purpose(purpose) }
+  /** The refresh has finished (no status, calendar mounted), the heading is the retained month and the booked day is shown. */
+  const keepsMonth = async (t, plan, day, label) => {
+    await t.page.locator('.availability-calendar').waitFor()
+    assert.equal(await t.page.getByText('Updating availability…').count(), 0, `${label}: refresh finished`)
+    assert.equal(await header(t).innerText(), plan.label, `${label}: the calendar keeps ${plan.label}`)
+    assert.equal(await dayButton(t, day, 'Occupied, unavailable, selected').isVisible(), true, `${label}: ${day} is shown occupied and selected`)
+  }
+  const currentMonth = t => monthLabel(t.today.slice(0, 7))
+  const cases = [
+    ['36.1 [FAIL-NOW] conflict keeps the chosen month and shows the occupied day', async t => {
+      const plan = monthPlan(t.today), day = plan.days[0]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await suite.conflict(t, day)
+      const response = await t.submit({ conflict: true })
+      assert.ok(!http || response.unavailableDates?.includes(day), 'the alert lists the unavailable day')
+      await keepsMonth(t, plan, day, 'conflict')
+      assert.equal(await t.page.locator('#detail-startDate').inputValue(), day)
+      assert.equal(await t.page.locator('#detail-endDate').inputValue(), day)
+      assert.equal(await t.page.locator('#booking-purpose').inputValue(), purpose)
+      assert.match(await t.page.locator('.booking-form [role=alert]').innerText(), new RegExp(day))
+      await assertNoOverflow(t.page, '36.8 after the conflict refresh')
+    }],
+    ['36.2 [FAIL-NOW] success keeps the chosen month and shows the booked day', async t => {
+      const plan = monthPlan(t.today), day = plan.days[1]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await t.submit({ success: true })
+      await keepsMonth(t, plan, day, 'success')
+      assert.match(await t.page.locator('.booking-form .success-notice').innerText(), /Pending approval/)
+    }],
+    ['36.3 [FAIL-NOW] the status stays while the refresh is in flight, then the month returns', async t => {
+      const plan = monthPlan(t.today), day = plan.days[1]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await t.page.route('**/api/v1/assets/*/availability', async route => { await pause(1500); await route.fallback() })
+      await pressRequest(t)
+      const status = t.page.getByText('Updating availability…')
+      await status.waitFor()
+      assert.equal(await t.page.locator('.availability-calendar').count(), 0, 'no calendar, so no old availability presented as current')
+      assert.equal(await dayButton(t, day, 'Available').count(), 0)
+      await status.waitFor({ state: 'detached' })
+      await t.page.getByRole('link', { name: 'View my reservations', exact: true }).waitFor()
+      await settle(t.page)
+      await keepsMonth(t, plan, day, 'after the delayed refresh')
+      await assertNoOverflow(t.page, '36.8 after the delayed refresh')
+    }, { modes: ['http'] }],
+    ['36.4 [FAIL-NOW] the arrows reflect the retained month in the last horizon month', async t => {
+      const plan = monthPlan(t.today, { lastMonth: true }), day = plan.days[0]
+      await toMonth(t, plan)
+      assert.equal(await arrow(t, 'Next').isDisabled(), true, 'Next month is disabled in the last horizon month')
+      await fill(t, day)
+      await t.submit({ success: true })
+      await keepsMonth(t, plan, day, 'last month')
+      assert.equal(await arrow(t, 'Previous').isDisabled(), false, 'Previous month is enabled')
+      assert.equal(await arrow(t, 'Next').isDisabled(), true, 'Next month stays disabled')
+      await press(t, arrow(t, 'Previous'))
+      assert.equal(await header(t).innerText(), plan.previousLabel)
+      assert.equal(await arrow(t, 'Next').isDisabled(), false, 'Next month is enabled again')
+    }],
+    ['36.5 [GUARD] the month is not kept for another asset, a new visit or a reload', async t => {
+      const plan = monthPlan(t.today), day = plan.days[0]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await suite.conflict(t, day)
+      await t.submit({ conflict: true })
+      const other = await suite.otherAsset(t)
+      await t.page.evaluate(id => { location.hash = `/assets/${id}` }, other)
+      await t.page.getByRole('heading', { name: 'Check availability', level: 2 }).waitFor()
+      await t.page.locator('.availability-calendar').waitFor()
+      assert.equal(await header(t).innerText(), currentMonth(t), 'a different asset starts on the current month')
+      await t.page.evaluate(() => { location.hash = '/explore' })
+      await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+      await t.page.evaluate(id => { location.hash = `/assets/${id}` }, t.assetId)
+      await t.page.locator('.availability-calendar').waitFor()
+      assert.equal(await header(t).innerText(), currentMonth(t), 're-entering the page starts on the current month')
+      await toMonth(t, plan)
+      await t.page.reload()
+      await t.page.locator('.availability-calendar').waitFor()
+      assert.equal(await header(t).innerText(), currentMonth(t), 'a reload starts on the current month')
+    }],
+    ['36.6 [FAIL-NOW] keyboard path: the retained month is reachable without pressing Next month', async t => {
+      const plan = monthPlan(t.today), day = plan.days[1]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await t.submit({ success: true })
+      await keepsMonth(t, plan, day, 'before the keyboard path')
+      // Shift+Tab from the Start date field enters the calendar at its last enabled day.
+      await t.page.locator('#detail-startDate').focus()
+      await t.page.keyboard.press('Shift+Tab')
+      const info = await activeInfo(t.page)
+      assert.match(info.name, /^\d{4}-\d{2}-\d{2}: /, `Shift+Tab reaches a calendar day (${describeActive(info)})`)
+      const picked = info.name.slice(0, 10)
+      assert.ok(picked.startsWith(plan.month), `the day reached by keyboard (${picked}) belongs to the retained month ${plan.month}`)
+      await t.page.keyboard.press('Enter')
+      assert.equal(await t.page.locator('#detail-startDate').inputValue(), picked)
+      assert.equal(await t.page.locator('#detail-endDate').inputValue(), picked)
+      assert.ok((await t.page.locator('.range-summary').innerText()).includes(formatCalendarDate(picked)), 'the summary follows the selected day')
+      const typed = plan.days[0]
+      await t.dates(typed, typed, true)
+      assert.ok((await t.page.locator('.range-summary').innerText()).includes(formatCalendarDate(typed)), 'typed dates still update the summary')
+    }],
+    ['36.7 [FAIL-NOW] "Retry availability" returns on the same month and focuses the panel heading', async t => {
+      const plan = monthPlan(t.today), day = plan.days[1]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await t.page.route('**/api/v1/assets/*/availability', route => route.abort('connectionreset'))
+      await pressRequest(t)
+      const retry = t.page.getByRole('button', { name: 'Retry availability', exact: true })
+      await retry.waitFor()
+      assert.equal(await t.page.getByText('Could not refresh availability.').isVisible(), true)
+      assert.match(await t.page.locator('.booking-form .success-notice').innerText(), /Pending approval/, 'the request itself succeeded')
+      assert.equal(await t.page.locator('.availability-calendar').count(), 0, 'no calendar while availability is unknown')
+      await t.page.unroute('**/api/v1/assets/*/availability')
+      await press(t, retry)
+      await keepsMonth(t, plan, day, 'after Retry availability')
+      await settle(t.page)
+      await assertFocus(t.page, { id: 'availability-heading', tag: 'H2', name: 'Check availability' }, 'after a successful retry')
+      await assertNoOverflow(t.page, '36.8 after the retry')
+    }, { modes: ['http'] }],
+    ['36.7 [FAIL-NOW] a failing retry leaves focus on "Retry availability"', async t => {
+      const plan = monthPlan(t.today), day = plan.days[1]
+      await toMonth(t, plan)
+      await fill(t, day)
+      await t.page.route('**/api/v1/assets/*/availability', route => route.abort('connectionreset'))
+      await pressRequest(t)
+      const retry = t.page.getByRole('button', { name: 'Retry availability', exact: true })
+      await retry.waitFor()
+      await press(t, retry)
+      await settle(t.page, 800)
+      await retry.waitFor()
+      await assertFocus(t.page, { tag: 'BUTTON', name: 'Retry availability' }, 'after a failing retry')
+      await t.page.unroute('**/api/v1/assets/*/availability')
+      await press(t, retry)
+      await keepsMonth(t, plan, day, 'after the second retry')
+    }, { modes: ['http'] }],
+    ['36.9 [FAIL-NOW][MOCK] the simulated conflict keeps the month shown before the submit', async t => {
+      const month = shiftMonth(t.today.slice(0, 7), 2), day = `${month}-10`
+      const plan = { label: monthLabel(month), steps: 2 }
+      await toMonth(t, plan)
+      await fill(t, day)
+      await suite.conflict(t, day)
+      await t.submit({ conflict: true })
+      await keepsMonth(t, plan, day, 'simulated conflict')
+    }, { modes: ['mock'] }],
   ]
   defineCases(suite, cases)
 }

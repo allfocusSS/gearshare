@@ -1125,3 +1125,29 @@ Checks on the candidate commit, from `frontend/`:
 The backend was not touched, so `uv lock --check` and `pytest` were not repeated for this commit. Servers and browsers were started by each harness and no vite, uvicorn or Chromium process was left running afterwards.
 
 Limits: Chromium only (not Firefox or Safari, where a focused control that becomes disabled can keep `document.activeElement`; the effect also treats focus on the request button itself as dropped, so those engines still reach the same target); the real clock decides the booking dates (units are unique per case); focus is asserted on `document.activeElement`, not screen-reader output.
+
+### #36 — the calendar keeps its month across the availability refresh
+
+**Red (fix's parent, `0249fb7`, application source unchanged).** `UX_ISSUES=36 npm run test:browser:http:ux`: 16 tests, 2 passed (the 36.5 guard at both widths), 14 failed. Every other case failed with the reported symptom: `conflict: the calendar keeps January 2027` expected `January 2027`, actual `October 2026` (36.1, 36.2, 36.3 after the delayed refresh, 36.4, 36.6 and the first 36.7 case at both widths); the second 36.7 case (a failing retry) failed with `after a failing retry: focus is on BODY, expected {"tag":"BUTTON","name":"Retry availability"}`. `UX_ISSUES=36 npm run test:browser:ux`: 12 tests; every [FAIL-NOW] case failed the same way (36.1, 36.2, 36.4, 36.6 with `October 2026` for `January 2027`, and 36.9 with `October 2026` for `December 2026`). In that first mock run the 36.5 guard also failed, for a test-code reason (the mock fixture did not return the unit id used to re-enter the page); after returning `camera-01` the guard passed on the unfixed tree, `UX_ISSUES=36 UX_CASES=36.5 npm run test:browser:ux`: 2 of 2.
+
+**Fix.** `AvailabilityCalendar.tsx` is controlled: it receives `month` (`null` = current month) and `onMonthChange`, shows that month clamped to the booking horizon and derives the arrows from it. `AssetDetailPage.tsx` owns the month state, resets it with the rest of the page state when the asset changes or "Retry detail" reloads, and passes it down; the calendar is still unmounted while availability refreshes, so old availability is never shown as current and the "Updating availability…" status is unchanged. "Retry availability": the button is removed during the refresh, which dropped focus (QA baseline `BODY`); the click now records an intent and, once the refresh settles, focus goes to `h2#availability-heading` (now `tabIndex={-1}`) after success, or back to the retry button after another failure, only if focus was dropped. No service interface, API, backend, message or style changed.
+
+**Green (candidate commit).** `UX_ISSUES=36 npm run test:browser:http:ux`: 16 of 16 passed; `UX_ISSUES=36 npm run test:browser:ux`: 12 of 12 passed. After this fix all #32 cases were run again with the full suites (both touch `AssetDetailPage.tsx`): 22 of 22 and 18 of 18 passed in the runs below. Calendar screenshots were not produced for this issue; the cases assert the heading text, the day button labels and the arrow states.
+
+Deviations from QA's case text: the month is reached by keyboard (focus plus Enter on "Next month") and the date fields are filled, as in #31; 36.3 and 36.7 run on the real stack only (the mock has no request delay or availability failure); 36.9 runs on the mock only and uses December 2026 (two months ahead) as QA's baseline did; 36.1 and 36.2 also run on the mock with the shared January-month plan; 36.6 reaches the calendar with Shift+Tab from the Start date (the last enabled day of the displayed month) instead of counting Tab presses from the page start, and asserts that day belongs to the retained month; the second 36.7 case (a failing retry leaves focus on the retry button) goes beyond QA's list because the rule requires a deliberate target after every outcome. 36.7b stays with #43 as ruled.
+
+Checks on the candidate commit, from `frontend/`:
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | 218 tests, 218 pass, 0 fail |
+| `npm run typecheck`, `npm run build` | exit 0; build 307.53 kB JS / 34.70 kB CSS |
+| `npm run test:browser`, `:catalogue`, `:bookings`, `:resources`, `:staff` (mock) | all exit 0 (26 checks, 28 checks, the bookings journey, the resources icon checks, 8 groups) |
+| `npm run test:browser:labels` | exit 0, 448 of 448 checks |
+| `npm run test:browser:http`, `:http:staff` (real stack) | all 19 and all 21 checks passed |
+| `node tests/qa25.browser.mjs` | exit 0, 4 controlled groups passed unchanged (36.10) |
+| `node tests/qa28.browser.mjs` (needs a committed `src`; the checks ran on the candidate before this evidence was amended in) | exit 0, 635 of 635 checks |
+| `npm run test:browser:http:ux` (blocks #31, #32, #36) | 66 tests, 66 pass |
+| `npm run test:browser:ux` (blocks #31, #32, #36) | 58 tests, 58 pass |
+
+Limits: the browser suites cannot reach the month reset in the page's load effect because `App` keys the page by asset id (and `tests/qa25.browser.mjs`' key-less fixture does not assert the month), so that line is defensive and has no regression case; mutation check: removing it leaves 36.5 and qa25 green. The retention is per visit by design (the rule); a club-date rollover while the page is open clamps the month into the new horizon. Backend untouched, not re-run.

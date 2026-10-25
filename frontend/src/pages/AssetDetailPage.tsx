@@ -14,6 +14,9 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
   const [loading, setLoading] = useState(true)
   const [retry, setRetry] = useState(0)
   const [selectingEnd, setSelectingEnd] = useState(false)
+  // The calendar month lives here, not in the calendar, because the calendar is unmounted while availability refreshes
+  // (so old availability is never shown as current). null = the current month; a new asset or visit starts there.
+  const [month, setMonth] = useState<string | null>(null)
   const [purpose, setPurpose] = useState('')
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState<ServiceError | null>(null)
@@ -24,6 +27,9 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
   // Set once per settled request: which control gets focus back when pending ends ('field' for a response with field errors).
   const restoreFocus = useRef<'field' | 'button' | null>(null)
   const panel = useRef<HTMLElement>(null)
+  const availabilityHeading = useRef<HTMLHeadingElement>(null)
+  const retryButton = useRef<HTMLButtonElement>(null)
+  const restoreRetryFocus = useRef(false)
   const requestButton = useRef<HTMLButtonElement>(null)
   const [refreshState, setRefreshState] = useState<'ready' | 'loading' | 'error'>('ready')
   async function refreshAvailability(generation = request.current) {
@@ -68,7 +74,7 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
     setLoading(true); setError(null); setData(null)
     submitting.current = false; setPending(false); setSuccess(''); setSubmitError(null); setRefreshState('ready')
     setRange({ startDate: '', endDate: '' }); setPurpose('')
-    restoreFocus.current = null
+    restoreFocus.current = null; restoreRetryFocus.current = false; setMonth(null)
     void Promise.all([service.getAsset(assetId), service.getAssetAvailability(assetId)]).then(([asset, availability]) => {
       if (id !== request.current) return
       if (!asset.ok) setError(asset.error)
@@ -93,6 +99,16 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
     if (target && !target.matches(':disabled')) target.focus()
   }, [pending])
 
+  // "Retry availability" is removed while the refresh runs, so focus is dropped. When the refresh settles, restore it once:
+  // the panel heading after a successful refresh (the calendar is back), the retry button again after another failure.
+  useEffect(() => {
+    if (!restoreRetryFocus.current || refreshState === 'loading') return
+    restoreRetryFocus.current = false
+    const active = document.activeElement
+    if (active && active !== document.body && active.isConnected && !active.matches(':disabled')) return
+    ;(refreshState === 'ready' ? availabilityHeading.current : retryButton.current)?.focus()
+  }, [refreshState])
+
   if (loading) return <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" />Loading equipment and calendar…</div>
   if (error) return <section className="workspace-placeholder detail-error" role="alert"><span className="placeholder-icon"><Icon name="box" /></span><h2>{error.code === 'NOT_FOUND' ? 'Equipment not found.' : 'Could not load this equipment.'}</h2><p>{error.message}</p>{error.code !== 'NOT_FOUND' && <button type="button" className="button secondary" onClick={() => setRetry((value) => value + 1)}>Retry detail</button>}<a className="button primary" href="#/explore">Back to Explore<Icon name="arrow" /></a></section>
   if (!data) return null
@@ -111,8 +127,8 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
   return <>
     <a href="#/explore" className="back-link">← Back to equipment</a>
     <div className="asset-detail-grid"><section className="asset-identity"><EquipmentArt category={asset.category} large /><div className="asset-heading"><span className="eyebrow">{asset.category} <span>/</span> {asset.inventoryCode}</span><h2>{asset.name}</h2><span className={`availability-badge ${asset.state === 'maintenance' ? 'maintenance' : 'unspecified'}`}>{asset.state === 'maintenance' ? '× Maintenance · unavailable for requests' : 'Active physical unit'}</span></div><p className="asset-description">{asset.description}</p><dl className="asset-specs"><div><dt>Inventory code</dt><dd>{asset.inventoryCode}</dd></div><div><dt>Category</dt><dd>{asset.category}</dd></div><div><dt>Pickup location</dt><dd>{asset.location}</dd></div></dl><p className="schedule-note">One record is one physical unit. {isMockMode ? 'This fictional demo equipment has its own independent calendar.' : 'This unit has its own independent calendar.'}</p></section>
-    <section className="availability-panel" ref={panel} aria-labelledby="availability-heading"><p className="eyebrow">Plan your next project</p><h2 id="availability-heading">Check availability</h2><p className="availability-intro">Whole days, from pickup through return.</p><fieldset className="request-date-fields" disabled={pending}>{refreshState === 'ready' && <AvailabilityCalendar key={assetId} availability={availability} selection={selected} onSelect={selectDay} />}<DateRangeFields prefix="detail" value={range} today={availability.today} error={dateFieldError} onChange={(value) => { setRange(value); setSelectingEnd(false) }} /></fieldset>
-      {refreshState !== 'ready' ? <div role={refreshState === 'error' ? 'alert' : 'status'} className="range-summary neutral"><strong>{refreshState === 'loading' ? 'Updating availability…' : 'Could not refresh availability.'}</strong><p>Availability is unknown until the calendar refreshes. Your request has not been resubmitted.</p>{refreshState === 'error' && <button type="button" className="button secondary" onClick={() => void refreshAvailability()}>Retry availability</button>}</div> : dateError ? <div className="form-alert" role="alert">{dateError.message}</div> : selected ? <div className={`range-summary ${unavailable.length ? 'range-unavailable' : 'range-available'}`} role="status"><strong>{unavailable.length ? asset.state === 'maintenance' ? 'Unavailable during maintenance' : 'Unavailable for selected dates' : 'Available for selected dates'}</strong><p>{formatCalendarDate(selected.startDate)} – {formatCalendarDate(selected.endDate)}</p><p><b>{inclusiveDays(selected.startDate, selected.endDate)} {inclusiveDays(selected.startDate, selected.endDate) === 1 ? 'day' : 'days'} inclusive</b> · Asia/Almaty</p>{unavailable.length > 0 && <p>{unavailable.length} selected {unavailable.length === 1 ? 'day is' : 'days are'} unavailable.</p>}</div> : <div className="range-summary neutral"><strong>No dates selected</strong><p>Choose a start and end to check this unit's scheduled availability.</p></div>}
+    <section className="availability-panel" ref={panel} aria-labelledby="availability-heading"><p className="eyebrow">Plan your next project</p><h2 id="availability-heading" ref={availabilityHeading} tabIndex={-1}>Check availability</h2><p className="availability-intro">Whole days, from pickup through return.</p><fieldset className="request-date-fields" disabled={pending}>{refreshState === 'ready' && <AvailabilityCalendar key={assetId} availability={availability} month={month} onMonthChange={setMonth} selection={selected} onSelect={selectDay} />}<DateRangeFields prefix="detail" value={range} today={availability.today} error={dateFieldError} onChange={(value) => { setRange(value); setSelectingEnd(false) }} /></fieldset>
+      {refreshState !== 'ready' ? <div role={refreshState === 'error' ? 'alert' : 'status'} className="range-summary neutral"><strong>{refreshState === 'loading' ? 'Updating availability…' : 'Could not refresh availability.'}</strong><p>Availability is unknown until the calendar refreshes. Your request has not been resubmitted.</p>{refreshState === 'error' && <button type="button" ref={retryButton} className="button secondary" onClick={() => { restoreRetryFocus.current = true; void refreshAvailability() }}>Retry availability</button>}</div> : dateError ? <div className="form-alert" role="alert">{dateError.message}</div> : selected ? <div className={`range-summary ${unavailable.length ? 'range-unavailable' : 'range-available'}`} role="status"><strong>{unavailable.length ? asset.state === 'maintenance' ? 'Unavailable during maintenance' : 'Unavailable for selected dates' : 'Available for selected dates'}</strong><p>{formatCalendarDate(selected.startDate)} – {formatCalendarDate(selected.endDate)}</p><p><b>{inclusiveDays(selected.startDate, selected.endDate)} {inclusiveDays(selected.startDate, selected.endDate) === 1 ? 'day' : 'days'} inclusive</b> · Asia/Almaty</p>{unavailable.length > 0 && <p>{unavailable.length} selected {unavailable.length === 1 ? 'day is' : 'days are'} unavailable.</p>}</div> : <div className="range-summary neutral"><strong>No dates selected</strong><p>Choose a start and end to check this unit's scheduled availability.</p></div>}
       <button type="button" className="button subtle full" disabled={pending} onClick={() => { setRange({ startDate: '', endDate: '' }); setSelectingEnd(false) }}>Clear dates</button><p className="schedule-note">Scheduled availability does not guarantee an earlier loan will return on time. </p>
       {user ? <form onSubmit={event => void submit(event)} noValidate className="booking-form"><label htmlFor="booking-purpose">Project purpose</label><p id="purpose-hint">Describe your project in 5–500 characters.</p><textarea id="booking-purpose" value={purpose} disabled={pending} aria-describedby={`purpose-hint${submitError?.fields?.purpose ? ' purpose-error' : ''}`} aria-invalid={!!submitError?.fields?.purpose} onChange={event => setPurpose(event.target.value)} />{submitError?.fields?.purpose && <p id="purpose-error" className="field-error">{submitError.fields.purpose}</p>}{submitError && <div role="alert" className="form-alert">{submitError.message}{submitError.unavailableDates?.length ? <p>Unavailable dates: {submitError.unavailableDates.join(', ')}</p> : null}{submitError.fields?.startDate && <p>{submitError.fields.startDate}</p>}{submitError.fields?.endDate && <p>{submitError.fields.endDate}</p>}</div>}{success && <div role="status" className="success-notice">{success}<a href="#/reservations">View my reservations</a></div>}<button type="submit" ref={requestButton} className="button primary full" disabled={pending || asset.state === 'maintenance'}>{pending ? 'Submitting request…' : 'Request equipment'}</button>{demoControls && <><button type="button" className="button subtle full" disabled={pending} onClick={() => { demoControls?.simulateConflict(); setSuccess(''); setSubmitError(null) }}>Simulate next-request conflict</button><button type="button" className="button subtle full" disabled={pending} onClick={() => { demoControls?.simulateFailure(); setSuccess(''); setSubmitError(null) }}>Simulate next-request failure</button><p className="schedule-note">Demo conflict reserves your next start day before submission, like another request arriving first.</p></>}</form> : <a className="button primary full" href={`#/signin?returnTo=${encodeURIComponent(`assets/${assetId}`)}`}>Sign in to request equipment</a>}
     </section></div>

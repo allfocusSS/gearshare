@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, selectedIssue } from './support/ux.mjs'
 const suite = { mode: 'mock', base: 'http://127.0.0.1:6243', output: outputFolder('mock-ux'), records: [] }
 let server, browser
 before(async () => {
@@ -37,9 +37,11 @@ suite.fresh = async (width, name, options = {}) => {
     }
   })
   const today = clubToday()
-  return { page, context, width, name, today, day: addDays(today, 20) }
+  return { page, context, width, name, today, day: addDays(today, 20), assetId: 'camera-01' }
 }
-suite.conflict = async t => t.page.getByRole('button', { name: 'Simulate next-request conflict', exact: true }).click()
+suite.conflict = async (t, day) => t.page.getByRole('button', { name: 'Simulate next-request conflict', exact: true }).click()
+suite.otherAsset = async () => 'camera-02'
 suite.fail = async t => t.page.getByRole('button', { name: 'Simulate next-request failure', exact: true }).click()
 describe('issue #31 — mock shared date validation (includes 31.10)', { skip: !selectedIssue(31), concurrency: false }, () => issue31(suite))
 describe('issue #32 — mock focus after the booking request settles (includes 32.12)', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))
+describe('issue #36 — mock calendar month across the availability refresh (includes 36.9)', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
