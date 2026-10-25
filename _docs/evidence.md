@@ -1118,7 +1118,7 @@ Checks on the candidate commit, from `frontend/`:
 | `npm run test:browser:labels` | exit 0, 448 of 448 checks |
 | `npm run test:browser:http`, `:http:staff` (real stack) | all 19 and all 21 checks passed |
 | `node tests/qa25.browser.mjs` | exit 0, 4 controlled groups passed unchanged |
-| `node tests/qa28.browser.mjs` (needs a committed `src`; run on `9a98ed3`, whose `frontend/src` equals the candidate's, the amend only added this evidence) | exit 0, 635 of 635 checks |
+| `node tests/qa28.browser.mjs` (needs a committed `src`; run on the pre-amend commit of `0249fb7`, whose `frontend/src` is identical, the amend only added this evidence) | exit 0, 635 of 635 checks |
 | `npm run test:browser:http:ux` (all blocks: #31 + #32) | 50 tests, 50 pass |
 | `npm run test:browser:ux` (all blocks: #31 + #32) | 46 tests, 46 pass |
 
@@ -1174,7 +1174,7 @@ Checks on the candidate commit, from `frontend/`:
 | `npm run test:browser:labels` | exit 0, 448 of 448 checks |
 | `npm run test:browser:http`, `:http:staff` (real stack) | all 19 and all 21 checks passed |
 | `node tests/qa25.browser.mjs` | exit 0, 4 controlled groups passed unchanged |
-| `node tests/qa28.browser.mjs` (needs a committed `src`; run on `2a7904c`, whose `frontend/src` equals the candidate's) | exit 0, 635 of 635 checks |
+| `node tests/qa28.browser.mjs` (needs a committed `src`; run on the pre-amend commit of `360b161`, whose `frontend/src` is identical) | exit 0, 635 of 635 checks |
 | `npm run test:browser:http:ux` (blocks #31, #32, #36, #37) | 142 tests, 140 pass, 0 fail, 2 TODO |
 | `npm run test:browser:ux` (blocks #31, #32, #36, #37) | 64 tests, 64 pass |
 
