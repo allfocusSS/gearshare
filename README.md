@@ -111,6 +111,13 @@ npm run test:browser:http         # #13: identity, session/401, catalogue, failu
 npm run test:browser:http:staff   # #14: student request -> approve -> checkout -> return, conflicts, stale versions, inventory, outages
 ```
 
+The #15 usability regressions (#31 onwards) have one issue-filterable block per bug in two suites that share `frontend/tests/support/ux.mjs`: `npm run test:browser:http:ux` (real stack, ports 6241/6242, evidence in ignored `frontend/test-results/http-ux/`) and `npm run test:browser:ux` (explicit mock adapter, port 6243, `frontend/test-results/mock-ux/`). Narrow a run with `UX_ISSUES=32,36` (issue numbers) and `UX_CASES=32.1,32.4` (exact QA case numbers); the cheap helper and stylesheet checks run in `npm test` (`tests/ux.test.mjs`). Both need the usual Chromium (`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`); the real-stack one also needs `uv`.
+
+```sh
+UX_ISSUES=32 npm run test:browser:http:ux   # example: only the #32 focus cases on the real stack
+UX_ISSUES=32 npm run test:browser:ux        # the same issue on the mock adapter
+```
+
 
 ## Start here
 

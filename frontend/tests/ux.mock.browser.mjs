@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, selectedIssue } from './support/ux.mjs'
 const suite = { mode: 'mock', base: 'http://127.0.0.1:6243', output: outputFolder('mock-ux'), records: [] }
 let server, browser
 before(async () => {
@@ -11,14 +11,14 @@ before(async () => {
   browser = await launchBrowser()
 })
 after(async () => { writeJson(suite.output, 'evidence.json', suite.records); await browser?.close(); server?.kill() })
-suite.fresh = async (width, name) => {
+suite.fresh = async (width, name, options = {}) => {
   // Every fresh browser context has its own isolated mock store, fresh unit and student.
   const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'en-US', timezoneId: 'Asia/Almaty' })
   const page = await context.newPage()
   page.setDefaultTimeout(10_000)
   const h = createHelpers(page, suite.base)
   const student = newStudent('ux31mock')
-  if (name.startsWith('31.10 ')) {
+  if (options.maya || name.startsWith('31.10 ')) {
     await page.goto(`${suite.base}/#/signin?returnTo=assets/camera-01`)
     await page.getByRole('button', { name: 'Fill student credentials', exact: true }).click()
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -42,3 +42,4 @@ suite.fresh = async (width, name) => {
 suite.conflict = async t => t.page.getByRole('button', { name: 'Simulate next-request conflict', exact: true }).click()
 suite.fail = async t => t.page.getByRole('button', { name: 'Simulate next-request failure', exact: true }).click()
 describe('issue #31 — mock shared date validation (includes 31.10)', { skip: !selectedIssue(31), concurrency: false }, () => issue31(suite))
+describe('issue #32 — mock focus after the booking request settles (includes 32.12)', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))

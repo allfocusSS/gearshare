@@ -1086,3 +1086,42 @@ Real-stack cases use unique API-created units and students, future dates, and ac
 All four actual empty-submit screenshots (HTTP/mock × 390/1440) were opened and inspected. Date errors sit below their controls; purpose error and summary remain present; text has no clipping/overlap. Committed checks additionally measure viewport/page width equality, error rectangles and ancestor clipping, matching described-by tokens, unique IDs, and the fully visible 44 px-high action. Regenerable images and actual field/geometry logs are in ignored `frontend/test-results/http-ux/` and `mock-ux/` (`31-empty-<mode>-<width>.png`, `evidence.json`).
 
 This scoped frontend change does not repeat the unchanged 1262-case backend campaign. Focus (#32), calendar month (#36), text size (#42) and other groomed #15 defects remain separate. No new product defect was found during this scope. Engineer verification is not an independent QA verdict; #31 stays open until the committed candidate is published and freshly verified by QA.
+
+## Iteration 5 — #15 part A: bugs #31, #32, #36, #37, #38 (engineer candidate)
+
+Part A of two engineer sessions for [#15](https://github.com/allfocusSS/gearshare/issues/15): bugs #31, #32, #36, #37 and #38 plus the shared regression suites. Parent of this work: `00e4fd68ecfe05978e64c2bb7fd1f3af66f23a28` (`main`, "Show associated booking date response errors — Refs #31"). One `Refs #N` + `Refs #15` commit per bug; nothing was closed, and these runs are engineer evidence, not an independent QA verdict.
+
+**#31 was adopted unchanged.** Another engineer session had already fixed #31, and independent QA had passed and closed it on `00e4fd6` before this session resumed (a rate limit interrupted this session after it had built an overlapping #31 implementation and suites). Re-committing #31 would have invalidated that PASS, so this session discarded its parallel version (backed up outside the repository, byte-compared), fast-forwarded to `00e4fd6` and extended that commit's `node:test`/`issueNN(suite)` architecture instead. `UX_ISSUES=31 npm run test:browser:http:ux` on the reconciled tree: 28 passed, 0 failed. QA's 31.13 stays inapplicable as recorded there.
+
+Environment (actual, not the pinned toolchain): Node v22.22.0, npm 10.9.4, uv 0.11.32, backend Python 3.12.3 (`uv run`), Playwright 1.62.1, Chromium 153.0.8010.0 (`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`), Linux 6.18.44. The README pins Node 24, npm 11 and uv 0.12.23; this sandbox has the versions above, so the runs are a deviation from the pinned toolchain, as QA's baselines also were. Club date during the runs: 2026-10-26 (Asia/Almaty).
+
+### #32 — focus after the booking request settles
+
+**Red (fix's parent, `00e4fd6`, application source unchanged).** Commands, from `frontend/`: `UX_ISSUES=32 npm run test:browser:http:ux` and `UX_ISSUES=32 npm run test:browser:ux`.
+
+- Real stack: 22 tests, 6 passed, 16 failed. Every [FAIL-NOW] case failed at both widths with the focus oracle, for example `keyboard submit (http @1440): focus is on BODY, expected {"id":"booking-purpose","tag":"TEXTAREA"}`, `empty form ...: focus is on BODY, expected #detail-startDate`, `start only ...: expected #detail-endDate`, `409`, `lost connection` and `success`: BODY, expected the "Request equipment" button; `401`: BODY, expected the "Sign in again" link, at 390 and 1440. 32.4 failed at its first landing assertion. The guards 32.9, 32.10 and 32.11 passed at both widths, as QA reported.
+- Mock adapter: 18 tests, 2 passed (32.11), 16 failed with the same BODY outcomes. In that first mock run 32.7 failed for a test-code reason (a selector matching the app-level "Demo account created" notice as well as the booking notice) instead of the focus; the selector was scoped to `.booking-form` and `UX_ISSUES=32 UX_CASES=32.5,32.7 npm run test:browser:ux` then failed 4 of 4 with `focus is on BODY, expected {"tag":"BUTTON","name":"Request equipment"}`.
+
+**Fix.** `AssetDetailPage.tsx`: `submit()` records the outcome of each settled request once (`restoreFocus`: `'field'` for a response with field errors, `'button'` for success and every other failure, nothing for a 401 because that removes the form). An effect keyed on `pending` runs after React has committed the enabled controls; if focus is on `body`, on the request button, removed or disabled it moves focus once, to the first `[aria-invalid="true"]` enabled input or textarea in DOM order inside the availability panel (Start date, End date, purpose) after a field failure, otherwise to the enabled "Request equipment" button. Focus the user placed elsewhere (the skip link in 32.10) and route changes (the component is gone) are left alone; opening another asset resets the intent. `App.tsx`: a 401 session-end event after the first session check sets an intent; an effect on the new notice moves focus once to the "Sign in again" link (or `h1#main-content` when there is none) if focus was dropped; an expired token found by the very first session check does not move focus. This is the shared 401 code groomed for #32 and #35; #35 only verifies it. No service interface, API, backend, `openapi.yml`, message or style changed.
+
+**Green (candidate commit).** `UX_ISSUES=32 npm run test:browser:http:ux`: 22 of 22 passed; `UX_ISSUES=32 npm run test:browser:ux`: 18 of 18 passed. Mutation check for the 32.10 guard: with the "user already moved" test removed from the effect, `UX_ISSUES=32 UX_CASES=32.10` failed at both widths (`focus is textarea#booking-purpose "Project purpose", expected <a>`), then the fix was restored.
+
+Deviations from QA's case text: 32.4 counts `focusin` on `#booking-purpose` and asserts exactly 1 after the first landing, still 1 after Tab plus 1 s, 2 after the user's own Shift+Tab, still 2 after typing plus 1 s, and 3 after the second failed submit (QA's wording would count the user's Shift+Tab as a pull-back); 32.1 types `abc` after `no`, which makes a valid five-character purpose, so the case overwrites the field before its pointer iteration; 32.9, 32.10 and 32.8 run on the real stack only (the mock has no request delay and never ends a session; stated, not skipped silently); 32.12 runs on the mock only, signed in as `maya_student`. 32.2 and 32.3 are no longer blocked because #31 is on `main`.
+
+Checks on the candidate commit, from `frontend/`:
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | 218 tests, 218 pass, 0 fail (214 before, plus the 4 `ux.test.mjs` checks) |
+| `npm run typecheck`, `npm run build` | exit 0; build 307.11 kB JS / 34.70 kB CSS |
+| `npm run test:browser`, `:catalogue`, `:bookings`, `:resources`, `:staff` (mock) | all exit 0 (26 checks, 28 checks, the bookings journey, the resources icon checks, 8 groups) |
+| `npm run test:browser:labels` | exit 0, 448 of 448 checks |
+| `npm run test:browser:http`, `:http:staff` (real stack) | all 19 and all 21 checks passed |
+| `node tests/qa25.browser.mjs` | exit 0, 4 controlled groups passed unchanged |
+| `node tests/qa28.browser.mjs` (needs a committed `src`; run on `9a98ed3`, whose `frontend/src` equals the candidate's, the amend only added this evidence) | exit 0, 635 of 635 checks |
+| `npm run test:browser:http:ux` (all blocks: #31 + #32) | 50 tests, 50 pass |
+| `npm run test:browser:ux` (all blocks: #31 + #32) | 46 tests, 46 pass |
+
+The backend was not touched, so `uv lock --check` and `pytest` were not repeated for this commit. Servers and browsers were started by each harness and no vite, uvicorn or Chromium process was left running afterwards.
+
+Limits: Chromium only (not Firefox or Safari, where a focused control that becomes disabled can keep `document.activeElement`; the effect also treats focus on the request button itself as dropped, so those engines still reach the same target); the real clock decides the booking dates (units are unique per case); focus is asserted on `document.activeElement`, not screen-reader output.

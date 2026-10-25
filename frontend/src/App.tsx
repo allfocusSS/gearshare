@@ -37,15 +37,20 @@ export function App() {
   const requestId = useRef(0)
   const sessionEnded = useRef(false)
   const mainHeading = useRef<HTMLHeadingElement>(null)
+  const sessionLink = useRef<HTMLAnchorElement>(null)
+  const focusSessionNotice = useRef(false)
+  const loadingSession = useRef(true)
 
   async function refreshSession() {
     const id = ++requestId.current
+    loadingSession.current = true
     setLoading(true)
     setError('')
     const result = await gearShareService.currentUser()
     if (id !== requestId.current) return
     if (result.ok) setUser(result.data)
     else setError(result.error.message)
+    loadingSession.current = false
     setLoading(false)
   }
 
@@ -58,10 +63,22 @@ export function App() {
   // cleared its token, so clear the user and say why. Pages then offer sign-in with their own return navigation.
   useEffect(() => subscribeToSessionEnd((event) => {
     sessionEnded.current = true
+    // Focus moves only for a 401 that arrives after the first session check (not for an expired token found at startup).
+    focusSessionNotice.current = event.reason === 'unauthenticated' && !loadingSession.current
     setUser(null)
     setMessage('')
     setSessionNotice({ reason: event.reason, text: event.message })
   }), [])
+
+  // A 401 removes the form or rows the user was working in, which drops keyboard focus (focus rule 5): move it once to
+  // "Sign in again", or to the page heading when the alert has no such link. Focus the user already holds stays.
+  useEffect(() => {
+    if (!sessionNotice || !focusSessionNotice.current) return
+    focusSessionNotice.current = false
+    const active = document.activeElement
+    if (active && active !== document.body && active.isConnected && !active.matches(':disabled')) return
+    ;(sessionLink.current ?? mainHeading.current)?.focus()
+  }, [sessionNotice])
 
   useEffect(() => {
     const changed = () => { setLocation(locationRoute()); mainHeading.current?.focus() }
@@ -125,7 +142,7 @@ export function App() {
       <header className="topbar"><div><span className="topbar-context">WORKSPACE <span>/</span></span><h1 ref={mainHeading} tabIndex={-1} id="main-content">{titles[route]}</h1></div><div className="account-area">{user ? <><span className="avatar" aria-hidden="true">{user.username.slice(0, 1).toUpperCase()}</span><span className="account-name">{user.username}<small>{user.role}</small></span><button type="button" className="button secondary" onClick={() => void logout()} disabled={pending || loading}>{pending ? 'Signing out…' : 'Sign out'}</button></> : <a className="button secondary" href={`#/signin?returnTo=${encodeURIComponent(signInReturn)}`}>Sign in<Icon name="arrow" /></a>}</div></header>
       <main className="main-content" aria-labelledby="main-content">
         {isMockMode && <DemoControls scenario={scenario} onChange={changeScenario} disabled={loading || pending} today={clubToday()} />}
-        {sessionNotice && <div className="service-notice" role="alert"><span>{sessionNotice.text}</span>{sessionNotice.reason === 'unauthenticated' && route !== 'signin' && route !== 'register' && <a className="button secondary" href={`#/signin?returnTo=${encodeURIComponent(signInReturn)}`}>Sign in again</a>}</div>}
+        {sessionNotice && <div className="service-notice" role="alert"><span>{sessionNotice.text}</span>{sessionNotice.reason === 'unauthenticated' && route !== 'signin' && route !== 'register' && <a ref={sessionLink} className="button secondary" href={`#/signin?returnTo=${encodeURIComponent(signInReturn)}`}>Sign in again</a>}</div>}
         {message && <div className="success-notice" role="status"><Icon name="check" />{message}</div>}
         {error && <div className="service-notice" role="alert"><span>{error}</span><button className="button secondary" type="button" disabled={loading || pending} onClick={() => void refreshSession()}>Retry session</button></div>}
         {loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" /><span>{isMockMode ? 'Loading your demo workspace…' : 'Loading your workspace…'}</span></div> : restricted ? <section className="workspace-placeholder"><span className="placeholder-icon"><Icon name="desk" /></span><p className="eyebrow">Coordinator access</p><h2>Sign in as a coordinator.</h2><p>{isMockMode ? 'This workspace is available to the fictional coordinator account.' : 'This workspace is available to coordinator accounts.'}</p><a className="button primary" href={`#/signin?returnTo=${route}`}>Go to sign in<Icon name="arrow" /></a></section> : route === 'signin' || route === 'register' ? <AuthPage key={`${route}-${scenario}`} register={route === 'register'} service={gearShareService} onPending={(value) => { setPending(value); if (value) setMessage('') }} onSuccess={signedIn} returnTo={returnTo} /> : route === 'explore' ? <CataloguePage service={gearShareService} /> : route === 'asset' ? <AssetDetailPage key={assetId} assetId={assetId} service={gearShareService} user={user} /> : route === 'reservations' ? <ReservationsPage service={gearShareService} user={user} /> : route === 'desk' ? <CoordinatorPage service={gearShareService} /> : <InventoryPage service={gearShareService} />}
