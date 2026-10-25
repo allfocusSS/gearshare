@@ -1179,3 +1179,34 @@ Checks on the candidate commit, from `frontend/`:
 | `npm run test:browser:ux` (blocks #31, #32, #36, #37) | 64 tests, 64 pass |
 
 Limits: the Explore, desk and Inventory checks look for text that runs past the viewport or a clipping ancestor and for page overflow; they do not check that wrapped text is readable at every size, and the sweep uses a shared database, so Explore also lists the earlier cases' long units. The 37.12 classification is geometric (panel left edge against the column right edge), not a read of the media query. Backend untouched, not re-run.
+
+### #38 — long unbroken equipment names on My reservations
+
+**Red (fix's parent, `360b161`, application source unchanged).** `UX_ISSUES=38 npm run test:browser:http:ux`: 50 tests, 26 passed, 24 failed. The 26 passes are QA's guards: the 30 x `a` and normal names at all four widths (8), the 40 x `a` name at 1100 and 1440 px in 38.1, 38.4, 38.5 and 38.6 (8), the notices at 390 and 1440 px (2), the 600/601 px layout (4) and the coordinator desk at all four widths (4). The failures reproduce QA's table, `documentElement.scrollWidth / clientWidth`: name of 40 x `a` 488/390 and 831/768, name of 100 x `W` 2035/390, 2378/768, 2378/1100 and 2390/1440, on Upcoming (38.1, 38.2) and on History (38.5, the same numbers); the details panel (38.6) fails on the same overflow at 390 px (both names) and at 768 px (40 x `a`), and for the 100 x `W` name at 768, 1100 and 1440 px because the panel leaves the viewport; 38.4 fails because the row facts ("2 Dec 2026 – 2 Dec 2026", the 14, 15, 16 and 17 Dec ranges) leave the viewport and, for the 40 x `a` name at 768 px, "View details" sits at x 727-806 in a 768 px page. `UX_ISSUES=38 npm run test:browser:ux` (mock, units added through its Inventory form, requested as `maya_student`): 4 tests, 1 passed (40 x `a` at 1440 px, as in the real stack), 3 failed with 488/390, 2035/390 and 2390/1440. `node --test tests/ux.test.mjs`: 6 tests, 5 passed, 1 failed (the 38 stylesheet check: `.reservation-row h3: no wrapping declaration along .reservation-row h3 < .reservation-row > div < .reservation-row (found null)`), run on a scratch copy of the parent's `frontend/src`.
+
+**Fix.** `styles.css`: `.reservation-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }` (the implicit `auto` track grew with the name) and `.reservation-row > div { min-width: 0; overflow-wrap: anywhere; }` (the flex child that holds the name, dates, badge and hint can shrink and wraps at any character). The row's flex direction, the 600 px breakpoint, gaps, button size, the details panel (which already wrapped) and the event timeline are unchanged; nothing is truncated or clipped. Screenshots of the fixed page at 390 and 1440 px with a 100 x `W` name and the details panel open were opened: the name wraps inside the row, "View details" stays in view (below the text at 390 px, beside it at 1440 px) and the panel name wraps inside the panel (not committed).
+
+**Green (candidate commit).** `UX_ISSUES=38 npm run test:browser:http:ux`: 50 of 50. `UX_ISSUES=38 npm run test:browser:ux`: 4 of 4. `node --test tests/ux.test.mjs`: 6 of 6.
+
+**Harness defect found by the first full run, fixed in the same commit.** The first all-issues `npm run test:browser:http:ux` on the committed tree failed all 50 #38 cases (192 tests, 140 passed, 50 failed, 2 TODO) with `{"code":"VALIDATION_ERROR",... "startDate":"Choose a date within the next 90 days."}` (422 !== 201): `suite.fresh` booked `20 + n` days ahead (from #31's adopted harness) and the case counter `n` had passed 70 by the time the #38 block ran. Alone, `UX_ISSUES=38` never reached that counter. The offset is now `20 + 1 + ((n - 1) % 60)` (21 to 80 days, identical to before for the first 60 cases; each case has its own unit, so reusing an offset cannot collide). It only affects the real-stack harness; the mock suite does not use it. Part B's blocks will need it as the counter grows.
+
+Deviations from QA's case text: 38.1 to 38.6 and 38.10 run at 390, 768, 1100 and 1440 px (the widths that pass before the fix are guards); 38.8 runs at 390 and 1440 px; 38.9 adds 600 and 601 px to pin the breakpoint; 38.10 uses a fresh unit per case and a separate coordinator browser context; 38.7 (complete text, no ellipsis or clipping ancestor) is asserted first inside every row check rather than as a case of its own; 38.11 repeats 38.1 and 38.2 at 390 and 1440 px only, and its rows are filtered by name because `maya_student` has seeded reservations, which must fit too; the My reservations screens of the 12-screen sweep are covered by these cases and 37.9 covers the other nine.
+
+### Part A final results
+
+Final tree: `frontend/src` equals the #38 fix commit `51d971d` (the commit that adds this section only changes tests and Markdown). Commands from `frontend/`, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`; the committed-implementation suites (`labels`, `qa25`, `qa28`) ran on the committed tree, the others before the commit on the identical `src` and, for the two UX suites, after it.
+
+| Command | Actual result |
+| --- | --- |
+| `npm test` | 220 tests, 220 pass, 0 fail |
+| `npm run typecheck`, `npm run build` | exit 0; build 307.53 kB JS / 34.81 kB CSS |
+| `npm run test:browser`, `:catalogue`, `:bookings`, `:resources`, `:staff` (mock) | all exit 0 (26 checks, 28 checks, the bookings journey, the resources icon checks, 8 groups) |
+| `npm run test:browser:labels` | exit 0, 448 of 448 checks |
+| `npm run test:browser:http`, `:http:staff` (real stack) | all 19 and all 21 checks passed |
+| `node tests/qa25.browser.mjs` | exit 0, 4 controlled groups passed unchanged |
+| `node tests/qa28.browser.mjs` | exit 0, 635 of 635 checks |
+| `npm run test:browser:http:ux` (blocks #31, #32, #36, #37, #38) | 192 tests, 190 pass, 0 fail, 2 TODO (the Explore clipping, #44) |
+| `npm run test:browser:ux` (blocks #31, #32, #36, #37, #38) | 68 tests, 68 pass |
+
+Limits: Chromium only (no Firefox or Safari); the toolchain deviates from the pinned versions (see above); the row and panel assertions measure boxes and text extents, not readability at every size; the first `test:browser:http:ux` run listed above failed before the harness fix and was rerun, not hidden; the `setMonth(null)` reset in #36's load effect is defensive and no browser case reaches it; backend untouched, not re-run; none of these runs is an independent QA verdict and no issue was closed.
+

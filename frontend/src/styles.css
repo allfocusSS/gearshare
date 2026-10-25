@@ -353,9 +353,11 @@ h1 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .booking-form textarea { min-height: 110px; resize: vertical; width: 100%; border: 1px solid var(--divider, #DCE0E3); border-radius: 8px; padding: 12px; font: inherit; }
 .booking-form p { margin: 0; }
 .reservation-tabs { display: flex; gap: 8px; margin: 24px 0; }
-.reservation-list { display: grid; gap: 12px; }
+.reservation-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .reservation-row, .reservation-detail { background: white; border: 1px solid #DCE0E3; border-radius: 12px; padding: 24px; }
 .reservation-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+/* The equipment name is typed by the coordinator: the text column can shrink and wraps at any character (design-system.md). */
+.reservation-row > div { min-width: 0; overflow-wrap: anywhere; }
 .reservation-row h3 { margin-top: 0; }
 .reservation-detail { margin-top: 24px; overflow-wrap: anywhere; }
 .event-timeline li { border-left: 2px solid #DCE0E3; padding: 12px; margin: 12px 0; }

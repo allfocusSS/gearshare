@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, issue37, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, issue37, issue38, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -40,7 +40,30 @@ suite.fresh = async (width, name, options = {}) => {
   else await page.getByRole('link', { name: 'Sign in to request equipment', exact: true }).waitFor()
   const today = (await api(stack, `/api/v1/assets/${unit.json.id}/availability`)).json.today
   assert.equal(today, clubToday())
-  return { page, context, width, name, today, day: addDays(today, 20 + n), assetId: unit.json.id, token: registration.json.token, student, unit: unit.json }
+  // Dates stay inside the 90 day booking horizon however many cases ran before: 21..80 days ahead, wrapping every 60 cases
+  // (each case has its own unit, so reusing an offset cannot collide).
+  const day = addDays(today, 20 + 1 + ((n - 1) % 60))
+  let booking = null
+  if (options.reserve) {
+    // One reservation for the case student through the API ('cancelled' also cancels it, for the History tab).
+    const made = await api(stack, '/api/v1/bookings', { method: 'POST', token: registration.json.token, body: { assetId: unit.json.id, startDate: day, endDate: day, purpose: 'Reservation for the layout check' } })
+    assert.equal(made.status, 201, JSON.stringify(made.json))
+    booking = made.json
+    if (options.reserve === 'cancelled') {
+      const cancelled = await api(stack, `/api/v1/bookings/${booking.id}/cancel`, { method: 'POST', token: registration.json.token, body: { expectedVersion: booking.version } })
+      assert.equal(cancelled.status, 200, JSON.stringify(cancelled.json))
+      booking = cancelled.json
+    }
+  }
+  return { page, context, width, name, today, day, assetId: unit.json.id, token: registration.json.token, student, unit: unit.json, booking }
+}
+/** A page of the same browser signed in as the coordinator (its own context, same viewport width). */
+suite.coordinatorPage = async t => {
+  const context = await browser.newContext({ viewport: { width: t.width, height: 900 }, locale: 'en-US', timezoneId: 'Asia/Almaty' })
+  await context.addInitScript(({ key, token }) => sessionStorage.setItem(key, token), { key: TOKEN_KEY, token: coordinatorToken })
+  const page = await context.newPage()
+  page.setDefaultTimeout(10_000)
+  return page
 }
 /**
  * Bookings for the desk screens of the #37/#38 sweeps, made through the API for the case student: a pending request, an
@@ -88,3 +111,4 @@ describe('issue #31 — associated server date validation', { skip: !selectedIss
 describe('issue #32 — focus after the booking request settles', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))
 describe('issue #36 — calendar month across the availability refresh', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
 describe('issue #37 — long unbroken equipment text on the asset detail page', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))
+describe('issue #38 — long unbroken equipment names on My reservations', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))

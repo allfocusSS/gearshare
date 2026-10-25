@@ -83,4 +83,14 @@ describe('user-entered text wrapping in styles.css', () => {
     assert.equal(declarationsFor(styles, '.asset-identity')['min-width'], '0', '.asset-identity is a grid item and must be allowed to shrink')
     assert.equal(declarationsFor(styles, '.asset-detail-grid', { media: '@media (max-width: 1099px)' })['grid-template-columns'], 'minmax(0, 1fr)', 'the one-column layout (up to 1099 px) uses minmax(0, 1fr)')
   })
+
+  it('38 My reservations: the list track and the row text column can shrink, and the name wraps at any character', () => {
+    const found = wrapChain(styles, ['.reservation-row h3', '.reservation-row > div', '.reservation-row'])
+    assert.equal(found.ok, true, `.reservation-row h3: no wrapping declaration along .reservation-row h3 < .reservation-row > div < .reservation-row (found ${found.selector})`)
+    assert.equal(declarationsFor(styles, '.reservation-row > div')['min-width'], '0', 'the flex child that holds the text must be allowed to shrink')
+    assert.match(declarationsFor(styles, '.reservation-list')['grid-template-columns'] ?? '', /^minmax\(0, 1fr\)$/, 'the list is a grid whose single track must not grow with a long name')
+    // The side-by-side (601 px and up) and stacked (600 px and below) row layouts stay as they were.
+    assert.equal(declarationsFor(styles, '.reservation-row')['flex-direction'] ?? 'row', 'row')
+    assert.equal(declarationsFor(styles, '.reservation-row', { media: '@media (max-width: 600px)' })['flex-direction'], 'column')
+  })
 })

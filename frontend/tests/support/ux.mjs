@@ -1046,6 +1046,179 @@ async function sweep(t, suite) {
   return failures
 }
 
+// ---- #38: long unbroken equipment names on My reservations ------------------------------------------------------------------
+
+export const LIST_WIDTHS = [390, 768, 1100, 1440]
+
+/** Rows, their text boxes and the details panel of My reservations in one browser round trip. */
+function measureReservations(page) {
+  return page.evaluate(() => {
+    const main = document.querySelector('main')
+    const textRight = element => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
+      return rects.length ? Math.max(...rects.map(rect => rect.right)) : null
+    }
+    const box = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height } }
+    const hiddenAncestors = element => {
+      const found = []
+      for (let ancestor = element.parentElement; ancestor && ancestor !== main.parentElement; ancestor = ancestor.parentElement) {
+        if (['hidden', 'clip'].includes(getComputedStyle(ancestor).overflowX)) found.push(ancestor.className || ancestor.tagName)
+      }
+      return found
+    }
+    const heading = element => ({ ...box(element), textRight: textRight(element), scrollWidth: element.scrollWidth, clientWidth: element.clientWidth, textContent: element.textContent, textOverflow: getComputedStyle(element).textOverflow, hidden: hiddenAncestors(element) })
+    const detail = document.querySelector('section.reservation-detail')
+    return {
+      doc: { scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, innerWidth },
+      rows: [...document.querySelectorAll('.reservation-row')].map(row => {
+        const button = row.querySelector('button')
+        return {
+          row: box(row), direction: getComputedStyle(row).flexDirection, h3: heading(row.querySelector('h3')),
+          button: { ...box(button), name: button.textContent },
+          lines: [...row.querySelectorAll('p, .availability-badge')].map(element => ({ ...box(element), text: element.textContent })),
+        }
+      }),
+      detail: detail ? { ...box(detail), h3: heading(detail.querySelector(':scope > h3')) } : null,
+      notices: [...document.querySelectorAll('.success-notice, .service-notice')].map(element => ({ ...box(element), text: element.textContent.slice(0, 60) })),
+    }
+  })
+}
+
+const openReservations = async (t, { history = false } = {}) => {
+  await t.page.evaluate(() => { location.hash = '/reservations' })
+  await t.page.getByRole('heading', { name: 'Plan. Collect. Create.', level: 2 }).waitFor()
+  if (history) await t.page.getByRole('button', { name: 'History', exact: true }).click()
+  await t.page.locator('.reservation-row').first().waitFor()
+  await settle(t.page, 250)
+}
+
+/** QA 38.1-38.3, 38.5 and 38.7: every row stays inside the viewport and wraps its full name. */
+async function assertRows(t, name, label) {
+  const m = await measureReservations(t.page)
+  // The real stack student has exactly this reservation; the mock's maya_student also has seeded ones, which must fit too.
+  const own = m.rows.filter(row => row.h3.textContent === name)
+  assert.equal(own.length, 1, `${label}: exactly one row shows the complete name "${name.slice(0, 12)}..." (rows: ${m.rows.map(row => row.h3.textContent.slice(0, 12)).join(', ')})`)
+  for (const row of own) {
+    // 38.7 complete names, no ellipsis, no clipping ancestor (first, they are guards).
+    assert.notEqual(row.h3.textOverflow, 'ellipsis', `${label}: no ellipsis`)
+    assert.deepEqual(row.h3.hidden, [], `${label}: no clipping ancestor`)
+  }
+  assert.equal(m.doc.scrollWidth, m.doc.clientWidth, `${label}: horizontal page overflow ${JSON.stringify(m.doc)}`)
+  for (const row of m.rows) {
+    assert.ok(row.row.left >= -0.5 && row.row.right <= m.doc.innerWidth + 0.5, `${label}: row ${Math.round(row.row.left)}-${Math.round(row.row.right)} leaves the ${m.doc.innerWidth}px viewport`)
+    assert.ok(row.h3.scrollWidth <= row.h3.clientWidth, `${label}: the name spills its own box (${row.h3.scrollWidth} in ${row.h3.clientWidth})`)
+    assert.ok(row.h3.textRight <= row.row.right, `${label}: the name runs to ${Math.round(row.h3.textRight)} past the row edge ${Math.round(row.row.right)}`)
+  }
+  return m
+}
+
+const LIST_ROWS = [
+  ['38.1', 'FAIL-NOW', 'name of 40 x a', { name: 'a'.repeat(40) }],
+  ['38.2', 'FAIL-NOW', 'name of 100 x W', { name: 'W'.repeat(100) }],
+  ['38.3', 'GUARD', 'name of 30 x a', { name: 'a'.repeat(30) }],
+  ['38.3', 'GUARD', 'normal-length name', { name: 'Normal Camera Body' }],
+]
+
+export function issue38(suite) {
+  const longRows = LIST_ROWS.filter(([id]) => id !== '38.3')
+  const cases = []
+  for (const [id, tag, title, unit] of LIST_ROWS) {
+    cases.push([`${id} [${tag}] Upcoming: ${title}`, async t => { await openReservations(t); await assertRows(t, unit.name, id) }, { unit, reserve: true, widths: LIST_WIDTHS, modes: ['http'] }])
+  }
+  for (const [, , title, unit] of longRows) {
+    cases.push([`38.4 [FAIL-NOW] View details stays reachable and the row facts stay visible: ${title}`, async t => {
+      await openReservations(t)
+      await t.page.locator('#main-content').focus()
+      const button = t.page.getByRole('button', { name: `View details for ${unit.name}`, exact: true })
+      let reached = false
+      for (let presses = 0; presses < 20 && !reached; presses++) {
+        await t.page.keyboard.press('Tab')
+        reached = await button.evaluate(element => element === document.activeElement)
+      }
+      assert.equal(reached, true, '"View details" is reachable by Tab from the page heading')
+      const m = await measureReservations(t.page)
+      const row = m.rows.find(candidate => candidate.h3.textContent === unit.name)
+      assert.ok(row.button.left >= -0.5 && row.button.right <= m.doc.innerWidth + 0.5 && row.button.height >= 44, `"View details" ${JSON.stringify(row.button)} is inside the ${m.doc.innerWidth}px viewport and 44 px high`)
+      assert.equal(row.lines.length, 3, 'date range, status badge and cancellation hint are shown')
+      for (const line of row.lines) assert.ok(line.left >= -0.5 && line.right <= m.doc.innerWidth + 0.5, `"${line.text}" stays inside the viewport`)
+      assert.match(row.lines.map(line => line.text).join(' '), /pending/)
+      assert.match(row.lines.map(line => line.text).join(' '), /Cancellation available in details\./)
+    }, { unit, reserve: true, widths: LIST_WIDTHS, modes: ['http'] }])
+    cases.push([`38.5 [FAIL-NOW] History tab: ${title}`, async t => {
+      await openReservations(t, { history: true })
+      const m = await assertRows(t, unit.name, '38.5')
+      assert.match(m.rows[0].lines.map(line => line.text).join(' '), /cancelled/)
+    }, { unit, reserve: 'cancelled', widths: LIST_WIDTHS, modes: ['http'] }])
+    cases.push([`38.6 [FAIL-NOW] details panel: ${title}`, async t => {
+      await openReservations(t)
+      await t.page.getByRole('button', { name: `View details for ${unit.name}`, exact: true }).click()
+      await t.page.locator('section.reservation-detail').waitFor()
+      await settle(t.page, 250)
+      const m = await measureReservations(t.page)
+      assert.equal(m.detail.h3.textContent, unit.name, 'the panel name is complete')
+      assert.ok(m.detail.left >= -0.5 && m.detail.right <= m.doc.innerWidth + 0.5, `the details panel stays inside the ${m.doc.innerWidth}px viewport`)
+      assert.ok(m.detail.h3.scrollWidth <= m.detail.h3.clientWidth && m.detail.h3.textRight <= m.detail.right, 'the panel name wraps without spilling')
+      assert.equal(m.doc.scrollWidth, m.doc.clientWidth, `horizontal page overflow ${JSON.stringify(m.doc)}`)
+      assert.deepEqual(await clippedLongText(t.page, unit.name.slice(0, 20)), [], 'no long text clipped')
+    }, { unit, reserve: true, widths: LIST_WIDTHS, modes: ['http'] }])
+  }
+  // 38.8: the failure and success notices above a long-name list keep inside the viewport (390 px as in QA, and 1440 px).
+  cases.push(['38.8 [GUARD] notices above a long-name list fit the viewport', async t => {
+    const unit = t.unit
+    await openReservations(t)
+    await t.page.getByRole('button', { name: `View details for ${unit.name}`, exact: true }).click()
+    await t.page.getByRole('button', { name: 'Cancel reservation', exact: true }).waitFor()
+    await t.page.route('**/api/v1/bookings/*/cancel', route => route.abort('connectionreset'))
+    await t.page.getByRole('button', { name: 'Cancel reservation', exact: true }).click()
+    const retry = t.page.getByRole('button', { name: 'Retry reservations', exact: true })
+    await retry.waitFor()
+    await settle(t.page, 250)
+    let m = await measureReservations(t.page)
+    assert.ok(m.notices.length >= 1 && m.notices.every(notice => notice.left >= -0.5 && notice.right <= m.doc.innerWidth + 0.5), `retry alert ${JSON.stringify(m.notices)} fits the ${m.doc.innerWidth}px viewport`)
+    await t.page.unroute('**/api/v1/bookings/*/cancel')
+    await t.page.getByRole('button', { name: 'Cancel reservation', exact: true }).click()
+    await t.page.getByText('Reservation cancelled. The dates have been released.').waitFor()
+    await settle(t.page, 250)
+    m = await measureReservations(t.page)
+    assert.ok(m.notices.length >= 1 && m.notices.every(notice => notice.left >= -0.5 && notice.right <= m.doc.innerWidth + 0.5), `success notice ${JSON.stringify(m.notices)} fits the ${m.doc.innerWidth}px viewport`)
+  }, { unit: { name: 'W'.repeat(100) }, reserve: true, widths: [390, 1440], modes: ['http'] }])
+  // 38.9: the control row keeps its layout: side by side from 601 px, stacked up to 600 px.
+  cases.push(['38.9 [GUARD] the normal-name row is side by side from 601 px and stacked up to 600 px', async t => {
+    await openReservations(t)
+    const m = await measureReservations(t.page)
+    const [row] = m.rows
+    const stacked = t.width <= 600
+    assert.equal(row.direction, stacked ? 'column' : 'row', `flex-direction at ${t.width}px`)
+    if (stacked) assert.ok(row.button.top >= row.h3.bottom, `the button (top ${Math.round(row.button.top)}) is below the name (bottom ${Math.round(row.h3.bottom)})`)
+    else assert.ok(row.button.left >= row.h3.right - 0.5 && row.button.top < Math.max(...row.lines.map(line => line.bottom)), `the button (left ${Math.round(row.button.left)}) sits beside the text (right ${Math.round(row.h3.right)})`)
+    assert.ok(row.button.height >= 44 && row.button.left >= row.row.left && row.button.right <= row.row.right, 'the 44 px button is inside the row')
+    assert.equal(m.doc.scrollWidth, m.doc.clientWidth)
+  }, { unit: { name: 'Normal Camera Body' }, reserve: true, widths: [390, 600, 601, 1440], modes: ['http'] }])
+  // 38.10: the coordinator desk still wraps the same name (guard; the desk was never affected).
+  cases.push(['38.10 [GUARD] coordinator desk row and booking detail keep a 100 x W name inside the page', async t => {
+    const desk = await suite.coordinatorPage(t)
+    try {
+      await desk.goto(`${suite.base}/#/desk`)
+      await desk.locator(`#review-${t.booking.id}`).waitFor()
+      await settle(desk, 250)
+      assert.deepEqual(await overflowInfo(desk).then(sizes => sizes.scrollWidth === sizes.clientWidth), true, 'desk queue overflows')
+      assert.deepEqual(await clippedLongText(desk, 'WWWWWWWWWWWWWWWWWWWW'), [], 'desk queue clips text')
+      await desk.locator(`#review-${t.booking.id}`).click()
+      await desk.getByRole('heading', { name: 'Manage reservation', exact: true }).waitFor()
+      await settle(desk, 250)
+      assert.deepEqual(await overflowInfo(desk).then(sizes => sizes.scrollWidth === sizes.clientWidth), true, 'booking detail overflows')
+      assert.deepEqual(await clippedLongText(desk, 'WWWWWWWWWWWWWWWWWWWW'), [], 'booking detail clips text')
+    } finally { await desk.context().close() }
+  }, { unit: { name: 'W'.repeat(100) }, reserve: true, widths: LIST_WIDTHS, modes: ['http'] }])
+  // 38.11: the mock repeats 38.1 and 38.2 at 390 and 1440 px (units added through the Inventory form, requested as maya_student).
+  for (const [id, , title, unit] of longRows) {
+    cases.push([`38.11 [FAIL-NOW][MOCK] ${id} Upcoming: ${title}`, async t => { await openReservations(t); await assertRows(t, unit.name, '38.11') }, { unit, reserve: true, widths: [390, 1440], modes: ['mock'] }])
+  }
+  defineCases(suite, cases)
+}
+
 // ====================================================================================================================
 // PART B SECTIONS: #33, #34, #35, #39, #40, #41, #43, #42
 // ====================================================================================================================

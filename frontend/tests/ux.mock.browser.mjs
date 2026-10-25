@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, issue37, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, issue37, issue38, selectedIssue } from './support/ux.mjs'
 const suite = { mode: 'mock', base: 'http://127.0.0.1:6243', output: outputFolder('mock-ux'), records: [] }
 let server, browser, serial = 0
 before(async () => {
@@ -36,6 +36,20 @@ suite.fresh = async (width, name, options = {}) => {
     assetId = (await page.locator(`tr:has-text("${unit.inventoryCode}") [id^="edit-"]`).first().getAttribute('id')).slice('edit-'.length)
     unit = { ...unit, inventoryCode: unit.inventoryCode.toUpperCase() }
     await page.evaluate(id => { location.hash = `/assets/${id}` }, assetId)
+    if (options.reserve) {
+      // The mock store lives in this page load: sign out, sign in as maya_student and request the unit through the form.
+      await h.signOut()
+      await page.evaluate(id => { location.hash = `/signin?returnTo=assets/${id}` }, assetId)
+      await page.getByRole('button', { name: 'Fill student credentials', exact: true }).click()
+      await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+      await h.accountName().waitFor()
+      await page.getByRole('button', { name: 'Request equipment', exact: true }).waitFor()
+      await page.locator('#detail-startDate').fill(addDays(clubToday(), 20))
+      await page.locator('#detail-endDate').fill(addDays(clubToday(), 20))
+      await page.locator('#booking-purpose').fill('Reservation for the layout check')
+      await page.getByRole('button', { name: 'Request equipment', exact: true }).click()
+      await page.getByRole('link', { name: 'View my reservations', exact: true }).waitFor()
+    }
   } else if (options.maya || name.startsWith('31.10 ')) {
     await page.goto(`${suite.base}/#/signin?returnTo=assets/camera-01`)
     await page.getByRole('button', { name: 'Fill student credentials', exact: true }).click()
@@ -64,3 +78,4 @@ describe('issue #31 — mock shared date validation (includes 31.10)', { skip: !
 describe('issue #32 — mock focus after the booking request settles (includes 32.12)', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))
 describe('issue #36 — mock calendar month across the availability refresh (includes 36.9)', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
 describe('issue #37 — mock long unbroken equipment text (37.10)', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))
+describe('issue #38 — mock long unbroken equipment names on My reservations (38.11)', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))
