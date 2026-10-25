@@ -1194,7 +1194,7 @@ Deviations from QA's case text: 38.1 to 38.6 and 38.10 run at 390, 768, 1100 and
 
 ### Part A final results
 
-Final tree: `frontend/src` equals the #38 fix commit `51d971d` (the commit that adds this section only changes tests and Markdown). Commands from `frontend/`, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`; the committed-implementation suites (`labels`, `qa25`, `qa28`) ran on the committed tree, the others before the commit on the identical `src` and, for the two UX suites, after it.
+Final tree: the #38 candidate commit `9dbd9c6` (its only application-source change is `styles.css`; the rest is tests and Markdown, and a later Markdown-only commit corrects this reference). The checks below ran on a tree whose `frontend/src` is identical to it (the commit was amended after the runs only to add Markdown and to reword its message). Commands from `frontend/`, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`; the committed-implementation suites (`labels`, `qa25`, `qa28`) ran on the committed tree, the others before the commit on the identical `src` and, for the two UX suites, after it.
 
 | Command | Actual result |
 | --- | --- |
