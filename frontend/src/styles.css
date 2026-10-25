@@ -263,7 +263,8 @@ h1 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .catalogue-empty h2 { margin-top: 20px; }
 .back-link { display: inline-flex; font-size: 12px; margin: 0 0 24px; text-decoration: none; font-weight: 550; }
 .asset-detail-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
-.asset-identity { min-width: 0; }
+/* Equipment name, description, eyebrow and specs are typed by the coordinator: wrap at any character, never clip or shrink. */
+.asset-identity { min-width: 0; overflow-wrap: anywhere; }
 .equipment-illustration.large { height: 280px; border-radius: 12px; border: 1px solid #e0e5ef; }
 .equipment-illustration.large svg { width: 240px; height: 190px; stroke-width: 1.5; }
 .equipment-illustration.large .illustration-orbit { width: 220px; height: 220px; }

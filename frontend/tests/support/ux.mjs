@@ -397,6 +397,19 @@ export function declarationsFor(rules, selector, { media = null } = {}) {
 /** True when the declarations let an unbroken token wrap (design-system.md "User-entered text wrapping"). */
 export const wrapsAnywhere = (declarations) => ['anywhere', 'break-word'].includes(declarations['overflow-wrap']) || ['break-word', 'break-all'].includes(declarations['word-break'])
 
+/**
+ * Whether text wraps at any character for an element whose rule chain is given closest first (the element's own selector,
+ * then the ancestors that carry inherited wrapping), the way `overflow-wrap` inherits: the first selector in the chain that
+ * declares `overflow-wrap` or `word-break` decides. Returns { ok, selector } so a failure can name what it found.
+ */
+export function wrapChain(rules, chain, { media = null } = {}) {
+  for (const selector of chain) {
+    const declarations = declarationsFor(rules, selector, { media })
+    if ('overflow-wrap' in declarations || 'word-break' in declarations) return { ok: wrapsAnywhere(declarations), selector }
+  }
+  return { ok: false, selector: null }
+}
+
 // EXTENSION POINT #42: add `fontSizesUnder(rules, floor)` here (every `font-size` below 12px, including inside @media rules,
 // outside the closed allow-list in design-system.md). parseCss already returns the media text for each rule.
 
@@ -486,15 +499,16 @@ export const LONG = {
 /**
  * Registers `[name, run, options]` cases once per width as node:test `it`s. `name` starts with the QA case number and may
  * carry the QA tags ("32.1 [FAIL-NOW] ..."); `UX_CASES=32.1,32.4` narrows a run to exact case numbers. `options` go to
- * `suite.fresh(width, name, options)` (unit overrides, signedIn, ...) except `widths` (default both) and `modes`
- * (default both adapters).
+ * `suite.fresh(width, name, options)` (unit overrides, signedIn, ...) except `widths` (default both), `modes`
+ * (default both adapters) and `todo` (a reason: the case documents a known open defect, so node:test reports it as a TODO
+ * and a failure does not fail the run; remove `todo` when that defect is fixed).
  */
 export function defineCases(suite, cases, { widths = WIDTHS } = {}) {
   for (const [name, run, options = {}] of cases) {
     if (options.modes && !options.modes.includes(suite.mode)) continue
     if (process.env.UX_CASES && !process.env.UX_CASES.split(',').some((id) => name.split(' ')[0].split('/').includes(id))) continue
     for (const width of options.widths ?? widths) {
-      it(`${suite.mode} ${name} @${width}`, async () => {
+      it(`${suite.mode} ${name} @${width}`, options.todo ? { todo: options.todo } : {}, async () => {
         const t = await suite.fresh(width, name, options)
         try { await augment(t, suite); await run(t); assertNoUnexpected(t.sink) }
         catch (error) { await snap(t.page, join(suite.output, `failure-${name.split(' ')[0].replaceAll('/', '-')}-${width}.png`)); throw error }
@@ -849,6 +863,187 @@ export function issue36(suite) {
     }, { modes: ['mock'] }],
   ]
   defineCases(suite, cases)
+}
+
+// ---- #37: long unbroken equipment text on the asset detail page -------------------------------------------------------------
+
+/** Every box of the asset detail page that holds coordinator-entered text, measured in one browser round trip. */
+function measureDetail(page) {
+  return page.evaluate(() => {
+    const textBox = element => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
+      return rects.length ? { left: Math.min(...rects.map(rect => rect.left)), right: Math.max(...rects.map(rect => rect.right)) } : null
+    }
+    const main = document.querySelector('main')
+    const info = selector => {
+      const element = document.querySelector(selector)
+      if (!element) return null
+      const style = getComputedStyle(element)
+      const box = element.getBoundingClientRect()
+      const hidden = []
+      for (let ancestor = element.parentElement; ancestor && ancestor !== main.parentElement; ancestor = ancestor.parentElement) {
+        if (['hidden', 'clip'].includes(getComputedStyle(ancestor).overflowX)) hidden.push(ancestor.className || ancestor.tagName)
+      }
+      return {
+        left: box.left, right: box.right, top: box.top, bottom: box.bottom, height: box.height, text: textBox(element), display: style.display,
+        scrollWidth: element.scrollWidth, clientWidth: element.clientWidth, textContent: element.textContent, textOverflow: style.textOverflow,
+        fontSize: style.fontSize, overflowWrap: style.overflowWrap, hidden,
+      }
+    }
+    return {
+      doc: { scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, innerWidth },
+      identity: info('.asset-identity'), panel: info('.availability-panel'), heading: info('.asset-heading'), h2: info('.asset-heading h2'),
+      eyebrow: info('.asset-heading .eyebrow'), description: info('p.asset-description'),
+      specs: [...document.querySelectorAll('.asset-specs dd')].map((_, index) => info(`.asset-specs > div:nth-child(${index + 1}) dd`)),
+      action: info('.booking-form button[type=submit], .availability-panel a.button.primary.full'),
+    }
+  })
+}
+
+/**
+ * The QA 37.1-37.8 and 37.12 assertions for one unit on the asset detail page. Guards run first so that a failing case on
+ * an unfixed tree names the overflow and not one of the properties that never changed; `unit` is the stored record.
+ */
+async function assertDetail(t, unit, { student }) {
+  const m = await measureDetail(t.page)
+  const label = `${t.name.split(' ')[0]} ${t.width}px ${student ? 'student' : 'visitor'}`
+  // 37.12 column classification: one column up to 1099 px, two from 1100 px.
+  const twoColumns = m.panel.left >= m.identity.right - 0.5
+  assert.equal(twoColumns, t.width >= TWO_COLUMN_FROM, `${label}: expected ${t.width >= TWO_COLUMN_FROM ? 'two columns' : 'one column'}`)
+  // 37.6 complete text, never truncated.
+  assert.equal(m.h2.textContent, unit.name, `${label}: name text is complete`)
+  assert.equal(m.description.textContent, unit.description, `${label}: description text is complete`)
+  assert.equal(m.eyebrow.textContent, `${unit.category} / ${unit.inventoryCode}`, `${label}: eyebrow text is complete`)
+  assert.deepEqual(m.specs.map(spec => spec.textContent), [unit.inventoryCode, unit.category, unit.location], `${label}: spec values are complete`)
+  for (const [name, box] of Object.entries({ h2: m.h2, description: m.description, eyebrow: m.eyebrow, ...Object.fromEntries(m.specs.map((spec, index) => [`spec ${index + 1}`, spec])) })) {
+    assert.notEqual(box.textOverflow, 'ellipsis', `${label}: ${name} must not truncate with an ellipsis`)
+    assert.deepEqual(box.hidden, [], `${label}: ${name} has an ancestor that clips horizontally`)
+  }
+  // 37.7 sizes are the design-system sizes (wrap, never shrink).
+  assert.equal(m.h2.fontSize, t.width <= 600 ? '28px' : '30px', `${label}: heading size`)
+  assert.equal(m.description.fontSize, '15px', `${label}: description size`)
+  // 37.8 the primary action stays reachable.
+  assert.equal(m.action.textContent.trim(), student ? 'Request equipment' : 'Sign in to request equipment')
+  assert.ok(m.action.height >= 44 && m.action.left >= 0 && m.action.right <= m.doc.innerWidth, `${label}: primary action ${JSON.stringify({ height: m.action.height, left: m.action.left, right: m.action.right })}`)
+  // 37.1-37.4: no page overflow, and every text box stays in its own box and column and clear of the booking panel.
+  assert.equal(m.doc.scrollWidth, m.doc.clientWidth, `${label}: horizontal page overflow ${JSON.stringify(m.doc)}`)
+  const boxes = { heading: m.heading, h2: m.h2, description: m.description, eyebrow: m.eyebrow, ...Object.fromEntries(m.specs.map((spec, index) => [`spec ${index + 1}`, spec])) }
+  for (const [name, box] of Object.entries(boxes)) {
+    if (box.display !== 'inline') assert.ok(box.scrollWidth <= box.clientWidth, `${label}: ${name} content spills its own box (${box.scrollWidth} wide in ${box.clientWidth})`)
+    assert.ok(box.text.right <= m.identity.right + 0.5, `${label}: ${name} text reaches ${Math.round(box.text.right)} past the column edge ${Math.round(m.identity.right)}`)
+    if (twoColumns) assert.ok(box.text.right <= m.panel.left, `${label}: ${name} text overlaps the booking panel (${Math.round(box.text.right)} > ${Math.round(m.panel.left)})`)
+  }
+  return m
+}
+
+/** The rows of QA's data matrix; `unit` may be a function of the case serial so unique values can be built. */
+const DETAIL_ROWS = [
+  ['37.1', 'FAIL-NOW', 'description "Manual: " + an 80-character URL', () => ({ description: LONG.manualUrl80() })],
+  ['37.2', 'FAIL-NOW', 'name of 40 x a', () => ({ name: 'a'.repeat(40) })],
+  ['37.3', 'FAIL-NOW', 'name of 30 x a', () => ({ name: 'a'.repeat(30) })],
+  ['37.4', 'FAIL-NOW', 'name of 100 x W', () => ({ name: 'W'.repeat(100) })],
+  ['37.4', 'FAIL-NOW', 'description of "Manual: https://docs.example.org/" + 470 x a', () => ({ description: LONG.manualUrl470() })],
+  ['37.4', 'FAIL-NOW', 'description of 2000 x a', () => ({ description: 'a'.repeat(2000) })],
+  ['37.5', 'GUARD', 'code of 30 x W, location of 100 x W and a 2000-character description with spaces', n => ({ inventoryCode: `${'W'.repeat(26)}${String(1000 + n).slice(-4)}`, location: 'W'.repeat(100), description: LONG.spacedDescription2000().trim() })],
+]
+
+export function issue37(suite) {
+  const cases = []
+  for (const [id, tag, title, unit] of DETAIL_ROWS) {
+    for (const student of [false, true]) {
+      cases.push([`${id} [${tag}] ${title} (${student ? 'student' : 'visitor'})`, async t => { await assertDetail(t, t.unit, { student }) }, { unit, signedIn: student, widths: WRAP_WIDTHS, modes: ['http'] }])
+    }
+  }
+  // 37.10: the mock repeats 37.1, 37.2 and 37.4 with units added through its Inventory form (signed in as the coordinator).
+  for (const [id, , title, unit] of DETAIL_ROWS.filter(([id, , title]) => ['37.1', '37.2'].includes(id) || title.startsWith('name of 100'))) {
+    cases.push([`37.10 [FAIL-NOW][MOCK] ${id} ${title}`, async t => { await assertDetail(t, t.unit, { student: true }) }, { unit, widths: [390, 1440], modes: ['mock'] }])
+  }
+  cases.push(['37.9 [GUARD] the nine catalogue and staff screens keep the long unit inside the page (asset detail is the fix)', async t => {
+    const failures = await sweep(t, suite)
+    assert.deepEqual(failures, [], `screens that overflow or clip at ${t.width}px:\n${failures.join('\n')}`)
+  }, { unit: () => ({ name: 'W'.repeat(100), description: LONG.manualUrl470() }), widths: [390, 768, 1100, 1440], as: 'coordinator', modes: ['http'] }])
+  // Found by the sweep and filed as #44: the Explore card clips a long unbroken name and location. Reported, not hidden.
+  cases.push(['37.9 [TODO #44] the Explore card shows a 100 x W name and location without clipping', async t => {
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    await t.page.locator('a.equipment-card').first().waitFor()
+    await settle(t.page, 250)
+    assert.deepEqual([...new Set(await clippedLongText(t.page, 'WWWWWWWWWWWWWWWWWWWW'))], [], 'Explore card text is clipped by the card')
+  }, { unit: () => ({ name: 'W'.repeat(100), location: 'W'.repeat(100) }), widths: [390, 1440], modes: ['http'], todo: '#44 the Explore card clips long unbroken names and locations' }])
+  defineCases(suite, cases)
+}
+
+/**
+ * Text of the long unbroken test strings that is visible and runs past the viewport or past the clipping box of an
+ * ancestor (`overflow: hidden|clip|auto|scroll`): the "clipped text" half of the sweep, which `scrollWidth` cannot see.
+ */
+function clippedLongText(page, marker) {
+  return page.evaluate(token => {
+    const found = []
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.nodeValue.includes(token)) continue
+      const element = node.parentElement
+      if (element.closest('.sr-only') || !element.checkVisibility()) continue
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
+      if (!rects.length) continue
+      const right = Math.max(...rects.map(rect => rect.right))
+      let limit = innerWidth, limiter = 'the viewport'
+      for (let ancestor = element; ancestor && ancestor !== document.documentElement; ancestor = ancestor.parentElement) {
+        if (/(hidden|clip|auto|scroll)/.test(getComputedStyle(ancestor).overflowX)) {
+          const edge = ancestor.getBoundingClientRect().right
+          if (edge < limit) { limit = edge; limiter = `${ancestor.tagName.toLowerCase()}.${ancestor.className}` }
+        }
+      }
+      if (right > limit + 0.5) found.push(`${element.tagName.toLowerCase()}.${element.className || '-'} text reaches ${Math.round(right)} but ${limiter} ends at ${Math.round(limit)}`)
+    }
+    return found
+  }, marker)
+}
+
+/** QA 37.9: nine of the twelve screens (My reservations, its details and History belong to #38) with the long unit in them. */
+async function sweep(t, suite) {
+  const { page } = t
+  const marker = 'WWWWWWWWWWWWWWWWWWWW'
+  const failures = []
+  const check = async (screen, ready, { clipping = true } = {}) => {
+    await ready()
+    await settle(page, 250)
+    const sizes = await overflowInfo(page)
+    if (sizes.scrollWidth !== sizes.clientWidth) failures.push(`${screen}: page scrolls sideways (${sizes.scrollWidth} > ${sizes.clientWidth})`)
+    if (clipping) for (const clipped of new Set(await clippedLongText(page, marker))) failures.push(`${screen}: ${clipped}`)
+  }
+  const seeded = await suite.seedDesk(t)
+  const go = hash => page.evaluate(next => { location.hash = next }, hash)
+  const view = name => page.locator('#desk-views').getByRole('button', { name: new RegExp(`^${name}`) })
+  // Explore's card clips long names and locations (#44); the clipping has its own todo case, the page overflow stays here.
+  await check('Explore', async () => { await go('/explore'); await page.locator('a.equipment-card').first().waitFor() }, { clipping: false })
+  await check('Desk queue (Pending requests)', async () => { await go('/desk'); await page.locator(`#review-${seeded.pending}`).waitFor() })
+  await check('Pickups', async () => { await view('Pickups').click(); await page.locator(`#review-${seeded.approved}`).waitFor() })
+  await check('Check-out form', async () => {
+    await page.locator(`#review-${seeded.approved}`).click()
+    await page.getByRole('button', { name: 'Check out equipment', exact: true }).click()
+    await page.locator('form.staff-action-form').waitFor()
+  })
+  await check('Booking detail (pending request)', async () => {
+    await go('/explore'); await go('/desk')
+    await page.locator(`#review-${seeded.pending}`).click()
+    await page.getByRole('heading', { name: 'Manage reservation', exact: true }).waitFor()
+  })
+  await check('History detail', async () => {
+    await page.getByRole('button', { name: '← Back to queues', exact: true }).click()
+    await view('History').click()
+    await page.locator(`#review-${seeded.returned}`).click()
+    await page.getByRole('heading', { name: 'Manage reservation', exact: true }).waitFor()
+  })
+  await check('Inventory', async () => { await go('/inventory'); await page.locator(`#edit-${t.assetId}`).waitFor() })
+  await check('Inventory editor', async () => { await page.locator(`#edit-${t.assetId}`).click(); await page.getByRole('heading', { name: 'Edit equipment details', exact: true }).waitFor() })
+  await check('Asset detail', async () => { await go(`/assets/${t.assetId}`); await page.getByRole('heading', { name: 'Check availability', level: 2 }).waitFor() })
+  suite.records.push({ width: t.width, case: '37.9 sweep', failures })
+  return failures
 }
 
 // ====================================================================================================================

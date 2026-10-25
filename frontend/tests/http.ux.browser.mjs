@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, issue37, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -26,19 +26,45 @@ suite.fresh = async (width, name, options = {}) => {
   const registration = await api(stack, '/api/v1/auth/register', { method: 'POST', body: student })
   assert.equal(registration.status, 201)
   const unit = await api(stack, '/api/v1/staff/assets', { method: 'POST', token: coordinatorToken, body: {
-    name: `UX unit ${n}`, inventoryCode: `UX-${n}`, category: 'Cameras', location: 'Club desk', description: 'Dedicated usability regression unit.', ...options.unit,
+    name: `UX unit ${n}`, inventoryCode: `UX-${n}`, category: 'Cameras', location: 'Club desk', description: 'Dedicated usability regression unit.', ...(typeof options.unit === 'function' ? options.unit(n) : options.unit),
   } })
   assert.equal(unit.status, 201, JSON.stringify(unit.json))
   const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'en-US', timezoneId: 'Asia/Almaty' })
-  if (options.signedIn !== false) await context.addInitScript(({ key, token }) => sessionStorage.setItem(key, token), { key: TOKEN_KEY, token: registration.json.token })
+  const token = options.as === 'coordinator' ? coordinatorToken : registration.json.token
+  if (options.signedIn !== false) await context.addInitScript(({ key, token }) => sessionStorage.setItem(key, token), { key: TOKEN_KEY, token })
   const page = await context.newPage()
   page.setDefaultTimeout(10_000)
   await page.goto(`${suite.base}/#/assets/${unit.json.id}`)
   await page.getByRole('heading', { name: 'Check availability', level: 2 }).waitFor()
   if (options.signedIn !== false) await page.getByRole('button', { name: 'Request equipment', exact: true }).waitFor()
+  else await page.getByRole('link', { name: 'Sign in to request equipment', exact: true }).waitFor()
   const today = (await api(stack, `/api/v1/assets/${unit.json.id}/availability`)).json.today
   assert.equal(today, clubToday())
   return { page, context, width, name, today, day: addDays(today, 20 + n), assetId: unit.json.id, token: registration.json.token, student, unit: unit.json }
+}
+/**
+ * Bookings for the desk screens of the #37/#38 sweeps, made through the API for the case student: a pending request, an
+ * approved pickup and a returned loan (request, approve, check out and return today). Returns the booking ids.
+ */
+suite.seedDesk = async t => {
+  const staff = (path, body) => api(stack, path, { method: 'POST', token: coordinatorToken, body })
+  const book = async (startDate, endDate, purpose) => {
+    const made = await api(stack, '/api/v1/bookings', { method: 'POST', token: t.token, body: { assetId: t.assetId, startDate, endDate, purpose } })
+    assert.equal(made.status, 201, JSON.stringify(made.json))
+    return made.json.id
+  }
+  const step = async (id, action, version, note) => {
+    const done = await staff(`/api/v1/staff/bookings/${id}/${action}`, { expectedVersion: version, ...(note ? { note } : {}) })
+    assert.equal(done.status, 200, `${action}: ${JSON.stringify(done.json)}`)
+  }
+  const pending = await book(addDays(t.today, 30), addDays(t.today, 31), 'Sweep: pending request with a normal purpose')
+  const approved = await book(addDays(t.today, 40), addDays(t.today, 41), 'Sweep: approved pickup with a normal purpose')
+  await step(approved, 'approve', 1)
+  const returned = await book(t.today, t.today, 'Sweep: returned loan with a normal purpose')
+  await step(returned, 'approve', 1)
+  await step(returned, 'checkout', 2, 'Kit complete and in good condition')
+  await step(returned, 'return', 3, 'Returned complete and clean')
+  return { pending, approved, returned }
 }
 /** Ends the case student's session on the server (the page still holds the token). */
 suite.revoke = async t => {
@@ -61,3 +87,4 @@ suite.fail = async (t, kind) => t.page.route('**/api/v1/bookings', route => kind
 describe('issue #31 — associated server date validation', { skip: !selectedIssue(31), concurrency: false }, () => issue31(suite))
 describe('issue #32 — focus after the booking request settles', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))
 describe('issue #36 — calendar month across the availability refresh', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
+describe('issue #37 — long unbroken equipment text on the asset detail page', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))

@@ -2,9 +2,9 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, issue37, selectedIssue } from './support/ux.mjs'
 const suite = { mode: 'mock', base: 'http://127.0.0.1:6243', output: outputFolder('mock-ux'), records: [] }
-let server, browser
+let server, browser, serial = 0
 before(async () => {
   server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '6243', '--strictPort'], { cwd: frontendDir, stdio: 'ignore', env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
   for (let i = 0; i < 100; i++) { try { if ((await fetch(suite.base)).ok) break } catch {} await new Promise(resolve => setTimeout(resolve, 100)) }
@@ -18,7 +18,25 @@ suite.fresh = async (width, name, options = {}) => {
   page.setDefaultTimeout(10_000)
   const h = createHelpers(page, suite.base)
   const student = newStudent('ux31mock')
-  if (options.maya || name.startsWith('31.10 ')) {
+  let unit = null, assetId = 'camera-01'
+  if (options.unit) {
+    // Units for the text-wrapping cases are added through the real Inventory form as the coordinator, as QA's 37.10 asks.
+    await page.goto(`${suite.base}/#/signin?returnTo=inventory`)
+    await page.getByRole('button', { name: 'Fill coordinator credentials', exact: true }).click()
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await h.accountName().waitFor()
+    unit = { name: `UX unit ${++serial}`, inventoryCode: `UXM-${serial}`, category: 'Cameras', location: 'Club desk', description: 'Dedicated usability regression unit.', ...(typeof options.unit === 'function' ? options.unit(serial) : options.unit) }
+    await page.getByRole('button', { name: /^Add equipment/ }).click()
+    await page.getByLabel('Equipment name', { exact: true }).fill(unit.name)
+    await page.getByLabel('Inventory code', { exact: true }).fill(unit.inventoryCode)
+    await page.getByLabel('Pickup location', { exact: true }).fill(unit.location)
+    await page.getByLabel('Description', { exact: true }).fill(unit.description)
+    await page.getByRole('button', { name: 'Add physical unit', exact: true }).click()
+    await page.locator('[id^="edit-"]').last().waitFor()
+    assetId = (await page.locator(`tr:has-text("${unit.inventoryCode}") [id^="edit-"]`).first().getAttribute('id')).slice('edit-'.length)
+    unit = { ...unit, inventoryCode: unit.inventoryCode.toUpperCase() }
+    await page.evaluate(id => { location.hash = `/assets/${id}` }, assetId)
+  } else if (options.maya || name.startsWith('31.10 ')) {
     await page.goto(`${suite.base}/#/signin?returnTo=assets/camera-01`)
     await page.getByRole('button', { name: 'Fill student credentials', exact: true }).click()
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -37,7 +55,7 @@ suite.fresh = async (width, name, options = {}) => {
     }
   })
   const today = clubToday()
-  return { page, context, width, name, today, day: addDays(today, 20), assetId: 'camera-01' }
+  return { page, context, width, name, today, day: addDays(today, 20), assetId, unit, student }
 }
 suite.conflict = async (t, day) => t.page.getByRole('button', { name: 'Simulate next-request conflict', exact: true }).click()
 suite.otherAsset = async () => 'camera-02'
@@ -45,3 +63,4 @@ suite.fail = async t => t.page.getByRole('button', { name: 'Simulate next-reques
 describe('issue #31 — mock shared date validation (includes 31.10)', { skip: !selectedIssue(31), concurrency: false }, () => issue31(suite))
 describe('issue #32 — mock focus after the booking request settles (includes 32.12)', { skip: !selectedIssue(32), concurrency: false }, () => issue32(suite))
 describe('issue #36 — mock calendar month across the availability refresh (includes 36.9)', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
+describe('issue #37 — mock long unbroken equipment text (37.10)', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))

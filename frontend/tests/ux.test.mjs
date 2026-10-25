@@ -1,9 +1,10 @@
 // Cheap checks for the #15 usability regressions and their shared helpers (support/ux.mjs). The browser suites are
 // http.ux.browser.mjs (real stack) and ux.mock.browser.mjs (mock adapter); this file needs no browser or server.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { addDays } from './support/browserKit.mjs'
-import { declarationsFor, horizonEnd, monthLabel, monthPlan, monthsBetween, parseCss, selectedIssue, shiftMonth, wrapsAnywhere } from './support/ux.mjs'
+import { declarationsFor, horizonEnd, monthLabel, monthPlan, monthsBetween, parseCss, selectedIssue, shiftMonth, wrapChain, wrapsAnywhere } from './support/ux.mjs'
 
 describe('support/ux.mjs helpers', () => {
   it('UX_ISSUES filters issue blocks and an empty filter runs every block', () => {
@@ -65,5 +66,21 @@ describe('support/ux.mjs helpers', () => {
     assert.equal(wrapsAnywhere({ 'overflow-wrap': 'normal' }), false)
     assert.equal(wrapsAnywhere({ 'text-overflow': 'ellipsis' }), false)
     assert.equal(rules.find(rule => rule.selectors.includes('.e')).media, '@media (min-width: 601px) and (max-width: 900px)')
+  })
+})
+
+// The shared wrapping rule of design-system.md "User-entered text wrapping": text typed by people wraps at any character
+// inside its container, and the grid or flex child that holds it can shrink (min-width: 0). These stylesheet checks are the
+// cheap half of each wrapping bug; the browser suites measure the real layout.
+const styles = parseCss(readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8'))
+
+describe('user-entered text wrapping in styles.css', () => {
+  it('37.11 asset detail: name, description and eyebrow wrap at any character, and their grid column can shrink', () => {
+    for (const chain of [['.asset-heading h2', '.asset-heading', '.asset-identity'], ['.asset-description', '.asset-identity'], ['.asset-heading .eyebrow', '.asset-heading', '.asset-identity']]) {
+      const found = wrapChain(styles, chain)
+      assert.equal(found.ok, true, `${chain[0]}: no wrapping declaration along ${chain.join(' < ')} (found ${found.selector})`)
+    }
+    assert.equal(declarationsFor(styles, '.asset-identity')['min-width'], '0', '.asset-identity is a grid item and must be allowed to shrink')
+    assert.equal(declarationsFor(styles, '.asset-detail-grid', { media: '@media (max-width: 1099px)' })['grid-template-columns'], 'minmax(0, 1fr)', 'the one-column layout (up to 1099 px) uses minmax(0, 1fr)')
   })
 })
