@@ -1054,3 +1054,35 @@ Candidate: merge commit `7a70ca13017e10a7cadf22594cac3f6dfa8f7a2c` (parents `7c7
 | `npm run test:browser:http:staff` (same real stack) | all 21 checks passed |
 
 Limits: the merged state has not yet been verified by an independent QA session; #13 and #14 remain open until it is. The earlier branch-tip verdicts do not transfer automatically because the base now contains the #12 harness changes and the merged documentation.
+
+## 2026-10-25 — #31 associated booking date errors (engineer)
+
+Starting commit/tree: `c975d5bbeef974cc6056cab710d2bfb4889d2e64` / `461342ca227a22f24ca6fdc4d38c0fb71e276be3`, clean before this issue. Actual issue body and all four comments were read, including PM's client-wins merge ruling and QA's updated 31.14/31.15 cases, before runtime edits. This follows independent QA's already-published red baseline; it is a separate engineer run.
+
+Pre-fix: with application source unchanged, `UX_ISSUES=31 UX_CASES=31.1,31.2,31.3,31.5 npm run test:browser:http:ux` reproduced all eight expected failures (four cases at each width): actual POST 422 response fields were recorded, but Start's `aria-invalid` was `false`, expected `true`. The initial case selector also selected 31.12/31.14 by prefix: 31.14 passed at both widths; the fieldset disabled probe in 31.12 was a harness error. The selector now matches exact case numbers and the fieldset probe checks its native disabled attribute. The exact filtered mock red run had eight failures/zero passes, with the same unflagged Start control. No runtime fix preceded these observations. The first full harness development run also exposed incorrect native date-key segmentation and a reservation-purpose row selector; these test-only assumptions were corrected. The final keyboard probe types the actual month/day/year segments through Chromium's native date input and asserts the resulting value.
+
+The runtime change is only AssetDetailPage's error passed to DateRangeFields: retained response fields are combined with client date fields, client text wins per key. DateRangeFields, purpose validation, the alert, date hints, request guards, API and backend are unchanged. No pure helper was introduced (QA 31.13 does not apply).
+
+Toolchain: Node 24.22.1, npm 11.9.0, Python 3.12.14. Host uv was 0.13.4; `uv tool run --from uv==0.12.23 uv --version` installed/reported the required actual 0.12.23 binary. HTTP harness commands used its real cached directory `/root/.cache/uv/archive-v0/VqJHEAAk_WkHk_FE/bin` first in PATH, so their child `uv` processes also used 0.12.23. Browser commands set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/workspace/scratch/e3fbdcf9622e/browser-tools/extracted/chromium`. Servers and browser were started by each owning harness in the same network namespace.
+
+Executed from `frontend/` on the corrected runtime:
+
+| Command | Actual result |
+| --- | --- |
+| `npm ci` | 33 locked packages installed; no lock change |
+| `npm test` | 214 passed, zero failures |
+| `npm run typecheck` | exit 0 |
+| `npm run build` | exit 0; Vite production build generated |
+| `UX_ISSUES=31 npm run test:browser:http:ux` | 28 passed, zero failures, 1440x900 and 390x900; 28.87 s |
+| `UX_ISSUES=31 npm run test:browser:ux` | 28 passed, zero failures, both widths; 59.60 s; actual mock call/result observation |
+| `npm run test:browser:catalogue` | all 28 existing checks passed |
+| `npm run test:browser:bookings` | existing full booking browser journey passed |
+| `npm run test:browser:http` | all 19 existing HTTP checks passed |
+
+The first `npm test`, before `npm ci`, had 118 passing cases and one failed test file because inherited node_modules lacked ajv. The locked install resolved that environment limitation; the recorded 214/214 result above is after installation. Existing test files/assertions were never changed.
+
+Real-stack cases use unique API-created units and students, future dates, and actual failed-response fields as the message/key oracle. The pending gate delays transmission only, then uses the real FastAPI response. The race uses a separately registered student's actual booking; network/500 failures are deliberate page-route injections. The mock repeats shared UI cases in fresh isolated stores, including Maya's seeded account, and records the real adapter calls/results with a pass-through observer. No fabricated response fields enter either final suite.
+
+All four actual empty-submit screenshots (HTTP/mock × 390/1440) were opened and inspected. Date errors sit below their controls; purpose error and summary remain present; text has no clipping/overlap. Committed checks additionally measure viewport/page width equality, error rectangles and ancestor clipping, matching described-by tokens, unique IDs, and the fully visible 44 px-high action. Regenerable images and actual field/geometry logs are in ignored `frontend/test-results/http-ux/` and `mock-ux/` (`31-empty-<mode>-<width>.png`, `evidence.json`).
+
+This scoped frontend change does not repeat the unchanged 1262-case backend campaign. Focus (#32), calendar month (#36), text size (#42) and other groomed #15 defects remain separate. No new product defect was found during this scope. Engineer verification is not an independent QA verdict; #31 stays open until the committed candidate is published and freshly verified by QA.

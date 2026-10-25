@@ -20,7 +20,9 @@
     "test:browser:staff": "node tests/staff.browser.mjs",
     "test:browser:labels": "node tests/staff-labels.qa.browser.mjs",
     "test:browser:http": "node tests/http.browser.mjs",
-    "test:browser:http:staff": "node tests/http.staff.browser.mjs"
+    "test:browser:http:staff": "node tests/http.staff.browser.mjs",
+    "test:browser:http:ux": "node --test tests/http.ux.browser.mjs",
+    "test:browser:ux": "node --test tests/ux.mock.browser.mjs"
   },
   "dependencies": {
     "react": "19.3.1",
