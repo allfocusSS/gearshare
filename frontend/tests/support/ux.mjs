@@ -1607,3 +1607,161 @@ export function issue33(suite) {
   defineCases(suite, cases)
 }
 
+// ---- #34: Inventory, Set maintenance / Make active ------------------------------------------------------------------------
+
+export function issue34(suite) {
+  const http = suite.mode === 'http'
+  const landed = landing(suite)
+  const toggle = (t, code, verb) => t.page.getByRole('button', { name: `${verb} for ${code}`, exact: true })
+  const button = (code, verb) => ({ tag: 'BUTTON', name: `${verb} for ${code}` })
+  const BLOCKED = 'Maintenance is blocked by an active loan or pending/approved reservation ending today or later.'
+  const statePath = (id) => `/api/v1/staff/assets/${id}/state`
+  const stateRoute = '**/api/v1/staff/assets/*/state'
+  const row = (t, id) => t.page.locator(`tr[data-asset-id="${id}"]`)
+  const open = async (t) => {
+    await t.page.evaluate(() => { location.hash = '/inventory' })
+    await t.page.getByRole('heading', { name: 'Every unit. Accounted for.', level: 2 }).waitFor()
+    await t.page.locator('table.inventory-table').waitFor()
+  }
+  const statusText = (t) => t.page.locator('.success-notice[role="status"]')
+  const COORDINATOR = { as: 'coordinator', modes: ['http'] }
+  const cases = []
+  for (const how of ['enter', 'pointer']) {
+    const tag = how === 'enter' ? '34.1' : '34.9'
+    cases.push([`${tag} [FAIL-NOW] ${how}: Set maintenance on a unit without commitments keeps focus on its toggle, now "Make active"`, async (t) => {
+      const x = await suite.newUnit()
+      await open(t)
+      await activate(t.page, toggle(t, x.inventoryCode, 'Set maintenance'), how)
+      await t.page.getByText(`${x.inventoryCode} is now maintenance.`).waitFor()
+      await landed(t, button(x.inventoryCode, 'Make active'), 'maintenance set')
+      assert.match(await statusText(t).innerText(), new RegExp(`${x.inventoryCode} is now maintenance\\.`))
+      assert.equal((await row(t, x.id).locator('.status-pill').innerText()).toLowerCase(), 'maintenance')
+    }, COORDINATOR])
+    cases.push([`${tag === '34.1' ? '34.2' : '34.9'} [FAIL-NOW] ${how}: Make active reverses it and keeps focus on the same button, now "Set maintenance"`, async (t) => {
+      const x = await suite.newUnit()
+      const done = await suite.staff(statePath(x.id), { state: 'maintenance' }, 'PUT')
+      assert.equal(done.status, 200, JSON.stringify(done.json))
+      await open(t)
+      await activate(t.page, toggle(t, x.inventoryCode, 'Make active'), how)
+      await t.page.getByText(`${x.inventoryCode} is now active.`).waitFor()
+      await landed(t, button(x.inventoryCode, 'Set maintenance'), 'made active')
+      assert.equal((await row(t, x.id).locator('.status-pill').innerText()).toLowerCase(), 'active')
+    }, COORDINATOR])
+    cases.push([`${tag === '34.1' ? '34.3' : '34.9'} [FAIL-NOW] ${how}: a maintenance conflict keeps focus on the unit's enabled "Set maintenance"`, async (t) => {
+      await open(t)
+      await activate(t.page, toggle(t, t.unit.inventoryCode, 'Set maintenance'), how)
+      await t.page.getByText(BLOCKED, { exact: false }).waitFor()
+      await landed(t, button(t.unit.inventoryCode, 'Set maintenance'), 'conflict')
+      assert.equal(await toggle(t, t.unit.inventoryCode, 'Set maintenance').isEnabled(), true)
+      assert.equal((await row(t, t.unit.id).locator('.status-pill').innerText()).toLowerCase(), 'active', 'still active')
+      assert.equal(await t.page.locator('.success-notice').count(), 0, 'no success text')
+    }, { ...COORDINATOR, reserve: true }])
+  }
+  cases.push(['34.4 [FAIL-NOW] lost connection keeps the state and focus on the unit\'s toggle', async (t) => {
+    const x = await suite.newUnit()
+    await open(t)
+    await inject(t.page, stateRoute, 'abort', { method: 'PUT' })
+    await activate(t.page, toggle(t, x.inventoryCode, 'Set maintenance'), 'enter')
+    await t.page.getByRole('alert').waitFor()
+    await landed(t, button(x.inventoryCode, 'Set maintenance'), 'lost connection')
+    assert.equal((await row(t, x.id).locator('.status-pill').innerText()).toLowerCase(), 'active', 'unit state unchanged')
+    assert.equal(await t.page.locator('.success-notice').count(), 0, 'no success text')
+  }, COORDINATOR])
+  cases.push(['34.5 [FAIL-NOW] with a search filter the focus lands on the same unit\'s toggle, filter and list unchanged', async (t) => {
+    const x = await suite.newUnit()
+    await open(t)
+    await t.page.locator('#inventory-search').fill(x.inventoryCode)
+    assert.equal(await t.page.locator('tbody tr').count(), 1)
+    await activate(t.page, toggle(t, x.inventoryCode, 'Set maintenance'), 'enter')
+    await t.page.getByText(`${x.inventoryCode} is now maintenance.`).waitFor()
+    await landed(t, button(x.inventoryCode, 'Make active'), 'filtered list')
+    assert.equal(await t.page.locator('#inventory-search').inputValue(), x.inventoryCode, 'search value unchanged')
+    assert.equal(await t.page.locator('tbody tr').count(), 1, 'list unchanged')
+  }, COORDINATOR])
+  cases.push(['34.6 [GUARD] every toggle is disabled while pending; a double Enter and a double click send one request each', async (t) => {
+    const x = await suite.newUnit()
+    await open(t)
+    await inject(t.page, stateRoute, 'pass', { method: 'PUT', delay: 800 })
+    await activate(t.page, toggle(t, x.inventoryCode, 'Set maintenance'), 'enter')
+    await t.page.keyboard.press('Enter')
+    await until(() => t.page.locator('tr[data-asset-id] button[disabled]').count().then((count) => count > 0), 'disabled row buttons')
+    assert.equal(await t.page.locator('tbody button:not([disabled])').count(), 0, 'every row button is disabled while pending')
+    await t.page.getByText(`${x.inventoryCode} is now maintenance.`).waitFor()
+    assert.equal(t.sink.requests.filter((request) => request.method === 'PUT' && request.url === statePath(x.id)).length, 1, 'one request under a double Enter')
+    await toggle(t, x.inventoryCode, 'Make active').dblclick()
+    await t.page.getByText(`${x.inventoryCode} is now active.`).waitFor()
+    assert.equal(t.sink.requests.filter((request) => request.method === 'PUT' && request.url === statePath(x.id)).length, 2, 'one more request under a double click')
+  }, COORDINATOR])
+  cases.push(['34.7 [GUARD] Add, Edit, Back, Discard and field errors keep their focus handling', async (t) => {
+    await open(t)
+    const add = t.page.locator('#add-equipment')
+    await activate(t.page, add, 'enter')
+    await landed(t, { id: 'inventory-editor-title', tag: 'H2' }, 'Add opens the editor on its heading')
+    await activate(t.page, t.page.getByRole('button', { name: '← Back to inventory', exact: true }), 'enter')
+    await landed(t, { id: 'add-equipment' }, 'Back restores Add equipment')
+    await activate(t.page, add, 'enter')
+    await activate(t.page, t.page.getByRole('button', { name: 'Add physical unit', exact: true }), 'enter')
+    await t.page.locator('#inventory-name-error').waitFor()
+    await landed(t, { id: 'inventory-name', tag: 'INPUT' }, 'a field error focuses the first invalid field')
+    const code = `UX-ED${Date.now().toString(36)}`.toUpperCase().slice(0, 30)
+    await t.page.locator('#inventory-name').fill('Editor flow unit')
+    await t.page.locator('#inventory-inventoryCode').fill(code)
+    await t.page.locator('#inventory-location').fill('Club desk')
+    await activate(t.page, t.page.getByRole('button', { name: 'Add physical unit', exact: true }), 'enter')
+    await t.page.getByText('Equipment added.', { exact: false }).waitFor()
+    await landed(t, { id: 'add-equipment' }, 'Add saved restores Add equipment')
+    await t.page.locator('#inventory-search').fill(code)
+    const edit = t.page.locator('tbody [id^="edit-"]')
+    const editId = await edit.getAttribute('id')
+    await activate(t.page, edit, 'enter')
+    await landed(t, { id: 'inventory-editor-title', tag: 'H2' }, 'Edit opens the editor on its heading')
+    await activate(t.page, t.page.getByRole('button', { name: 'Discard changes', exact: true }), 'enter')
+    await landed(t, { id: editId }, 'Discard restores the Edit button')
+    await activate(t.page, edit, 'enter')
+    await t.page.locator('#inventory-name').fill('Editor flow unit renamed')
+    await activate(t.page, t.page.getByRole('button', { name: 'Save equipment details', exact: true }), 'enter')
+    await t.page.getByText('Equipment details saved.', { exact: false }).waitFor()
+    await landed(t, { id: editId }, 'Edit saved restores the Edit button')
+  }, COORDINATOR])
+  cases.push(['34.8 [FAIL-NOW] Retry inventory lands on the page heading, or on itself when it fails again', async (t) => {
+    await inject(t.page, '**/api/v1/staff/assets', 'abort', { method: 'GET' })
+    await t.page.evaluate(() => { location.hash = '/inventory' })
+    const retry = t.page.getByRole('button', { name: 'Retry inventory', exact: true })
+    await retry.waitFor()
+    const before = gets(t, '/api/v1/staff/assets')
+    await activate(t.page, retry, 'enter')
+    await until(() => gets(t, '/api/v1/staff/assets') > before, 'the retried list request')
+    await landed(t, { tag: 'BUTTON', name: 'Retry inventory' }, 'retry fails again')
+    await t.page.unroute('**/api/v1/staff/assets')
+    await activate(t.page, retry, 'enter')
+    await t.page.locator('table.inventory-table').waitFor()
+    await landed(t, { id: 'main-content', tag: 'H1', name: 'Inventory' }, 'retry succeeds')
+  }, COORDINATOR])
+  cases.push(['34.10 [FAIL-NOW][MOCK] alex_coordinator: a unit without commitments toggles and a unit with an open request is blocked, focus stays on the toggle', async (t) => {
+    await t.h.signIn('alex_coordinator', 'CoordinatorDemo42!', 'inventory')
+    await t.page.locator('table.inventory-table').waitFor()
+    await activate(t.page, toggle(t, 'ACC-003', 'Set maintenance'), 'enter')
+    await t.page.getByText('ACC-003 is now maintenance.').waitFor()
+    await landed(t, button('ACC-003', 'Make active'), 'mock maintenance set')
+    await activate(t.page, toggle(t, 'ACC-003', 'Make active'), 'enter')
+    await t.page.getByText('ACC-003 is now active.').waitFor()
+    await landed(t, button('ACC-003', 'Set maintenance'), 'mock made active')
+    for (const how of ['enter', 'pointer']) {
+      await activate(t.page, toggle(t, 'CAM-001', 'Set maintenance'), how)
+      await t.page.getByText(BLOCKED, { exact: false }).waitFor()
+      await landed(t, button('CAM-001', 'Set maintenance'), `mock conflict (${how})`)
+    }
+  }, { modes: ['mock'], bare: true }])
+  cases.push(['34.11 [GUARD] no overflow, and at 390 px both row buttons stay inside the viewport', async (t) => {
+    await open(t)
+    await assertNoOverflow(t.page, 'inventory')
+    for (const verb of ['Edit', 'Set maintenance']) {
+      const target = verb === 'Edit' ? row(t, t.unit.id).locator('[id^="edit-"]') : toggle(t, t.unit.inventoryCode, verb)
+      const box = await geometry(target)
+      assert.ok(box.left >= 0 && box.right <= box.innerWidth, `${verb} ${Math.round(box.left)}-${Math.round(box.right)} is inside the ${box.innerWidth}px viewport`)
+      assert.ok(box.height >= 44 - 0.5, `${verb} is ${box.height}px high`)
+    }
+  }, COORDINATOR])
+  defineCases(suite, cases)
+}
+

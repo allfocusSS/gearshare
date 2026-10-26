@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue33, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue33, issue34, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
 const mockPort = Number(process.env.UX_MOCK_PORT ?? 6243)
 const suite = { mode: 'mock', base: `http://127.0.0.1:${mockPort}`, output: outputFolder('mock-ux'), records: [] }
 let server, browser, serial = 0
@@ -88,3 +88,4 @@ describe('issue #37 — mock long unbroken equipment text (37.10)', { skip: !sel
 describe('issue #38 — mock long unbroken equipment names on My reservations (38.11)', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))
 describe('issue #43 — mock Retry detail on the asset detail load error (43.11)', { skip: !selectedIssue(43), concurrency: false }, () => issue43(suite))
 describe('issue #33 — mock My reservations focus (33.11)', { skip: !selectedIssue(33), concurrency: false }, () => issue33(suite))
+describe('issue #34 — mock Inventory maintenance toggle focus (34.10)', { skip: !selectedIssue(34), concurrency: false }, () => issue34(suite))

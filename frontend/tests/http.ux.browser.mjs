@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue33, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue33, issue34, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -130,3 +130,4 @@ describe('issue #37 — long unbroken equipment text on the asset detail page', 
 describe('issue #38 — long unbroken equipment names on My reservations', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))
 describe('issue #43 — Retry detail on the asset detail load error', { skip: !selectedIssue(43), concurrency: false }, () => issue43(suite))
 describe('issue #33 — My reservations: View details and Cancel reservation focus', { skip: !selectedIssue(33), concurrency: false }, () => issue33(suite))
+describe('issue #34 — Inventory maintenance toggle focus', { skip: !selectedIssue(34), concurrency: false }, () => issue34(suite))
