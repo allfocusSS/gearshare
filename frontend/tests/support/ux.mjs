@@ -1426,3 +1426,184 @@ export function issue43(suite) {
   }, { modes: ['mock'], bare: true }])
   defineCases(suite, cases)
 }
+
+// ---- #33: My reservations, View details and Cancel reservation ---------------------------------------------------------------
+
+export function issue33(suite) {
+  const http = suite.mode === 'http'
+  const landed = landing(suite)
+  const HEADING = { id: 'reservation-detail-title', tag: 'H2', name: 'Reservation details' }
+  const PAGE_HEADING = { id: 'main-content', tag: 'H1', name: 'My reservations' }
+  const CANCEL = { tag: 'BUTTON', name: 'Cancel reservation' }
+  const UNIT = { name: 'Directional Microphone' }
+  const cancelPath = (t) => `/api/v1/bookings/${t.booking.id}/cancel`
+  const view = (t, name = t.unit.name) => t.page.getByRole('button', { name: `View details for ${name}`, exact: true })
+  const cancelButton = (t) => t.page.getByRole('button', { name: 'Cancel reservation', exact: true })
+  const panel = (t) => t.page.locator('section.reservation-detail')
+  const opened = (t, name) => t.page.locator('section.reservation-detail > h3', { hasText: name })
+  const open = async (t) => {
+    await t.page.evaluate(() => { location.hash = '/reservations' })
+    await t.page.locator('.reservation-row').first().waitFor()
+    await settle(t.page, 200)
+  }
+  const openDetails = async (t, how = 'enter', name = t.unit.name) => {
+    await activate(t.page, view(t, name), how)
+    await opened(t, name).waitFor()
+  }
+  const cancelled = async (t, how = 'enter') => {
+    await activate(t.page, cancelButton(t), how)
+    await t.page.getByText('Reservation cancelled. The dates have been released.').waitFor()
+  }
+  const cases = [
+    ['33.1 [FAIL-NOW] View details lands on the details heading and the next Tab reaches "Cancel reservation"', async (t) => {
+      await open(t)
+      await openDetails(t)
+      await landed(t, HEADING, 'View details')
+      assert.equal(await t.page.locator('#reservation-detail-title').getAttribute('tabindex'), '-1', 'the heading is focusable but not a tab stop')
+      await t.page.keyboard.press('Tab')
+      await assertFocus(t.page, CANCEL, 'the next Tab')
+    }, { unit: UNIT, reserve: true, modes: ['http'] }],
+    ['33.2 [FAIL-NOW] switching to another booking moves focus to the new panel heading', async (t) => {
+      const other = await suite.newUnit({ name: 'Second Camera Body' })
+      await suite.book(t, other.id, 12)
+      await open(t)
+      await openDetails(t)
+      await landed(t, HEADING, 'first booking')
+      await openDetails(t, 'enter', 'Second Camera Body')
+      await landed(t, HEADING, 'second booking')
+      assert.equal(await opened(t, 'Second Camera Body').count(), 1, 'the panel shows the other booking')
+      assert.equal(await panel(t).count(), 1, 'one panel')
+    }, { unit: UNIT, reserve: true, modes: ['http'] }],
+    ['33.3 [FAIL-NOW] cancel success lands on the details heading, one request under a double Enter, booking moves to History', async (t) => {
+      await open(t)
+      await openDetails(t)
+      await activate(t.page, cancelButton(t), 'enter')
+      await t.page.keyboard.press('Enter')
+      await t.page.getByText('Reservation cancelled. The dates have been released.').waitFor()
+      await landed(t, HEADING, 'cancel success')
+      assert.equal(await t.page.locator('.success-notice[role="status"]').count(), 1, 'the status message keeps role=status')
+      assert.equal(await panel(t).locator('p strong').first().innerText(), 'cancelled')
+      assert.ok(await panel(t).locator('.event-timeline li').filter({ hasText: 'cancel' }).count() >= 1, 'the event history lists the cancellation')
+      assert.equal(await t.page.locator('.reservation-row', { hasText: t.unit.name }).count(), 0, 'gone from Upcoming')
+      assert.equal(posts(t, cancelPath(t)), 1, 'exactly one cancel request')
+      await activate(t.page, t.page.getByRole('button', { name: 'History', exact: true }), 'enter')
+      await t.page.locator('.reservation-row', { hasText: t.unit.name }).waitFor()
+    }, { unit: UNIT, reserve: true, modes: ['http'] }],
+    ['33.4 [FAIL-NOW] cancel failure (a) lost connection (b) stale 409 leaves focus on "Cancel reservation"', async (t) => {
+      await open(t)
+      await openDetails(t)
+      await inject(t.page, '**/api/v1/bookings/*/cancel', 'abort', { method: 'POST' })
+      await activate(t.page, cancelButton(t), 'enter')
+      await t.page.getByRole('alert').waitFor()
+      await landed(t, CANCEL, 'lost connection')
+      assert.equal(await cancelButton(t).isEnabled(), true)
+      assert.equal(await panel(t).locator('p strong').first().innerText(), 'pending', 'not shown as cancelled')
+      assert.equal(await t.page.locator('.success-notice').count(), 0, 'no success text')
+      await t.page.unroute('**/api/v1/bookings/*/cancel')
+      const approved = await suite.staff(`/api/v1/staff/bookings/${t.booking.id}/approve`, { expectedVersion: t.booking.version })
+      assert.equal(approved.status, 200, JSON.stringify(approved.json))
+      await activate(t.page, cancelButton(t), 'enter')
+      await t.page.getByText('This reservation changed. Re-read it before continuing.').waitFor()
+      await landed(t, CANCEL, 'stale version')
+      assert.equal(await panel(t).locator('p strong').first().innerText(), 'pending', 'the panel still shows the old status')
+      assert.equal(await t.page.locator('.success-notice').count(), 0, 'no success text')
+    }, { unit: UNIT, reserve: true, modes: ['http'] }],
+    ['33.5 [FAIL-NOW] View details failure leaves focus on the button that was activated', async (t) => {
+      await open(t)
+      await inject(t.page, '**/api/v1/bookings/*', 'abort', { method: 'GET' })
+      await activate(t.page, view(t), 'enter')
+      await t.page.getByRole('alert').waitFor()
+      await landed(t, { tag: 'BUTTON', name: `View details for ${t.unit.name}` }, 'view details failed')
+      assert.equal(await panel(t).count(), 0, 'no panel')
+    }, { unit: UNIT, reserve: true, modes: ['http'] }],
+    ['33.6 [FAIL-NOW] Retry reservations lands on the page heading, or on itself when it fails again', async (t) => {
+      await inject(t.page, '**/api/v1/bookings', 'abort', { method: 'GET' })
+      await t.page.evaluate(() => { location.hash = '/reservations' })
+      const retry = t.page.getByRole('button', { name: 'Retry reservations', exact: true })
+      await retry.waitFor()
+      const before = gets(t, '/api/v1/bookings')
+      await activate(t.page, retry, 'enter')
+      await until(() => gets(t, '/api/v1/bookings') > before, 'the retried list request')
+      await landed(t, { tag: 'BUTTON', name: 'Retry reservations' }, 'retry fails again')
+      await t.page.unroute('**/api/v1/bookings')
+      await activate(t.page, retry, 'enter')
+      await t.page.locator('.reservation-row').first().waitFor()
+      await landed(t, PAGE_HEADING, 'retry succeeds')
+    }, { unit: UNIT, reserve: true, modes: ['http'] }],
+  ]
+  for (const how of ['space', 'pointer']) {
+    cases.push([`33.7 [FAIL-NOW] ${how} on "View details" and "Cancel reservation" lands on the details heading`, async (t) => {
+      await open(t)
+      await openDetails(t, how)
+      await landed(t, HEADING, `${how}: View details`)
+      await cancelled(t, how)
+      await landed(t, HEADING, `${how}: cancel success`)
+    }, { unit: UNIT, reserve: true, modes: ['http'] }])
+  }
+  cases.push(['33.8 [FAIL-NOW] one landing on the heading, no pull-back, Tab, Shift+Tab and typing move focus normally', async (t) => {
+    await open(t)
+    await countFocusins(t.page)
+    await openDetails(t)
+    await landed(t, HEADING, 'landing')
+    assert.equal(await focusins(t.page, 'reservation-detail-title'), 1, 'one landing')
+    await t.page.keyboard.press('Tab')
+    await pause(1000)
+    await assertFocus(t.page, CANCEL, 'Tab')
+    await t.page.keyboard.press('Shift+Tab')
+    await pause(1000)
+    // The heading is not a tab stop: Shift+Tab from "Cancel reservation" goes to the previous one, the row's "View details".
+    await assertFocus(t.page, { tag: 'BUTTON', name: `View details for ${t.unit.name}` }, 'Shift+Tab moves normally')
+    assert.equal(await focusins(t.page, 'reservation-detail-title'), 1, 'Tab and Shift+Tab are not pulled back to the heading')
+    await t.page.keyboard.type('x')
+    await pause(1000)
+    assert.equal(await focusins(t.page, 'reservation-detail-title'), 1, 'typing and rerenders never reclaim focus')
+  }, { unit: UNIT, reserve: true, modes: ['http'] }])
+  cases.push(['33.8 [GUARD] the History tab keeps its own focus when activated by keyboard', async (t) => {
+    await open(t)
+    await openDetails(t)
+    await activate(t.page, t.page.getByRole('button', { name: 'History', exact: true }), 'enter')
+    await pause(600)
+    await assertFocus(t.page, { tag: 'BUTTON', name: 'History' }, 'the History tab keeps its own focus')
+    assert.equal(await panel(t).count(), 0, 'switching tabs closes the panel')
+    await activate(t.page, t.page.getByRole('button', { name: 'Upcoming', exact: true }), 'enter')
+    await pause(600)
+    await assertFocus(t.page, { tag: 'BUTTON', name: 'Upcoming' }, 'the Upcoming tab keeps its own focus')
+  }, { unit: UNIT, reserve: true, modes: ['http'] }])
+  cases.push(['33.9 [GUARD] panel semantics, status role, one cancel request, no overflow', async (t) => {
+    await open(t)
+    await assertNoOverflow(t.page, 'list')
+    await openDetails(t)
+    assert.equal(await panel(t).getAttribute('aria-labelledby'), 'reservation-detail-title')
+    assert.equal(await t.page.locator('#reservation-detail-title').innerText(), 'Reservation details')
+    assert.ok(await panel(t).locator('ol.event-timeline li').count() >= 1, 'event timeline')
+    await assertNoOverflow(t.page, 'details')
+    await cancelled(t)
+    assert.equal(await t.page.locator('[role="status"]', { hasText: 'Reservation cancelled.' }).count(), 1)
+    assert.equal(posts(t, cancelPath(t)), 1, 'one cancel request')
+    await assertNoOverflow(t.page, 'after cancel')
+  }, { unit: UNIT, reserve: true, modes: ['http'] }])
+  cases.push(['33.10 [GUARD] navigating away while the cancel is pending does not steal focus', async (t) => {
+    await open(t)
+    await openDetails(t)
+    await inject(t.page, '**/api/v1/bookings/*/cancel', 'pass', { method: 'POST', delay: 1200 })
+    await activate(t.page, cancelButton(t), 'enter')
+    await t.page.getByRole('button', { name: 'Cancelling…', exact: true }).waitFor()
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await pause(2000)
+    await assertFocus(t.page, { id: 'main-content', tag: 'H1', name: 'Explore' }, 'no steal on Explore')
+  }, { unit: UNIT, reserve: true, modes: ['http'] }])
+  cases.push(['33.11 [FAIL-NOW][MOCK] maya_student: View details and a successful cancel land on the details heading', async (t) => {
+    await t.h.signIn('maya_student', 'StudentDemo42!', 'reservations')
+    const row = t.page.locator('.reservation-row', { hasText: 'Cancellation available in details.' }).first()
+    await row.waitFor()
+    const name = await row.locator('h3').innerText()
+    await activate(t.page, row.getByRole('button'), 'enter')
+    await opened(t, name).waitFor()
+    await landed(t, HEADING, 'mock View details')
+    await cancelled(t)
+    await landed(t, HEADING, 'mock cancel success')
+  }, { modes: ['mock'], bare: true }])
+  defineCases(suite, cases)
+}
+

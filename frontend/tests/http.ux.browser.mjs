@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue33, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -89,6 +89,22 @@ suite.seedDesk = async t => {
   await step(returned, 'return', 3, 'Returned complete and clean')
   return { pending, approved, returned }
 }
+/** A second unit (unique code) for cases that need more than the case's own unit. */
+suite.newUnit = async (overrides = {}) => {
+  const n = ++serial
+  const unit = await api(stack, '/api/v1/staff/assets', { method: 'POST', token: coordinatorToken, body: { name: `UX unit ${n}`, inventoryCode: `UX-${n}`, category: 'Cameras', location: 'Club desk', description: 'Extra unit for a usability regression.', ...overrides } })
+  assert.equal(unit.status, 201, JSON.stringify(unit.json))
+  return unit.json
+}
+/** A booking of one day, `offset` days ahead, for the case student (returns the booking). */
+suite.book = async (t, assetId, offset, purposeText = 'Second reservation for the focus check') => {
+  const day = addDays(t.today, offset)
+  const made = await api(stack, '/api/v1/bookings', { method: 'POST', token: t.token, body: { assetId, startDate: day, endDate: day, purpose: purposeText } })
+  assert.equal(made.status, 201, JSON.stringify(made.json))
+  return made.json
+}
+/** A coordinator API call (staff actions behind the page's back: approve, check out, return, cancel). */
+suite.staff = (path, body, method = 'POST') => api(stack, path, { method, token: coordinatorToken, body })
 /** Ends the case student's session on the server (the page still holds the token). */
 suite.revoke = async t => {
   const result = await api(stack, '/api/v1/auth/logout', { method: 'POST', token: t.token })
@@ -113,3 +129,4 @@ describe('issue #36 — calendar month across the availability refresh', { skip:
 describe('issue #37 — long unbroken equipment text on the asset detail page', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))
 describe('issue #38 — long unbroken equipment names on My reservations', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))
 describe('issue #43 — Retry detail on the asset detail load error', { skip: !selectedIssue(43), concurrency: false }, () => issue43(suite))
+describe('issue #33 — My reservations: View details and Cancel reservation focus', { skip: !selectedIssue(33), concurrency: false }, () => issue33(suite))
