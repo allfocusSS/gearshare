@@ -2,12 +2,12 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, issue37, issue38, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
 before(async () => {
-  stack = await startStack({ backendPort: 6241, vitePort: 6242 })
+  stack = await startStack({ backendPort: Number(process.env.UX_HTTP_BACKEND_PORT ?? 6241), vitePort: Number(process.env.UX_HTTP_VITE_PORT ?? 6242) })
   suite.base = stack.frontendUrl
   browser = await launchBrowser()
   const login = await api(stack, '/api/v1/auth/login', { method: 'POST', body: stack.coordinator })
@@ -112,3 +112,4 @@ describe('issue #32 — focus after the booking request settles', { skip: !selec
 describe('issue #36 — calendar month across the availability refresh', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
 describe('issue #37 — long unbroken equipment text on the asset detail page', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))
 describe('issue #38 — long unbroken equipment names on My reservations', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))
+describe('issue #43 — Retry detail on the asset detail load error', { skip: !selectedIssue(43), concurrency: false }, () => issue43(suite))

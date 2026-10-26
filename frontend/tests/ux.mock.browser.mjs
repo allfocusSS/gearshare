@@ -2,11 +2,12 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue36, issue37, issue38, selectedIssue } from './support/ux.mjs'
-const suite = { mode: 'mock', base: 'http://127.0.0.1:6243', output: outputFolder('mock-ux'), records: [] }
+import { issue31, issue32, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
+const mockPort = Number(process.env.UX_MOCK_PORT ?? 6243)
+const suite = { mode: 'mock', base: `http://127.0.0.1:${mockPort}`, output: outputFolder('mock-ux'), records: [] }
 let server, browser, serial = 0
 before(async () => {
-  server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '6243', '--strictPort'], { cwd: frontendDir, stdio: 'ignore', env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
+  server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(mockPort), '--strictPort'], { cwd: frontendDir, stdio: 'ignore', env: { ...process.env, VITE_GEARSHARE_SERVICE: 'mock' } })
   for (let i = 0; i < 100; i++) { try { if ((await fetch(suite.base)).ok) break } catch {} await new Promise(resolve => setTimeout(resolve, 100)) }
   browser = await launchBrowser()
 })
@@ -19,6 +20,8 @@ suite.fresh = async (width, name, options = {}) => {
   const h = createHelpers(page, suite.base)
   const student = newStudent('ux31mock')
   let unit = null, assetId = 'camera-01'
+  // `options.bare`: an empty page for the cases of other screens; the case itself navigates and signs in.
+  if (options.bare) return { page, context, width, name, today: clubToday(), day: addDays(clubToday(), 20), assetId, unit, student }
   if (options.unit) {
     // Units for the text-wrapping cases are added through the real Inventory form as the coordinator, as QA's 37.10 asks.
     await page.goto(`${suite.base}/#/signin?returnTo=inventory`)
@@ -79,3 +82,4 @@ describe('issue #32 — mock focus after the booking request settles (includes 3
 describe('issue #36 — mock calendar month across the availability refresh (includes 36.9)', { skip: !selectedIssue(36), concurrency: false }, () => issue36(suite))
 describe('issue #37 — mock long unbroken equipment text (37.10)', { skip: !selectedIssue(37), concurrency: false }, () => issue37(suite))
 describe('issue #38 — mock long unbroken equipment names on My reservations (38.11)', { skip: !selectedIssue(38), concurrency: false }, () => issue38(suite))
+describe('issue #43 — mock Retry detail on the asset detail load error (43.11)', { skip: !selectedIssue(43), concurrency: false }, () => issue43(suite))

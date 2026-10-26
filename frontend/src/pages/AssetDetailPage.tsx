@@ -6,6 +6,7 @@ import { DateRangeFields } from '../components/DateRangeFields.tsx'
 import { AvailabilityCalendar } from '../components/AvailabilityCalendar.tsx'
 import { demoControls, isMockMode } from '../services/index.ts'
 import { Icon } from '../components/Icon.tsx'
+import { focusIfDropped } from '../focus.ts'
 
 export function AssetDetailPage({ assetId, service, user }: { assetId: string; service: GearShareService; user: User | null }) {
   const [data, setData] = useState<{ asset: Asset; availability: AssetAvailability } | null>(null)
@@ -30,6 +31,8 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
   const availabilityHeading = useRef<HTMLHeadingElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
   const restoreRetryFocus = useRef(false)
+  const retryDetail = useRef<HTMLButtonElement>(null)
+  const restoreDetailFocus = useRef(false)
   const requestButton = useRef<HTMLButtonElement>(null)
   const [refreshState, setRefreshState] = useState<'ready' | 'loading' | 'error'>('ready')
   async function refreshAvailability(generation = request.current) {
@@ -109,8 +112,17 @@ export function AssetDetailPage({ assetId, service, user }: { assetId: string; s
     ;(refreshState === 'ready' ? availabilityHeading.current : retryButton.current)?.focus()
   }, [refreshState])
 
+  // "Retry detail" is removed with the error section while the load runs, which drops focus. When the load settles, restore it
+  // once: the page heading after success, the re-rendered "Retry detail" after another failure (no button for "not found").
+  // A route change unmounts this page, so nothing is moved on the new page.
+  useEffect(() => {
+    if (!restoreDetailFocus.current || loading) return
+    restoreDetailFocus.current = false
+    focusIfDropped((error && retryDetail.current) || document.getElementById('main-content'))
+  }, [loading, error])
+
   if (loading) return <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" />Loading equipment and calendar…</div>
-  if (error) return <section className="workspace-placeholder detail-error" role="alert"><span className="placeholder-icon"><Icon name="box" /></span><h2>{error.code === 'NOT_FOUND' ? 'Equipment not found.' : 'Could not load this equipment.'}</h2><p>{error.message}</p>{error.code !== 'NOT_FOUND' && <button type="button" className="button secondary" onClick={() => setRetry((value) => value + 1)}>Retry detail</button>}<a className="button primary" href="#/explore">Back to Explore<Icon name="arrow" /></a></section>
+  if (error) return <section className="workspace-placeholder detail-error" role="alert"><span className="placeholder-icon"><Icon name="box" /></span><h2>{error.code === 'NOT_FOUND' ? 'Equipment not found.' : 'Could not load this equipment.'}</h2><p>{error.message}</p>{error.code !== 'NOT_FOUND' && <button type="button" ref={retryDetail} className="button secondary" onClick={() => { restoreDetailFocus.current = true; setRetry((value) => value + 1) }}>Retry detail</button>}<a className="button primary" href="#/explore">Back to Explore<Icon name="arrow" /></a></section>
   if (!data) return null
   const { asset, availability } = data
   const dateError = validateDateRange(range.startDate, range.endDate, availability.today)

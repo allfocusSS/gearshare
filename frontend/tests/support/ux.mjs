@@ -521,6 +521,59 @@ export function defineCases(suite, cases, { widths = WIDTHS } = {}) {
 // EXTENSION POINT: part B appends helpers here (focus sweeps for #33-#35/#39-#41, the 21-state font scan with aria-hidden
 // and pseudo-element handling for #42) and its `issueNN(suite)` sections at "PART B SECTIONS" below.
 
+// ---- part B helpers: focus landings, activation, failure injection ---------------------------------------------------------
+
+/** Landing assertion bound to a suite: waits the QA settle time (request finished plus 400 ms), then checks `document.activeElement`. */
+export const landing = (suite) => async (t, expected, label) => {
+  await settle(t.page)
+  return assertFocus(t.page, expected, `${label} (${suite.mode} @${t.width})`)
+}
+
+/** Installs a `focusin` counter keyed by element id (read with `focusins`). Call it before the action under test. */
+export const countFocusins = (page) => page.evaluate(() => {
+  window.__focusIns = {}
+  document.addEventListener('focusin', (event) => { const key = event.target.id || event.target.tagName; window.__focusIns[key] = (window.__focusIns[key] ?? 0) + 1 })
+})
+export const focusins = (page, key) => page.evaluate((key) => window.__focusIns?.[key] ?? 0, key)
+
+/**
+ * Activates a control the way the QA cases do: 'enter' and 'space' put keyboard focus on it first and press the key,
+ * 'pointer' is a real mouse click. Returns after the key or click event was dispatched, not after anything settled.
+ */
+export async function activate(page, locator, how = 'enter') {
+  if (how === 'pointer') return locator.click()
+  await locator.focus()
+  await page.keyboard.press(how === 'space' ? 'Space' : 'Enter')
+}
+export const HOWS = ['enter', 'space', 'pointer']
+
+/**
+ * Failure injection on a route glob: kind 'abort' (lost connection), '500' (fulfilled server error) or 'pass' (only delay).
+ * `method` limits it to one HTTP method, `delay` waits first. Undo with `page.unroute(pattern)`.
+ */
+export function inject(page, pattern, kind, { method, delay = 0 } = {}) {
+  return page.route(pattern, async (route) => {
+    if (method && route.request().method() !== method) return route.fallback()
+    if (delay) await pause(delay)
+    if (kind === 'abort') return route.abort('connectionreset')
+    if (kind === '500') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'INTERNAL_ERROR', message: 'Internal server error.' }) })
+    return route.fallback()
+  })
+}
+
+/** Polls `read()` until it returns something truthy (page-side counters, request sinks). */
+export async function until(read, label, timeout = 8000) {
+  const limit = Date.now() + timeout
+  for (;;) {
+    const value = await read()
+    if (value) return value
+    if (Date.now() > limit) throw new Error(`timed out waiting for ${label}`)
+    await pause(50)
+  }
+}
+export const gets = (t, url) => t.sink.requests.filter((request) => request.method === 'GET' && request.url === url).length
+export const posts = (t, url) => t.sink.requests.filter((request) => request.method === 'POST' && request.url === url).length
+
 // ====================================================================================================================
 // PART A SECTIONS: #32, #36, #37, #38 (each added in its own commit, after its red run)
 // ====================================================================================================================
@@ -1222,3 +1275,154 @@ export function issue38(suite) {
 // ====================================================================================================================
 // PART B SECTIONS: #33, #34, #35, #39, #40, #41, #43, #42
 // ====================================================================================================================
+
+// ---- #43: Retry detail on the asset detail load error ----------------------------------------------------------------------
+
+const MAIN_HEADING = { id: 'main-content', tag: 'H1' }
+
+export function issue43(suite) {
+  const landed = landing(suite)
+  const RETRY = { tag: 'BUTTON', name: 'Retry detail' }
+  const calls = { asset: (t) => `**/api/v1/assets/${t.assetId}`, availability: (t) => `**/api/v1/assets/${t.assetId}/availability` }
+  const path = { asset: (t) => `/api/v1/assets/${t.assetId}`, availability: (t) => `/api/v1/assets/${t.assetId}/availability` }
+  const alertHeading = (t) => t.page.getByRole('heading', { name: 'Could not load this equipment.', level: 2 })
+  const retryButton = (t) => t.page.getByRole('button', { name: 'Retry detail', exact: true })
+  const loaded = (t) => t.page.getByRole('heading', { name: 'Check availability', level: 2 }).waitFor()
+  /** Opens the detail page with one of its two calls failing: the load-error section with "Retry detail" and "Back to Explore". */
+  const openFailing = async (t, which, kind) => {
+    await inject(t.page, calls[which](t), kind)
+    await t.page.reload()
+    await alertHeading(t).waitFor()
+    await retryButton(t).waitFor()
+    await t.page.getByRole('link', { name: 'Back to Explore', exact: true }).waitFor()
+  }
+  /** Activates "Retry detail" and returns after the retry request was sent (the page is not settled yet). */
+  const retry = async (t, which, how) => {
+    const before = gets(t, path[which](t))
+    await activate(t.page, retryButton(t), how)
+    await until(() => gets(t, path[which](t)) > before, 'the retried request')
+  }
+  const cases = []
+  for (const [which, success, failing] of [['asset', '43.1', '43.2'], ['availability', '43.3', '43.3']]) {
+    cases.push([`${success} [FAIL-NOW] success after a failed ${which} call lands on the page heading`, async (t) => {
+      await openFailing(t, which, 'abort')
+      await t.page.unroute(calls[which](t))
+      await retry(t, which, 'enter')
+      await loaded(t)
+      await landed(t, { ...MAIN_HEADING, name: 'Equipment detail' }, `${which} call restored`)
+    }, { modes: ['http'] }])
+    for (const kind of ['abort', '500']) {
+      cases.push([`${failing} [FAIL-NOW] a retry that fails again (${which} call ${kind === 'abort' ? 'still aborted' : 'answered 500'}) lands on "Retry detail"`, async (t) => {
+        await openFailing(t, which, 'abort')
+        if (kind === '500') { await t.page.unroute(calls[which](t)); await inject(t.page, calls[which](t), '500') }
+        await retry(t, which, 'enter')
+        await landed(t, RETRY, `${which} retry fails again (${kind})`)
+        assert.equal(await alertHeading(t).count(), 1, 'the alert is shown again')
+        assert.equal(await retryButton(t).isEnabled(), true, 'the Retry detail button is enabled')
+        // A further Enter, without touching the focus, retries once more and sends exactly one more request.
+        const before = gets(t, path[which](t))
+        await t.page.keyboard.press('Enter')
+        await until(() => gets(t, path[which](t)) > before, 'one more request')
+        await landed(t, RETRY, 'second retry fails again')
+        assert.equal(gets(t, path[which](t)), before + 1, 'exactly one more request')
+      }, { modes: ['http'] }])
+    }
+  }
+  for (const how of ['space', 'pointer']) {
+    for (const which of ['asset', 'availability']) {
+      cases.push([`43.4 [FAIL-NOW] ${how} on "Retry detail" (${which} call): success and failing again`, async (t) => {
+        await openFailing(t, which, 'abort')
+        await retry(t, which, how)
+        await landed(t, RETRY, `${how}: fails again`)
+        await t.page.unroute(calls[which](t))
+        await retry(t, which, how)
+        await loaded(t)
+        await landed(t, { ...MAIN_HEADING, name: 'Equipment detail' }, `${how}: success`)
+      }, { modes: ['http'] }])
+    }
+  }
+  cases.push(['43.5 [FAIL-NOW] one landing on the heading, no pull-back, Tab, Shift+Tab and typing move focus normally', async (t) => {
+    await openFailing(t, 'asset', 'abort')
+    await t.page.unroute(calls.asset(t))
+    await countFocusins(t.page)
+    await retry(t, 'asset', 'enter')
+    await loaded(t)
+    await landed(t, { ...MAIN_HEADING, name: 'Equipment detail' }, 'landing')
+    assert.equal(await focusins(t.page, 'main-content'), 1, 'exactly one focusin on the heading')
+    await t.page.keyboard.press('Tab')
+    await pause(1000)
+    const tabbed = await activeInfo(t.page)
+    assert.ok(!tabbed.isBody && tabbed.id !== 'main-content', `Tab moved on (${describeActive(tabbed)})`)
+    await t.page.keyboard.press('Shift+Tab')
+    await pause(1000)
+    const back = await activeInfo(t.page)
+    assert.ok(!back.isBody && back.id !== 'main-content', `Shift+Tab moved normally (${describeActive(back)})`)
+    await t.page.locator('#booking-purpose').focus()
+    await t.page.keyboard.type('typing works')
+    await pause(1000)
+    assert.equal(await t.page.locator('#booking-purpose').inputValue(), 'typing works')
+    await assertFocus(t.page, { id: 'booking-purpose' }, 'typing keeps focus where it is')
+    assert.equal(await focusins(t.page, 'main-content'), 1, 'no rerender pulled focus back to the heading')
+  }, { modes: ['http'] }])
+  cases.push(['43.6 [GUARD] navigating away while the retry is pending does not steal focus on the new page', async (t) => {
+    await openFailing(t, 'asset', 'abort')
+    await t.page.unroute(calls.asset(t))
+    await inject(t.page, calls.asset(t), 'pass', { delay: 1500 })
+    await activate(t.page, retryButton(t), 'enter')
+    await t.page.getByText('Loading equipment and calendar…').waitFor()
+    await t.page.evaluate(() => { location.hash = '/reservations' })
+    await t.page.getByRole('heading', { name: 'My reservations', level: 1 }).waitFor()
+    await pause(2200) // the delayed call finishes while the new page is shown
+    await assertFocus(t.page, { ...MAIN_HEADING, name: 'My reservations' }, 'no steal on the new page')
+  }, { modes: ['http'] }])
+  cases.push(['43.7 [GUARD] "Equipment not found." has no Retry, route changes still focus the heading', async (t) => {
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.evaluate(() => { location.hash = '/assets/does-not-exist-123' })
+    await t.page.getByRole('heading', { name: 'Equipment not found.', level: 2 }).waitFor()
+    assert.equal(await retryButton(t).count(), 0, 'no Retry detail button for a missing id')
+    assert.equal(await t.page.getByRole('link', { name: 'Back to Explore', exact: true }).count(), 1)
+    await landed(t, { ...MAIN_HEADING, name: 'Equipment detail' }, 'not found')
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.evaluate((id) => { location.hash = `/assets/${id}` }, t.assetId)
+    await loaded(t)
+    await landed(t, { ...MAIN_HEADING, name: 'Equipment detail' }, 'route change to a working detail page')
+  }, { modes: ['http'] }])
+  cases.push(['43.8 [GUARD] "Retry availability" after a request stays; "Retry detail" is not shown', async (t) => {
+    await t.dates(t.day, t.day)
+    await t.purpose(purpose)
+    await inject(t.page, calls.availability(t), 'abort')
+    await pressRequest(t)
+    await t.page.getByText('Could not refresh availability.').waitFor()
+    assert.equal(await t.page.getByRole('button', { name: 'Retry availability', exact: true }).count(), 1)
+    assert.equal(await retryButton(t).count(), 0, 'Retry detail is not shown')
+  }, { modes: ['http'] }])
+  cases.push(['43.9 [GUARD] the error state has no overflow and both controls are 44 px high inside the viewport', async (t) => {
+    await openFailing(t, 'asset', 'abort')
+    await assertNoOverflow(t.page, 'error state')
+    for (const control of [retryButton(t), t.page.getByRole('link', { name: 'Back to Explore', exact: true })]) {
+      const box = await geometry(control)
+      assert.ok(box.height >= 44 - 0.5, `${box.text.trim()} is ${box.height}px high`)
+      assert.ok(box.left >= 0 && box.right <= box.innerWidth, `${box.text.trim()} ${Math.round(box.left)}-${Math.round(box.right)} is inside the ${box.innerWidth}px viewport`)
+    }
+  }, { modes: ['http'] }])
+  cases.push(['43.11 [FAIL-NOW][MOCK] Error fixture: Retry detail fails again and focus stays on "Retry detail" (keyboard and pointer)', async (t) => {
+    await t.page.goto(`${suite.base}/#/explore`)
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.locator('details.demo-controls summary').click()
+    await t.page.locator('#demo-scenario').selectOption('error')
+    await t.page.evaluate(() => { location.hash = '/assets/camera-01' })
+    await alertHeading(t).waitFor()
+    for (const how of ['enter', 'pointer']) {
+      await activate(t.page, retryButton(t), how)
+      // The mock answers after 250 ms: settled means the loading state came and the error section is back.
+      await t.page.getByText('Loading equipment and calendar…').waitFor()
+      await alertHeading(t).waitFor()
+      await landed(t, RETRY, `mock Error fixture, ${how}`)
+      assert.equal(await alertHeading(t).count(), 1, 'the alert is shown again')
+      assert.match(await t.page.getByRole('alert').filter({ has: alertHeading(t) }).innerText(), /The demo service is unavailable\. Try again or choose the Normal fixture\./)
+    }
+  }, { modes: ['mock'], bare: true }])
+  defineCases(suite, cases)
+}
