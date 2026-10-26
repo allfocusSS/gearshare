@@ -3,6 +3,7 @@ import type { Booking, BookingAction, GearShareService, ServiceError, StaffBooki
 import { formatCalendarDate } from '../services/dates.ts'
 import { BookingHistory } from '../components/BookingHistory.tsx'
 import { Icon } from '../components/Icon.tsx'
+import { focusIfDropped } from '../focus.ts'
 
 const views = [ ['pending', 'Pending requests'], ['approved', 'Pickups'], ['checked_out', 'Active loans'], ['history', 'History'] ] as const
 const actionLabels = { approve: 'Approve request', reject: 'Reject request', cancel: 'Cancel reservation', checkout: 'Check out equipment', return: 'Record return' } as const
@@ -18,7 +19,7 @@ export function CoordinatorPage({ service }: { service: GearShareService }) {
   const [deskError, setDeskError] = useState<ServiceError | null>(null), [savedAwaitingDesk, setSavedAwaitingDesk] = useState(false)
   const request = useRef(0), busy = useRef(false), returnFocus = useRef('desk-views')
   const reading = useRef(false), refreshFocus = useRef(false)
-  const heading = useRef<HTMLHeadingElement>(null), noteField = useRef<HTMLTextAreaElement>(null)
+  const heading = useRef<HTMLHeadingElement>(null), noteField = useRef<HTMLTextAreaElement>(null), confirm = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     const id = ++request.current
     reading.current = true
@@ -35,7 +36,14 @@ export function CoordinatorPage({ service }: { service: GearShareService }) {
   useEffect(() => { if (selected) heading.current?.focus() }, [selected?.id])
   useEffect(() => { if (action) { if (['reject', 'checkout', 'return'].includes(action)) noteField.current?.focus(); else document.getElementById('staff-action-title')?.focus() } }, [action])
   useEffect(() => { if (!pending && message) heading.current?.focus() }, [message, pending])
-  useEffect(() => { if (!pending && error?.fields?.note) noteField.current?.focus() }, [error, pending])
+  useEffect(() => {
+    if (pending || !error) return
+    // A note that failed validation is a field failure: first invalid control. Any other failure (a stale 409, a lost connection)
+    // returns to the Confirm button that started the action once it is enabled again, unless the user already moved focus. A 401
+    // is not handled here: App moves focus to "Sign in again".
+    if (error.fields?.note) noteField.current?.focus()
+    else if (error.code !== 'UNAUTHENTICATED') focusIfDropped(confirm.current, confirm.current)
+  }, [error, pending])
   useEffect(() => {
     if (!loading && refreshFocus.current) {
       refreshFocus.current = false
@@ -96,7 +104,7 @@ export function CoordinatorPage({ service }: { service: GearShareService }) {
       {verifiedSelected?.overdue && <p className="custody-note">This loan is overdue. Record its return to release physical custody; late returns remain available.</p>}
       {!desk && <p className="muted">Refresh the desk before another staff action. The confirmed reservation and its event history are retained below.</p>}
       {desk && !action && <div className="staff-actions">{selected.state === 'pending' && <><button className="button primary" disabled={pending} onClick={() => setAction('approve')}>Approve request</button><button className="button secondary danger" disabled={pending} onClick={() => setAction('reject')}>Reject request</button></>}{selected.state === 'approved' && <button className="button primary" disabled={pending} onClick={() => setAction('checkout')}>Check out equipment</button>}{['pending', 'approved'].includes(selected.state) && <button className="button secondary danger" disabled={pending} onClick={() => setAction('cancel')}>Cancel reservation</button>}{selected.state === 'checked_out' && <button className="button primary" disabled={pending} onClick={() => setAction('return')}>Record return</button>}{['rejected', 'cancelled', 'returned'].includes(selected.state) && <p className="muted">This reservation is complete. Its event history is retained.</p>}</div>}
-      {action && <form className="staff-action-form" onSubmit={event => { event.preventDefault(); void submit() }} noValidate aria-label={actionLabels[action]}><h3 id="staff-action-title" tabIndex={-1}>{actionLabels[action]}</h3><p>{action === 'approve' ? 'Approve the requested dates for this physical unit.' : action === 'cancel' ? 'Cancel this reservation and release its booked dates. The event history will remain.' : action === 'reject' ? 'Explain why this request cannot go ahead. The reason stays in its history.' : action === 'checkout' ? 'Confirm the unit, accessories and condition before handing it over.' : 'Check the returned unit and accessories, then record their condition.'}</p>{notesRequired && <div className="field"><label htmlFor="staff-note">{noteLabel}</label><textarea id="staff-note" ref={noteField} value={note} disabled={pending} aria-invalid={!!error?.fields?.note} aria-describedby={`staff-note-hint${error?.fields?.note ? ' staff-note-error' : ''}`} onChange={event => setNote(event.target.value)} /><span className="field-hint" id="staff-note-hint">Required · 3–500 characters after trimming whitespace.</span>{error?.fields?.note && <span className="field-error" id="staff-note-error">{error.fields.note}</span>}</div>}<div className="staff-actions"><button className={`button ${action === 'reject' || action === 'cancel' ? 'destructive' : 'primary'}`} disabled={pending} type="submit">{pending ? 'Saving…' : `Confirm ${actionLabels[action].toLowerCase()}`}</button><button className="button secondary" disabled={pending} type="button" onClick={() => { setAction(null); setNote(''); setError(null); requestAnimationFrame(() => heading.current?.focus()) }}>Keep reservation unchanged</button></div><p className="pending-text" role="status">{pending ? 'Saving the action and refreshing queues…' : ''}</p></form>}
+      {action && <form className="staff-action-form" onSubmit={event => { event.preventDefault(); void submit() }} noValidate aria-label={actionLabels[action]}><h3 id="staff-action-title" tabIndex={-1}>{actionLabels[action]}</h3><p>{action === 'approve' ? 'Approve the requested dates for this physical unit.' : action === 'cancel' ? 'Cancel this reservation and release its booked dates. The event history will remain.' : action === 'reject' ? 'Explain why this request cannot go ahead. The reason stays in its history.' : action === 'checkout' ? 'Confirm the unit, accessories and condition before handing it over.' : 'Check the returned unit and accessories, then record their condition.'}</p>{notesRequired && <div className="field"><label htmlFor="staff-note">{noteLabel}</label><textarea id="staff-note" ref={noteField} value={note} disabled={pending} aria-invalid={!!error?.fields?.note} aria-describedby={`staff-note-hint${error?.fields?.note ? ' staff-note-error' : ''}`} onChange={event => setNote(event.target.value)} /><span className="field-hint" id="staff-note-hint">Required · 3–500 characters after trimming whitespace.</span>{error?.fields?.note && <span className="field-error" id="staff-note-error">{error.fields.note}</span>}</div>}<div className="staff-actions"><button ref={confirm} className={`button ${action === 'reject' || action === 'cancel' ? 'destructive' : 'primary'}`} disabled={pending} type="submit">{pending ? 'Saving…' : `Confirm ${actionLabels[action].toLowerCase()}`}</button><button className="button secondary" disabled={pending} type="button" onClick={() => { setAction(null); setNote(''); setError(null); requestAnimationFrame(() => heading.current?.focus()) }}>Keep reservation unchanged</button></div><p className="pending-text" role="status">{pending ? 'Saving the action and refreshing queues…' : ''}</p></form>}
       <BookingHistory booking={selected} />
     </section> : loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" />Loading coordinator desk…</div> : !desk ? <p className="muted">The coordinator desk is unavailable. Use Refresh desk to retry.</p> : <>
       <dl className="desk-counts"><div><dt>Pending requests</dt><dd>{desk.counts.pending}<Icon name="desk" /></dd></div><div><dt>Returns due today</dt><dd>{desk.counts.dueToday}<Icon name="calendar" /></dd></div><div className={desk.counts.overdue ? 'needs-attention' : ''}><dt>Overdue loans</dt><dd>{desk.counts.overdue}<Icon name="box" /></dd></div></dl>

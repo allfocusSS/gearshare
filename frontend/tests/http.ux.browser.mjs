@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue33, issue34, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue33, issue34, issue35, issue36, issue37, issue38, issue43, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -30,7 +30,14 @@ suite.fresh = async (width, name, options = {}) => {
   } })
   assert.equal(unit.status, 201, JSON.stringify(unit.json))
   const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'en-US', timezoneId: 'Asia/Almaty' })
-  const token = options.as === 'coordinator' ? coordinatorToken : registration.json.token
+  // 'coordinator-session' is a coordinator login of its own, so a case can end that session without touching the shared one.
+  let sessionToken = null
+  if (options.as === 'coordinator-session') {
+    const own = await api(stack, '/api/v1/auth/login', { method: 'POST', body: stack.coordinator })
+    assert.equal(own.status, 200)
+    sessionToken = own.json.token
+  }
+  const token = sessionToken ?? (options.as === 'coordinator' ? coordinatorToken : registration.json.token)
   if (options.signedIn !== false) await context.addInitScript(({ key, token }) => sessionStorage.setItem(key, token), { key: TOKEN_KEY, token })
   const page = await context.newPage()
   page.setDefaultTimeout(10_000)
@@ -55,7 +62,7 @@ suite.fresh = async (width, name, options = {}) => {
       booking = cancelled.json
     }
   }
-  return { page, context, width, name, today, day, assetId: unit.json.id, token: registration.json.token, student, unit: unit.json, booking }
+  return { page, context, width, name, today, day, assetId: unit.json.id, token: registration.json.token, sessionToken, student, unit: unit.json, booking }
 }
 /** A page of the same browser signed in as the coordinator (its own context, same viewport width). */
 suite.coordinatorPage = async t => {
@@ -105,6 +112,8 @@ suite.book = async (t, assetId, offset, purposeText = 'Second reservation for th
 }
 /** A coordinator API call (staff actions behind the page's back: approve, check out, return, cancel). */
 suite.staff = (path, body, method = 'POST') => api(stack, path, { method, token: coordinatorToken, body })
+/** An API call as any token (the case student, a coordinator session): suite.as(token, path, body, method = 'POST'). */
+suite.as = (token, path, body, method = 'POST') => api(stack, path, { method, token, body })
 /** Ends the case student's session on the server (the page still holds the token). */
 suite.revoke = async t => {
   const result = await api(stack, '/api/v1/auth/logout', { method: 'POST', token: t.token })
@@ -131,3 +140,4 @@ describe('issue #38 — long unbroken equipment names on My reservations', { ski
 describe('issue #43 — Retry detail on the asset detail load error', { skip: !selectedIssue(43), concurrency: false }, () => issue43(suite))
 describe('issue #33 — My reservations: View details and Cancel reservation focus', { skip: !selectedIssue(33), concurrency: false }, () => issue33(suite))
 describe('issue #34 — Inventory maintenance toggle focus', { skip: !selectedIssue(34), concurrency: false }, () => issue34(suite))
+describe('issue #35 — Coordinator desk: a failed staff action keeps focus', { skip: !selectedIssue(35), concurrency: false }, () => issue35(suite))

@@ -1765,3 +1765,196 @@ export function issue34(suite) {
   defineCases(suite, cases)
 }
 
+
+// ---- #35: coordinator desk, a failed staff action --------------------------------------------------------------------------
+
+export function issue35(suite) {
+  const landed = landing(suite)
+  const ACTIONS = { approve: 'Approve request', reject: 'Reject request', cancel: 'Cancel reservation', checkout: 'Check out equipment', return: 'Record return' }
+  const CONFIRM = { approve: 'Confirm approve request', reject: 'Confirm reject request', cancel: 'Confirm cancel reservation', checkout: 'Confirm check out equipment', return: 'Confirm record return' }
+  const QUEUE = { approve: 'Pending requests', reject: 'Pending requests', cancel: 'Pending requests', checkout: 'Pickups', return: 'Active loans' }
+  const NOTES = { reject: 'Not available for this project', checkout: 'Kit complete and in good condition', return: 'Returned complete and clean' }
+  const STALE = 'This reservation changed. Re-read it before continuing.'
+  const OFFLINE = 'Could not reach the GearShare server. Check your connection and try again.'
+  const BOOKING_HEADING = { id: 'staff-booking-title', tag: 'H2', name: 'Manage reservation' }
+  const confirmButton = (t) => t.page.locator('.staff-action-form button[type="submit"]')
+  const refreshDesk = (t) => t.page.getByRole('button', { name: 'Refresh desk', exact: true })
+  const keepButton = (t) => t.page.getByRole('button', { name: 'Keep reservation unchanged', exact: true })
+  // Cancelling is one endpoint for students and staff; the other four actions are staff routes.
+  const staffPath = (id, action) => (action === 'cancel' ? `/api/v1/bookings/${id}/cancel` : `/api/v1/staff/bookings/${id}/${action}`)
+  const desk = async (t, queue = 'Pending requests') => {
+    await t.page.evaluate(() => { location.hash = '/desk' })
+    await t.page.locator('#desk-views').waitFor()
+    if (queue !== 'Pending requests') await t.page.getByRole('button', { name: new RegExp(`^${queue}`) }).click()
+  }
+  /** Opens a booking's detail on the desk and then its action form (with the note typed unless `note` is null). */
+  const openAction = async (t, id, action, { queue = QUEUE[action], note = NOTES[action] } = {}) => {
+    await desk(t, queue)
+    await activate(t.page, t.page.locator(`#review-${id}`), 'enter')
+    await t.page.getByRole('heading', { name: 'Manage reservation', level: 2 }).waitFor()
+    await t.page.getByRole('button', { name: ACTIONS[action], exact: true }).click()
+    await t.page.locator('.staff-action-form').waitFor()
+    if (NOTES[action] && note !== null) await t.page.locator('#staff-note').fill(note)
+  }
+  const staffStep = async (id, action, version, note) => {
+    const done = await suite.staff(staffPath(id, action), { expectedVersion: version, ...(note ? { note } : {}) })
+    assert.equal(done.status, 200, `${action}: ${JSON.stringify(done.json)}`)
+  }
+  /**
+   * The booking each action needs, and `stale()`, which changes it behind the open page's back so the page's version is old:
+   * a pending request (the case reservation; the student cancels it), an approved pickup for today (staff cancel), or a
+   * checked-out loan (staff records the return).
+   */
+  const prepare = async (t, action, { approved = false } = {}) => {
+    if (action === 'checkout' || approved) {
+      const booking = await suite.book(t, t.assetId, approved ? 5 : 0)
+      await staffStep(booking.id, 'approve', 1)
+      return { booking, stale: () => suite.staff(staffPath(booking.id, 'cancel'), { expectedVersion: 2 }) }
+    }
+    if (action === 'return') {
+      const booking = await suite.book(t, t.assetId, 0)
+      await staffStep(booking.id, 'approve', 1)
+      await staffStep(booking.id, 'checkout', 2, NOTES.checkout)
+      return { booking, stale: () => suite.staff(staffPath(booking.id, 'return'), { expectedVersion: 3, note: NOTES.return }) }
+    }
+    return { booking: t.booking, stale: () => suite.as(t.token, `/api/v1/bookings/${t.booking.id}/cancel`, { expectedVersion: t.booking.version }) }
+  }
+  const COORDINATOR = { as: 'coordinator', modes: ['http'], reserve: true }
+  const cases = []
+  // 35.1 / 35.2: the stale-version 409 of the six action variants.
+  for (const [id, label, action, approved] of [
+    ['35.1', 'approve', 'approve'], ['35.2', 'reject', 'reject'], ['35.2', 'cancel of a pending booking', 'cancel'],
+    ['35.2', 'cancel of an approved booking', 'cancel', true], ['35.2', 'check out', 'checkout'], ['35.2', 'record return', 'return'],
+  ]) {
+    cases.push([`${id} [FAIL-NOW] stale-version 409 on ${label} lands on its enabled Confirm button, alert and note kept`, async (t) => {
+      const { booking, stale } = await prepare(t, action, { approved })
+      await openAction(t, booking.id, action, { queue: approved ? 'Pickups' : QUEUE[action] })
+      const behind = await stale()
+      assert.equal(behind.status, 200, `the change behind the page's back: ${behind.status} ${JSON.stringify(behind.json)}`)
+      await activate(t.page, confirmButton(t), 'enter')
+      await t.page.getByText(STALE).waitFor()
+      await landed(t, { tag: 'BUTTON', name: CONFIRM[action] }, `stale 409 (${label})`)
+      assert.equal(await confirmButton(t).isEnabled(), true, 'Confirm is enabled')
+      assert.equal(await refreshDesk(t).count(), 1, 'Refresh desk is shown')
+      if (NOTES[action]) assert.equal(await t.page.locator('#staff-note').inputValue(), NOTES[action], 'the note is retained')
+    }, COORDINATOR])
+  }
+  // 35.3 / 35.4: lost connection, and the retry by Enter alone.
+  for (const action of ['approve', 'reject', 'return']) {
+    cases.push([`${action === 'approve' ? '35.3/35.4' : '35.3'} [FAIL-NOW] lost connection on ${action} lands on Confirm, booking unchanged${NOTES[action] ? ', note retained' : '; Enter alone retries once and succeeds'}`, async (t) => {
+      const { booking } = await prepare(t, action)
+      await openAction(t, booking.id, action)
+      const route = `**${staffPath(booking.id, action)}`
+      await inject(t.page, route, 'abort', { method: 'POST' })
+      await activate(t.page, confirmButton(t), 'enter')
+      await t.page.getByText(OFFLINE).waitFor()
+      await landed(t, { tag: 'BUTTON', name: CONFIRM[action] }, `lost connection (${action})`)
+      if (NOTES[action]) assert.equal(await t.page.locator('#staff-note').inputValue(), NOTES[action], 'the note is retained')
+      const fresh = await suite.as(t.token, `/api/v1/bookings/${booking.id}`, undefined, 'GET')
+      assert.equal(fresh.json.state, action === 'return' ? 'checked_out' : 'pending', 'the booking is unchanged on a fresh read')
+      if (action !== 'approve') return
+      // 35.4: restore the connection and press Enter straight away, without any other focus action.
+      await t.page.unroute(route)
+      const before = posts(t, staffPath(booking.id, 'approve'))
+      await t.page.keyboard.press('Enter')
+      await t.page.keyboard.press('Enter')
+      await t.page.getByText('Request approved.', { exact: false }).waitFor()
+      await landed(t, BOOKING_HEADING, 'success after the retry')
+      assert.equal(posts(t, staffPath(booking.id, 'approve')), before + 1, 'exactly one request for the retry, also under a double Enter')
+    }, COORDINATOR])
+  }
+  // 35.5: a note that is too short is a field failure and keeps focus on the note.
+  for (const action of ['reject', 'checkout', 'return']) {
+    cases.push([`35.5 [GUARD] note "ab" on ${action} keeps focus on #staff-note, not on the button`, async (t) => {
+      const { booking } = await prepare(t, action)
+      await openAction(t, booking.id, action, { note: 'ab' })
+      await activate(t.page, confirmButton(t), 'enter')
+      await t.page.locator('#staff-note-error').waitFor()
+      await landed(t, { id: 'staff-note', tag: 'TEXTAREA' }, `field failure (${action})`)
+      assert.equal(await t.page.locator('#staff-note').getAttribute('aria-invalid'), 'true')
+    }, COORDINATOR])
+  }
+  cases.push(['35.6 [GUARD] 401 mid-action lands on "Sign in again" (shared with #32)', async (t) => {
+    const { booking } = await prepare(t, 'approve')
+    await openAction(t, booking.id, 'approve')
+    const ended = await suite.as(t.sessionToken, '/api/v1/auth/logout')
+    assert.ok([200, 204].includes(ended.status), `logout status ${ended.status}`)
+    await activate(t.page, confirmButton(t), 'enter')
+    await t.page.getByRole('link', { name: 'Sign in again', exact: true }).waitFor()
+    assert.ok(await t.page.getByText('Your session has ended. Sign in again to continue.').count() >= 1, 'session-ended alert')
+    await landed(t, { tag: 'A', name: 'Sign in again' }, '401 mid-action')
+  }, { ...COORDINATOR, as: 'coordinator-session' }])
+  cases.push(['35.7 [GUARD] recovery controls: DOM order, Shift+Tab twice from Confirm reaches Refresh desk, Tab reaches Keep reservation unchanged, Enter on Refresh desk focuses the heading', async (t) => {
+    const { booking, stale } = await prepare(t, 'approve')
+    await openAction(t, booking.id, 'approve')
+    assert.equal((await stale()).status, 200)
+    await activate(t.page, confirmButton(t), 'enter')
+    await t.page.getByText(STALE).waitFor()
+    await settle(t.page)
+    const order = await t.page.evaluate(() => [...document.querySelectorAll('main button, main a')].map((element) => element.textContent.trim().replace(/\s+/g, ' ')))
+    const wanted = ['Refresh desk', '← Back to queues', 'Confirm approve request', 'Keep reservation unchanged']
+    const indexes = wanted.map((name) => order.indexOf(name))
+    assert.ok(indexes.every((index, at) => index >= 0 && (at === 0 || index > indexes[at - 1])), `DOM order ${JSON.stringify(indexes)} of ${wanted.join(' | ')} in ${JSON.stringify(order)}`)
+    // From the Confirm landing; put there by hand so this guard also passes before the fix.
+    await confirmButton(t).focus()
+    await t.page.keyboard.press('Shift+Tab')
+    await assertFocus(t.page, { tag: 'BUTTON', name: '← Back to queues' }, 'Shift+Tab once')
+    await t.page.keyboard.press('Shift+Tab')
+    await assertFocus(t.page, { tag: 'BUTTON', name: 'Refresh desk' }, 'Shift+Tab twice')
+    await confirmButton(t).focus()
+    await t.page.keyboard.press('Tab')
+    await assertFocus(t.page, { tag: 'BUTTON', name: 'Keep reservation unchanged' }, 'Tab from Confirm')
+    await activate(t.page, refreshDesk(t), 'enter')
+    await t.page.getByText(STALE).waitFor({ state: 'detached' })
+    await landed(t, BOOKING_HEADING, 'Refresh desk')
+  }, COORDINATOR])
+  cases.push(['35.8 [GUARD] Back to queues, Keep reservation unchanged, opening an action, one request per Confirm, no overflow', async (t) => {
+    await desk(t)
+    const rowButton = t.page.locator(`#review-${t.booking.id}`)
+    await activate(t.page, rowButton, 'enter')
+    await landed(t, BOOKING_HEADING, 'opening a booking')
+    await assertNoOverflow(t.page, 'booking detail')
+    await activate(t.page, t.page.getByRole('button', { name: '← Back to queues', exact: true }), 'enter')
+    await landed(t, { id: `review-${t.booking.id}` }, 'Back to queues restores the row button')
+    await activate(t.page, rowButton, 'enter')
+    await t.page.getByRole('button', { name: ACTIONS.approve, exact: true }).click()
+    await landed(t, { id: 'staff-action-title', tag: 'H3' }, 'opening Approve')
+    await activate(t.page, keepButton(t), 'enter')
+    await landed(t, BOOKING_HEADING, 'Keep reservation unchanged')
+    await t.page.getByRole('button', { name: ACTIONS.reject, exact: true }).click()
+    await landed(t, { id: 'staff-note', tag: 'TEXTAREA' }, 'opening Reject')
+    await activate(t.page, keepButton(t), 'enter')
+    await t.page.getByRole('button', { name: ACTIONS.approve, exact: true }).click()
+    await activate(t.page, confirmButton(t), 'enter')
+    await t.page.keyboard.press('Enter')
+    await t.page.getByText('Request approved.', { exact: false }).waitFor()
+    await landed(t, BOOKING_HEADING, 'success')
+    assert.equal(posts(t, staffPath(t.booking.id, 'approve')), 1, 'one request under a double Enter')
+    await assertNoOverflow(t.page, 'after approve')
+  }, COORDINATOR])
+  cases.push(['35.9 [GUARD][MOCK] mock desk: field failure and the opening/Back/Keep focus rules (the mock cannot produce a 409 or a lost connection)', async (t) => {
+    await t.h.signIn('alex_coordinator', 'CoordinatorDemo42!', 'desk')
+    await t.page.locator('#desk-views').waitFor()
+    await activate(t.page, t.page.locator('#review-fixture-pending'), 'enter')
+    await landed(t, BOOKING_HEADING, 'mock opening a booking')
+    await activate(t.page, t.page.getByRole('button', { name: '← Back to queues', exact: true }), 'enter')
+    await landed(t, { id: 'review-fixture-pending' }, 'mock Back to queues')
+    await activate(t.page, t.page.locator('#review-fixture-pending'), 'enter')
+    await t.page.getByRole('button', { name: ACTIONS.reject, exact: true }).click()
+    await landed(t, { id: 'staff-note', tag: 'TEXTAREA' }, 'mock opening Reject')
+    await t.page.locator('#staff-note').fill('ab')
+    await activate(t.page, confirmButton(t), 'enter')
+    await t.page.locator('#staff-note-error').waitFor()
+    await landed(t, { id: 'staff-note', tag: 'TEXTAREA' }, 'mock field failure')
+    await activate(t.page, keepButton(t), 'enter')
+    await landed(t, BOOKING_HEADING, 'mock Keep reservation unchanged')
+    await t.page.getByRole('button', { name: ACTIONS.approve, exact: true }).click()
+    await landed(t, { id: 'staff-action-title', tag: 'H3' }, 'mock opening Approve')
+    await activate(t.page, confirmButton(t), 'enter')
+    await t.page.keyboard.press('Enter')
+    await t.page.getByText('Request approved.', { exact: false }).waitFor()
+    await landed(t, BOOKING_HEADING, 'mock success')
+    await assertNoOverflow(t.page, 'mock desk')
+  }, { modes: ['mock'], bare: true }])
+  defineCases(suite, cases)
+}
