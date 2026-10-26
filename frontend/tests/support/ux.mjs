@@ -1958,3 +1958,189 @@ export function issue35(suite) {
   }, { modes: ['mock'], bare: true }])
   defineCases(suite, cases)
 }
+
+// ---- #39: Sign in / Register, a form-level failure ----------------------------------------------------------------------------
+
+export function issue39(suite) {
+  const http = suite.mode === 'http'
+  const landed = landing(suite)
+  const WRONG = 'wrong-password-xyz'
+  const BAD = 'Username or password is incorrect.'
+  const SUBMIT = { signin: 'Sign in', register: 'Create student account' }
+  const HEADING = { signin: 'Sign in to GearShare', register: 'Create your account' }
+  const ROUTE = { signin: '**/api/v1/auth/login', register: '**/api/v1/auth/register' }
+  const PATH = { signin: '/api/v1/auth/login', register: '/api/v1/auth/register' }
+  const submitButton = (t) => t.page.locator('form button[type="submit"]')
+  const open = async (t, route) => {
+    await t.page.evaluate((target) => { location.hash = `/${target}` }, route)
+    await t.page.getByRole('heading', { name: HEADING[route], level: 2 }).waitFor()
+  }
+  const enter = async (t, { username, password }) => {
+    await t.page.locator('#username').fill(username)
+    await t.page.locator('#password').fill(password)
+  }
+  /** Starts the submit with Enter in #password, or with a pointer click on the submit button. */
+  const start = async (t, how) => {
+    if (how === 'pointer') await submitButton(t).click()
+    else { await t.page.locator('#password').focus(); await t.page.keyboard.press('Enter') }
+  }
+  /** The settled form-level failure: alert, focus on the enabled submit button, #24's rule (no field marked, values kept, no session). */
+  const assertFormLevel = async (t, route, values, label) => {
+    await t.page.locator('.form-alert').waitFor()
+    await landed(t, { tag: 'BUTTON', name: SUBMIT[route] }, label)
+    assert.equal(await submitButton(t).isEnabled(), true, `${label}: the submit button is enabled`)
+    for (const id of ['username', 'password']) {
+      assert.equal(await t.page.locator(`#${id}`).getAttribute('aria-invalid'), 'false', `${label}: #${id} is not marked invalid`)
+      assert.equal(await t.page.locator(`#${id}`).isEnabled(), true, `${label}: #${id} is enabled`)
+    }
+    assert.equal(await t.page.locator('.field-error').count(), 0, `${label}: no field error`)
+    assert.equal(await t.page.locator('#username').inputValue(), values.username, `${label}: username retained`)
+    assert.equal((await t.page.locator('#password').inputValue()).length, values.password.length, `${label}: password length retained`)
+    assert.equal(await t.h.token(), null, `${label}: no session`)
+    assert.equal(await t.page.locator('.success-notice').count(), 0, `${label}: no success text`)
+  }
+  const VISITOR = { signedIn: false, modes: ['http'] }
+  const cases = []
+  for (const how of ['enter', 'pointer']) {
+    cases.push([`${how === 'enter' ? '39.1' : '39.5'} [FAIL-NOW] ${how}: a wrong password lands on the enabled "Sign in" button, no field marked, values and no session as before`, async (t) => {
+      await open(t, 'signin')
+      const values = { username: t.student.username, password: WRONG }
+      await enter(t, values)
+      await start(t, how)
+      await assertFormLevel(t, 'signin', values, `wrong password (${how})`)
+      assert.equal(await t.page.locator('.form-alert').innerText(), BAD)
+    }, VISITOR])
+    for (const kind of ['abort', '500']) {
+      cases.push([`${how === 'enter' ? '39.3' : '39.5'} [FAIL-NOW] ${how}: sign in with ${kind === 'abort' ? 'a lost connection' : 'a server error'} lands on "Sign in", values retained`, async (t) => {
+        await open(t, 'signin')
+        const values = { username: t.student.username, password: t.student.password }
+        await enter(t, values)
+        await inject(t.page, ROUTE.signin, kind, { method: 'POST' })
+        await start(t, how)
+        await assertFormLevel(t, 'signin', values, `sign in ${kind} (${how})`)
+        assert.notEqual(await t.page.locator('.form-alert').innerText(), BAD)
+      }, VISITOR])
+      cases.push([`${how === 'enter' ? '39.4' : '39.5'} [FAIL-NOW] ${how}: Register with ${kind === 'abort' ? 'a lost connection' : 'a server error'} lands on "Create student account", no account created`, async (t) => {
+        const fresh = newStudent('ux39reg')
+        await open(t, 'register')
+        await enter(t, fresh)
+        await inject(t.page, ROUTE.register, kind, { method: 'POST' })
+        await start(t, how)
+        await assertFormLevel(t, 'register', fresh, `register ${kind} (${how})`)
+        const login = await suite.as(undefined, PATH.signin, fresh)
+        assert.equal(login.status, 401, 'no account was created: a login with those credentials is refused')
+      }, VISITOR])
+    }
+  }
+  cases.push(['39.2 [FAIL-NOW] after the landing Shift+Tab reaches #password, Tab goes to the button and then to "Create an account"; typing does not pull focus back', async (t) => {
+    await open(t, 'signin')
+    const values = { username: t.student.username, password: WRONG }
+    await enter(t, values)
+    await start(t, 'enter')
+    await assertFormLevel(t, 'signin', values, 'wrong password')
+    await t.page.keyboard.press('Shift+Tab')
+    await assertFocus(t.page, { id: 'password', tag: 'INPUT' }, 'Shift+Tab from the button')
+    await t.page.keyboard.type('ABC')
+    await settle(t.page, 1000)
+    await assertFocus(t.page, { id: 'password', tag: 'INPUT' }, 'typing in #password')
+    // Keyboard focus selects the field's text, so the typed characters replace it; what matters is that they reached the field.
+    assert.ok((await t.page.locator('#password').inputValue()).endsWith('ABC'), 'typed characters reached the password field')
+    await t.page.keyboard.press('Tab')
+    await assertFocus(t.page, { tag: 'BUTTON', name: 'Sign in' }, 'Tab to the button')
+    await t.page.keyboard.press('Tab')
+    await assertFocus(t.page, { tag: 'A', name: 'Create an account' }, 'Tab to the Create an account link')
+    await t.page.keyboard.press('Shift+Tab')
+    await t.page.keyboard.press('Shift+Tab')
+    await t.page.keyboard.press('Shift+Tab')
+    await assertFocus(t.page, { id: 'username', tag: 'INPUT' }, 'Shift+Tab back to #username')
+    await t.page.keyboard.type('x')
+    await settle(t.page, 1000)
+    await assertFocus(t.page, { id: 'username', tag: 'INPUT' }, 'typing in #username')
+  }, VISITOR])
+  cases.push(['39.6 [FAIL-NOW] after a lost connection Enter alone retries once (also under a double Enter with the response delayed 800 ms) and signs in on "Explore"', async (t) => {
+    await open(t, 'signin')
+    const values = { username: t.student.username, password: t.student.password }
+    await enter(t, values)
+    await inject(t.page, ROUTE.signin, 'abort', { method: 'POST' })
+    await start(t, 'enter')
+    await assertFormLevel(t, 'signin', values, 'lost connection')
+    await t.page.unroute(ROUTE.signin)
+    await inject(t.page, ROUTE.signin, 'pass', { method: 'POST', delay: 800 })
+    const before = posts(t, PATH.signin)
+    await t.page.keyboard.press('Enter')
+    await t.page.keyboard.press('Enter')
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await landed(t, { id: 'main-content', tag: 'H1', name: 'Explore' }, 'signed in by the retry')
+    assert.equal(posts(t, PATH.signin), before + 1, 'exactly one login request for the retry, also under a double Enter')
+    assert.notEqual(await t.h.token(), null, 'a session exists')
+  }, VISITOR])
+  cases.push(['39.7 [GUARD] #24: field-level failures still focus the first invalid control, and typing does not steal focus again', async (t) => {
+    await open(t, 'register')
+    const submit = async () => { await t.page.locator('#password').focus(); await t.page.keyboard.press('Enter') }
+    // Empty submit: both fields invalid, #username first.
+    await submit()
+    await t.page.locator('.field-error').first().waitFor()
+    await landed(t, { id: 'username', tag: 'INPUT' }, 'empty submit')
+    assert.equal(await t.page.locator('.field-error').count(), 2)
+    // Only the password invalid.
+    await t.page.locator('#username').fill(newStudent('ux39pw').username)
+    await t.page.locator('#password').fill('short')
+    await submit()
+    await t.page.locator('#password-error').waitFor()
+    await landed(t, { id: 'password', tag: 'INPUT' }, 'password only')
+    await t.page.keyboard.type('Z')
+    await settle(t.page, 1000)
+    await assertFocus(t.page, { id: 'password', tag: 'INPUT' }, 'typing in #password')
+    // Both invalid again: #username first.
+    await t.page.locator('#username').fill('a')
+    await submit()
+    await t.page.locator('#username-error').waitFor()
+    await landed(t, { id: 'username', tag: 'INPUT' }, 'both invalid')
+    await t.page.keyboard.type('b')
+    await settle(t.page, 1000)
+    await assertFocus(t.page, { id: 'username', tag: 'INPUT' }, 'typing in #username')
+    // A taken username in a different case.
+    await t.page.locator('#username').fill(t.student.username.toUpperCase())
+    await t.page.locator('#password').fill(t.student.password)
+    await submit()
+    await t.page.locator('#username-error').waitFor()
+    await landed(t, { id: 'username', tag: 'INPUT' }, 'duplicate username in another case')
+  }, VISITOR])
+  cases.push(['39.8 [GUARD] the submit button is at least 44 px high and fully visible and nothing overflows in the failure state', async (t) => {
+    await open(t, 'signin')
+    await enter(t, { username: t.student.username, password: WRONG })
+    await start(t, 'enter')
+    await t.page.locator('.form-alert').waitFor()
+    await settle(t.page)
+    await submitButton(t).scrollIntoViewIfNeeded()
+    const box = await geometry(submitButton(t))
+    assert.ok(box.height >= 44 - 0.5, `submit button is ${box.height}px high`)
+    assert.ok(box.left >= 0 && box.right <= box.innerWidth, `submit button ${Math.round(box.left)}-${Math.round(box.right)} is inside the ${box.innerWidth}px viewport`)
+    assert.ok(box.top >= 0 && box.bottom <= 900, `submit button ${Math.round(box.top)}-${Math.round(box.bottom)} is inside the 900px viewport`)
+    await assertNoOverflow(t.page, 'sign in failure state')
+  }, VISITOR])
+  cases.push(['39.10 [GUARD] navigating away while the login is pending: Explore keeps focus after the response', async (t) => {
+    await open(t, 'signin')
+    await enter(t, { username: t.student.username, password: WRONG })
+    await inject(t.page, ROUTE.signin, 'pass', { method: 'POST', delay: 800 })
+    await start(t, 'enter')
+    await until(() => t.page.locator('form button[type="submit"]:disabled').count().then((count) => count > 0), 'the pending state')
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await settle(t.page, 1500)
+    await assertFocus(t.page, { id: 'main-content', tag: 'H1' }, 'after the delayed response')
+  }, VISITOR])
+  cases.push(['39.9 [FAIL-NOW][MOCK] maya_student with a wrong password lands on "Sign in", fields not invalid', async (t) => {
+    await t.page.evaluate(() => { location.hash = '/signin' })
+    await t.page.getByRole('heading', { name: HEADING.signin, level: 2 }).waitFor()
+    const values = { username: 'maya_student', password: WRONG }
+    await enter(t, values)
+    await start(t, 'enter')
+    await assertFormLevel(t, 'signin', values, 'mock wrong password')
+    assert.ok((await t.page.locator('.form-alert').innerText()).startsWith(BAD), 'wrong-credentials alert')
+    await start(t, 'pointer')
+    await t.page.waitForTimeout(600)
+    await assertFormLevel(t, 'signin', values, 'mock wrong password again (pointer)')
+  }, { modes: ['mock'], bare: true }])
+  defineCases(suite, cases)
+}

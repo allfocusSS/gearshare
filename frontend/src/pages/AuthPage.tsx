@@ -3,6 +3,7 @@ import type { Credentials, GearShareService, ServiceError, User } from '../servi
 import { DEMO_ACCOUNTS } from '../services/mockService.ts'
 import { Icon } from '../components/Icon.tsx'
 import { isMockMode } from '../services/index.ts'
+import { focusIfDropped } from '../focus.ts'
 
 export function AuthPage({ register, service, onSuccess, onPending, returnTo }: {
   register: boolean
@@ -17,12 +18,16 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
   const submitting = useRef(false)
   const usernameRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
+  const submitRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (pending) return
     // React has committed disabled=false before effects run. Only a new result moves focus.
     const target = error?.fields?.username ? usernameRef.current : error?.fields?.password ? passwordRef.current : null
-    if (target && !target.disabled) target.focus()
+    if (target) { if (!target.disabled) target.focus() }
+    // A failure that belongs to no field (wrong credentials, lost connection, server error) leaves the fields unmarked (#24) and
+    // returns focus to the submit button that started the request, unless the user already moved focus elsewhere.
+    else if (error) focusIfDropped(submitRef.current, submitRef.current)
   }, [pending, error])
 
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
@@ -79,7 +84,7 @@ export function AuthPage({ register, service, onSuccess, onPending, returnTo }: 
           <span id="password-hint" className="field-hint">10–128 characters.</span>
           {error?.fields?.password && <span id="password-error" className="field-error">{error.fields.password}</span>}
         </div>
-        <button className="button primary full" type="submit" disabled={pending}>{pending ? <><span className="spinner" aria-hidden="true" />{register ? 'Creating account…' : 'Signing in…'}</> : <>{register ? 'Create student account' : 'Sign in'}<Icon name="arrow" /></>}</button>
+        <button ref={submitRef} className="button primary full" type="submit" disabled={pending}>{pending ? <><span className="spinner" aria-hidden="true" />{register ? 'Creating account…' : 'Signing in…'}</> : <>{register ? 'Create student account' : 'Sign in'}<Icon name="arrow" /></>}</button>
         <p className="pending-text" role="status">{pending ? `Waiting for the ${isMockMode ? 'demo service' : 'GearShare server'}. Please keep this form open.` : ''}</p>
       </form>
       <p className="auth-switch">{register ? 'Already have an account?' : 'New to GearShare?'} <a href={`#/${register ? 'signin' : 'register'}?returnTo=${encodeURIComponent(returnTo)}`}>{register ? 'Sign in' : 'Create an account'}</a></p>
