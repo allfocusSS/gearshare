@@ -2290,3 +2290,129 @@ export function issue40(suite) {
   }, { modes: ['mock'], bare: true }])
   defineCases(suite, cases)
 }
+
+// ---- #41: Sign out, and Retry session --------------------------------------------------------------------------------------
+
+export function issue41(suite) {
+  const landed = landing(suite)
+  const EXPLORE_HEADING = { id: 'main-content', tag: 'H1', name: 'Explore' }
+  const SIGNED_OUT = /^Signed out\. Your (demo )?session has ended\.$/
+  const UNCONFIRMED = 'You are signed out on this device, but the server could not be reached, so it was not told to end the session. It stays valid on the server for up to 24 hours from sign-in.'
+  const signOut = (t) => t.page.getByRole('button', { name: 'Sign out', exact: true })
+  const headerSignIn = (t) => t.page.locator('.account-area').getByRole('link', { name: 'Sign in' })
+  const sidebar = (t) => t.page.locator('nav[aria-label="Main navigation"] a').allInnerTexts().then((texts) => texts.map((text) => text.trim()))
+  const openRoute = async (t, route, heading) => {
+    await t.page.evaluate((target) => { location.hash = target }, route)
+    await t.page.getByRole('heading', { name: heading, level: 1 }).waitFor()
+    await signOut(t).waitFor()
+  }
+  /** The signed-out state every sign-out ends in: header, sidebar, no session token, no Sign out button. */
+  const assertSignedOut = async (t, sidebarItems, label) => {
+    assert.equal(await headerSignIn(t).count(), 1, `${label}: the header shows the Sign in link`)
+    assert.equal(await signOut(t).count(), 0, `${label}: there is no Sign out button`)
+    assert.deepEqual(await sidebar(t), sidebarItems, `${label}: sidebar`)
+    assert.equal(await t.h.token(), null, `${label}: the local token is removed`)
+  }
+  const STUDENT_NAV = ['Explore', 'My reservations']
+  const COORDINATOR_NAV = ['Explore', 'My reservations', 'Coordinator desk', 'Inventory']
+  const COORDINATOR = { as: 'coordinator-session', modes: ['http'] }
+  const STUDENT = { modes: ['http'] }
+  const cases = []
+  for (const how of ['enter', 'pointer']) {
+    cases.push([`${how === 'enter' ? '41.1' : '41.6'} [FAIL-NOW] ${how}: a student signing out on Explore lands on h1 "Explore"; header, sidebar and the old token as before`, async (t) => {
+      await openRoute(t, '/explore', 'Explore')
+      await activate(t.page, signOut(t), how)
+      await t.page.getByText('Signed out. Your session has ended.').waitFor()
+      await landed(t, EXPLORE_HEADING, `sign out (${how})`)
+      await assertSignedOut(t, STUDENT_NAV, `student sign out (${how})`)
+      assert.equal((await suite.as(t.token, '/api/v1/auth/me', undefined, 'GET')).status, 401, 'the old token is refused')
+    }, STUDENT])
+  }
+  cases.push(['41.2 [FAIL-NOW] a coordinator signing out on Explore lands on h1 "Explore"; the sidebar loses Coordinator desk and Inventory', async (t) => {
+    await openRoute(t, '/explore', 'Explore')
+    assert.deepEqual(await sidebar(t), COORDINATOR_NAV)
+    await activate(t.page, signOut(t), 'enter')
+    await t.page.getByText('Signed out. Your session has ended.').waitFor()
+    await landed(t, EXPLORE_HEADING, 'coordinator sign out')
+    await assertSignedOut(t, STUDENT_NAV, 'coordinator sign out')
+    assert.equal((await suite.as(t.sessionToken, '/api/v1/auth/me', undefined, 'GET')).status, 401, 'the old token is refused')
+  }, COORDINATOR])
+  for (const [route, heading, options, who] of [
+    ['/reservations', 'My reservations', STUDENT, 'student'], ['/assets/ASSET', 'Equipment detail', STUDENT, 'student'],
+    ['/desk', 'Coordinator desk', COORDINATOR, 'coordinator'], ['/inventory', 'Inventory', COORDINATOR, 'coordinator'],
+  ]) {
+    cases.push([`41.3 [GUARD] ${who} signing out from ${route.replace('/ASSET', '/<id>')} ends on #/explore with h1 "Explore" focused`, async (t) => {
+      await openRoute(t, route.replace('ASSET', t.assetId), heading)
+      await activate(t.page, signOut(t), 'enter')
+      await t.page.getByText('Signed out. Your session has ended.').waitFor()
+      await landed(t, EXPLORE_HEADING, `sign out from ${route}`)
+      assert.match(await t.page.evaluate(() => location.hash), /^#\/explore/)
+      await assertSignedOut(t, STUDENT_NAV, `sign out from ${route}`)
+    }, options])
+  }
+  // 41.4a-c (and 41.9, the reachability record: after any failed logout there is no Sign out button, the header shows Sign in).
+  for (const [id, label, kind] of [['41.4a', 'aborted', 'abort'], ['41.4b', 'answered 500', '500'], ['41.4c', 'answered 401 (the session was already revoked)', '401']]) {
+    cases.push([`${id}/41.9 [FAIL-NOW] a logout ${label} on Explore ends the local session and lands on h1 "Explore"; no Sign out button remains`, async (t) => {
+      await openRoute(t, '/explore', 'Explore')
+      if (kind === '401') {
+        const revoked = await suite.as(t.token, '/api/v1/auth/logout')
+        assert.ok([200, 204].includes(revoked.status), `logout status ${revoked.status}`)
+      } else await inject(t.page, '**/api/v1/auth/logout', kind, { method: 'POST' })
+      await activate(t.page, signOut(t), 'enter')
+      if (kind === '401') await t.page.getByText('Signed out. Your session has ended.').waitFor()
+      else {
+        await t.page.getByRole('alert').filter({ hasText: UNCONFIRMED }).waitFor()
+        assert.equal(await t.page.locator('.service-notice[role="alert"]').innerText(), UNCONFIRMED, 'the unconfirmed-logout notice')
+      }
+      await landed(t, EXPLORE_HEADING, `logout ${label}`)
+      await assertSignedOut(t, STUDENT_NAV, `logout ${label}`)
+      if (kind === '401') assert.equal(await t.page.getByText(UNCONFIRMED).count(), 0, 'the unconfirmed notice is not shown for an already revoked session')
+    }, STUDENT])
+  }
+  cases.push(['41.5 [FAIL-NOW] Retry session: still failing it stays on the new Retry button; after a success focus is h1 "Explore" and the header is signed in', async (t) => {
+    await inject(t.page, '**/api/v1/auth/me', 'abort', { method: 'GET' })
+    await t.page.reload()
+    const retry = t.page.getByRole('button', { name: 'Retry session', exact: true })
+    await retry.waitFor()
+    await activate(t.page, retry, 'enter')
+    await t.page.getByText('Loading your workspace…').waitFor({ state: 'detached' })
+    await landed(t, { tag: 'BUTTON', name: 'Retry session' }, 'the retry fails again')
+    await t.page.unroute('**/api/v1/auth/me')
+    await t.page.keyboard.press('Enter')
+    await signOut(t).waitFor()
+    await landed(t, { id: 'main-content', tag: 'H1' }, 'the retry succeeds')
+  }, STUDENT])
+  cases.push(['41.7 [GUARD] the skip link and sign-in success still end on h1; no horizontal overflow after signing out', async (t) => {
+    await openRoute(t, '/explore', 'Explore')
+    await activate(t.page, signOut(t), 'enter')
+    await t.page.getByText('Signed out. Your session has ended.').waitFor()
+    await settle(t.page)
+    await assertNoOverflow(t.page, 'after sign out')
+    await t.page.reload()
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.keyboard.press('Tab')
+    await assertFocus(t.page, { tag: 'A', name: 'Skip to content' }, 'first Tab')
+    await t.page.keyboard.press('Enter')
+    await assertFocus(t.page, EXPLORE_HEADING, 'the skip link target')
+    await t.page.evaluate(() => { location.hash = '/signin' })
+    await t.page.getByRole('heading', { name: 'Sign in to GearShare', level: 2 }).waitFor()
+    await t.page.locator('#username').fill(t.student.username)
+    await t.page.locator('#password').fill(t.student.password)
+    await t.page.locator('#password').focus()
+    await t.page.keyboard.press('Enter')
+    await t.page.getByText(`Signed in as ${t.student.username}.`).waitFor()
+    await landed(t, EXPLORE_HEADING, 'sign-in success')
+  }, STUDENT])
+  cases.push(['41.8 [FAIL-NOW][MOCK] mock: signing out on Explore as maya_student and as alex_coordinator lands on h1 "Explore"', async (t) => {
+    for (const [username, password, nav] of [['maya_student', 'StudentDemo42!', STUDENT_NAV], ['alex_coordinator', 'CoordinatorDemo42!', COORDINATOR_NAV]]) {
+      await t.h.signIn(username, password, 'explore')
+      await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+      assert.deepEqual(await sidebar(t), nav, `${username}: sidebar`)
+      await activate(t.page, signOut(t), 'enter')
+      await t.page.getByText('Signed out. Your demo session has ended.').waitFor()
+      await landed(t, EXPLORE_HEADING, `mock sign out (${username})`)
+      assert.equal(await headerSignIn(t).count(), 1, `${username}: the header shows Sign in`)
+    }
+  }, { modes: ['mock'], bare: true }])
+  defineCases(suite, cases)
+}

@@ -9,6 +9,7 @@ import { ReservationsPage } from './pages/ReservationsPage.tsx'
 import { AssetDetailPage } from './pages/AssetDetailPage.tsx'
 import type { WorkspaceRoute } from './pages/ShellPage.tsx'
 import { clubToday } from './services/dates.ts'
+import { focusIfDropped } from './focus.ts'
 import { demoControls, gearShareService, isMockMode, subscribeToSessionEnd } from './services/index.ts'
 import type { DemoScenario } from './services/mockService.ts'
 import type { User } from './services/types.ts'
@@ -38,6 +39,8 @@ export function App() {
   const sessionEnded = useRef(false)
   const mainHeading = useRef<HTMLHeadingElement>(null)
   const sessionLink = useRef<HTMLAnchorElement>(null)
+  const retrySession = useRef<HTMLButtonElement>(null)
+  const restoreAfterRetry = useRef(false)
   const focusSessionNotice = useRef(false)
   const loadingSession = useRef(true)
 
@@ -88,12 +91,24 @@ export function App() {
 
   useEffect(() => { document.title = `${titles[location.route]} · GearShare` }, [location.route])
 
+  // "Retry session" is replaced by the loading state: once the session check settles, focus goes to the new Retry button after
+  // a failure or to the page heading after a success, unless the user moved it elsewhere.
+  useEffect(() => {
+    if (loading || !restoreAfterRetry.current) return
+    restoreAfterRetry.current = false
+    focusIfDropped((error && retrySession.current) || mainHeading.current)
+  }, [loading, error])
+
   function changeScenario(next: DemoScenario) {
     demoControls?.setScenario(next)
     setUser(null)
     setMessage('')
     setScenario(next)
   }
+
+  // Signing out removes the Sign out button that held focus. From another route the hashchange handler moves focus to the page
+  // heading; already on Explore no hashchange fires, so do it here, unless the user has moved focus to another control.
+  function keepFocusOnHeading() { focusIfDropped(mainHeading.current) }
 
   async function logout() {
     if (pending) return
@@ -107,9 +122,11 @@ export function App() {
       setUser(null)
       window.location.hash = '/explore'
       setMessage(isMockMode ? 'Signed out. Your demo session has ended.' : 'Signed out. Your session has ended.')
+      keepFocusOnHeading()
     } else if (sessionEnded.current) {
       // Signed out locally but the server could not confirm it: the notice from the session event says so honestly.
       window.location.hash = '/explore'
+      keepFocusOnHeading()
     } else setError(result.error.message)
     setPending(false)
   }
@@ -144,7 +161,7 @@ export function App() {
         {isMockMode && <DemoControls scenario={scenario} onChange={changeScenario} disabled={loading || pending} today={clubToday()} />}
         {sessionNotice && <div className="service-notice" role="alert"><span>{sessionNotice.text}</span>{sessionNotice.reason === 'unauthenticated' && route !== 'signin' && route !== 'register' && <a ref={sessionLink} className="button secondary" href={`#/signin?returnTo=${encodeURIComponent(signInReturn)}`}>Sign in again</a>}</div>}
         {message && <div className="success-notice" role="status"><Icon name="check" />{message}</div>}
-        {error && <div className="service-notice" role="alert"><span>{error}</span><button className="button secondary" type="button" disabled={loading || pending} onClick={() => void refreshSession()}>Retry session</button></div>}
+        {error && <div className="service-notice" role="alert"><span>{error}</span><button className="button secondary" type="button" disabled={loading || pending} ref={retrySession} onClick={() => { restoreAfterRetry.current = true; void refreshSession() }}>Retry session</button></div>}
         {loading ? <div className="loading-state" role="status"><span className="spinner" aria-hidden="true" /><span>{isMockMode ? 'Loading your demo workspace…' : 'Loading your workspace…'}</span></div> : restricted ? <section className="workspace-placeholder"><span className="placeholder-icon"><Icon name="desk" /></span><p className="eyebrow">Coordinator access</p><h2>Sign in as a coordinator.</h2><p>{isMockMode ? 'This workspace is available to the fictional coordinator account.' : 'This workspace is available to coordinator accounts.'}</p><a className="button primary" href={`#/signin?returnTo=${route}`}>Go to sign in<Icon name="arrow" /></a></section> : route === 'signin' || route === 'register' ? <AuthPage key={`${route}-${scenario}`} register={route === 'register'} service={gearShareService} onPending={(value) => { setPending(value); if (value) setMessage('') }} onSuccess={signedIn} returnTo={returnTo} /> : route === 'explore' ? <CataloguePage service={gearShareService} /> : route === 'asset' ? <AssetDetailPage key={assetId} assetId={assetId} service={gearShareService} user={user} /> : route === 'reservations' ? <ReservationsPage service={gearShareService} user={user} /> : route === 'desk' ? <CoordinatorPage service={gearShareService} /> : <InventoryPage service={gearShareService} />}
         <footer className="page-footer"><span>GEARSHARE <span>·</span> CAMPUS EQUIPMENT LENDING</span><span>Made for shared possibilities.</span></footer>
       </main>
