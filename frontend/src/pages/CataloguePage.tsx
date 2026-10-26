@@ -6,6 +6,7 @@ import { DateRangeFields } from '../components/DateRangeFields.tsx'
 import { EquipmentArt } from '../components/EquipmentArt.tsx'
 import { Icon } from '../components/Icon.tsx'
 import { isMockMode } from '../services/index.ts'
+import { focusIfDropped } from '../focus.ts'
 
 export function CataloguePage({ service }: { service: GearShareService }) {
   const [filters, setFilters] = useState<AssetFilters>({ search: '' })
@@ -13,7 +14,7 @@ export function CataloguePage({ service }: { service: GearShareService }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<ServiceError | null>(null)
   const [retry, setRetry] = useState(0)
-  const request = useRef(0)
+  const request = useRef(0), retryButton = useRef<HTMLButtonElement>(null), restoreAfterRetry = useRef(false)
   const today = clubToday()
   const dateError = validateDateRange(filters.startDate ?? '', filters.endDate ?? '', today)
 
@@ -32,7 +33,17 @@ export function CataloguePage({ service }: { service: GearShareService }) {
     return () => { request.current += 1 }
   }, [filters, retry, service])
 
+  // Retry equipment is replaced by the loading state and then by the list or a new error: once the reload settles, focus goes to
+  // the new Retry button after a failure or to the page heading after a success, unless the user moved it elsewhere.
+  useEffect(() => {
+    if (loading || !restoreAfterRetry.current) return
+    restoreAfterRetry.current = false
+    focusIfDropped((error && retryButton.current) || document.getElementById('main-content'))
+  }, [loading, error])
+
   function update(next: AssetFilters) { setData(null); setLoading(true); setFilters(next) }
+  // The empty state, and the Clear all filters button in it, is replaced by the reloaded list: focus goes to the page heading.
+  function clearAll() { update({ search: '' }); document.getElementById('main-content')?.focus() }
   const range: DateRange = { startDate: filters.startDate ?? '', endDate: filters.endDate ?? '' }
   return <>
     <div className="catalogue-intro"><div><p className="eyebrow">The club equipment desk</p><h2>Good equipment. <span>Shared fairly.</span></h2><p>Find a physical unit for your next idea.</p></div><span className="catalogue-stamp">FICTIONAL INVENTORY<br />ONE SHARED DESK</span></div>
@@ -41,9 +52,9 @@ export function CataloguePage({ service }: { service: GearShareService }) {
       <fieldset className="category-filter"><legend>Category</legend><div>{(['All equipment', ...CATEGORIES] as const).map((category) => <button type="button" key={category} aria-pressed={category === (filters.category ?? 'All equipment')} onClick={() => update({ ...filters, category: category === 'All equipment' ? undefined : category as Category })}>{category}</button>)}</div></fieldset>
       <div className="catalogue-date-filter"><DateRangeFields prefix="catalogue" today={today} value={range} error={dateError} onChange={(dates) => update({ ...filters, ...dates })} /><button className="button subtle" type="button" onClick={() => update({ ...filters, startDate: '', endDate: '' })}>Clear dates</button></div>
     </section>
-    {dateError ? <div className="catalogue-feedback form-alert" role="alert"><strong>Check your dates.</strong><p>{dateError.message} Results are paused until both dates are valid, or clear the dates.</p></div> : loading ? <div className="loading-state catalogue-loading" role="status"><span className="spinner" aria-hidden="true" />Finding equipment…</div> : error ? <div className="catalogue-feedback service-notice" role="alert"><span>{error.message}</span><button type="button" className="button secondary" onClick={() => setRetry((value) => value + 1)}>Retry equipment</button></div> : data && <>
+    {dateError ? <div className="catalogue-feedback form-alert" role="alert"><strong>Check your dates.</strong><p>{dateError.message} Results are paused until both dates are valid, or clear the dates.</p></div> : loading ? <div className="loading-state catalogue-loading" role="status"><span className="spinner" aria-hidden="true" />Finding equipment…</div> : error ? <div className="catalogue-feedback service-notice" role="alert"><span>{error.message}</span><button ref={retryButton} type="button" className="button secondary" onClick={() => { restoreAfterRetry.current = true; setRetry((value) => value + 1) }}>Retry equipment</button></div> : data && <>
       <div className="catalogue-results-label" role="status"><span><strong>{data.items.length}</strong> {data.items.length === 1 ? 'physical unit' : 'physical units'}{data.range ? ' available for your dates' : ' to explore'}</span>{data.range ? <span>{formatCalendarDate(data.range.startDate)} – {formatCalendarDate(data.range.endDate)} · {inclusiveDays(data.range.startDate, data.range.endDate)} {inclusiveDays(data.range.startDate, data.range.endDate) === 1 ? 'day' : 'days'} inclusive · Asia/Almaty</span> : <span>Choose both dates to check scheduled availability.</span>}</div>
-      {data.items.length ? <div className="equipment-grid">{data.items.map((asset) => <a className="equipment-card" key={asset.id} href={`#/assets/${asset.id}`} aria-label={`View ${asset.name}, ${asset.inventoryCode}`}><EquipmentArt category={asset.category} /><div className="equipment-card-body"><div className="equipment-card-meta"><span>{asset.inventoryCode}</span><span>{asset.category}</span></div><h3>{asset.name}</h3><p className="pickup-location">{asset.location}</p><div className="equipment-card-bottom"><span className={`availability-badge ${asset.state === 'maintenance' ? 'maintenance' : data.range ? 'available' : 'unspecified'}`}>{asset.state === 'maintenance' ? '× Maintenance · unavailable' : data.range ? 'Available for selected dates' : 'Choose dates to check'}</span><Icon name="arrow" /></div></div></a>)}</div> : <section className="workspace-placeholder catalogue-empty"><span className="placeholder-icon"><Icon name="compass" /></span><h2>No equipment to show.</h2><p>{isMockMode ? 'Try another search or category, change your dates, or choose the Normal demo fixture.' : 'Try another search or category, or change your dates.'}</p><button className="button secondary" type="button" onClick={() => update({ search: '' })}>Clear all filters</button></section>}
+      {data.items.length ? <div className="equipment-grid">{data.items.map((asset) => <a className="equipment-card" key={asset.id} href={`#/assets/${asset.id}`} aria-label={`View ${asset.name}, ${asset.inventoryCode}`}><EquipmentArt category={asset.category} /><div className="equipment-card-body"><div className="equipment-card-meta"><span>{asset.inventoryCode}</span><span>{asset.category}</span></div><h3>{asset.name}</h3><p className="pickup-location">{asset.location}</p><div className="equipment-card-bottom"><span className={`availability-badge ${asset.state === 'maintenance' ? 'maintenance' : data.range ? 'available' : 'unspecified'}`}>{asset.state === 'maintenance' ? '× Maintenance · unavailable' : data.range ? 'Available for selected dates' : 'Choose dates to check'}</span><Icon name="arrow" /></div></div></a>)}</div> : <section className="workspace-placeholder catalogue-empty"><span className="placeholder-icon"><Icon name="compass" /></span><h2>No equipment to show.</h2><p>{isMockMode ? 'Try another search or category, change your dates, or choose the Normal demo fixture.' : 'Try another search or category, or change your dates.'}</p><button className="button secondary" type="button" onClick={clearAll}>Clear all filters</button></section>}
     </>}
     <p className="schedule-note">Scheduled availability is a plan, not a guarantee against late returns.{isMockMode ? ' All equipment shown is fictional demo inventory.' : ''}</p>
   </>

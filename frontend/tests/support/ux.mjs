@@ -2144,3 +2144,149 @@ export function issue39(suite) {
   }, { modes: ['mock'], bare: true }])
   defineCases(suite, cases)
 }
+
+// ---- #40: Explore, "Clear all filters" and "Retry equipment" -------------------------------------------------------------------
+
+export function issue40(suite) {
+  const landed = landing(suite)
+  const EXPLORE_HEADING = { id: 'main-content', tag: 'H1', name: 'Explore' }
+  const NO_MATCH = 'zzzz-no-match'
+  const cardCount = (t) => t.page.locator('a.equipment-card').count()
+  const clearAll = (t) => t.page.getByRole('button', { name: 'Clear all filters', exact: true })
+  const chip = (t, name) => t.page.getByRole('button', { name, exact: true })
+  const openExplore = async (t) => {
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.locator('a.equipment-card').first().waitFor()
+    return cardCount(t)
+  }
+  const noMatch = async (t) => {
+    await t.page.locator('#equipment-search').fill(NO_MATCH)
+    await t.page.getByRole('heading', { name: 'No equipment to show.', level: 2 }).waitFor()
+  }
+  /** The reset the activation must produce: all three filters cleared and the whole list back. */
+  const assertReset = async (t, unfiltered, label) => {
+    await until(() => cardCount(t).then((count) => count === unfiltered), `${label}: the unfiltered list (${unfiltered} units) back`)
+    assert.equal(await t.page.locator('#equipment-search').inputValue(), '', `${label}: search is empty`)
+    assert.equal(await chip(t, 'All equipment').getAttribute('aria-pressed'), 'true', `${label}: All equipment is pressed`)
+    assert.equal(await t.page.locator('#catalogue-startDate').inputValue(), '', `${label}: start date is empty`)
+    assert.equal(await t.page.locator('#catalogue-endDate').inputValue(), '', `${label}: end date is empty`)
+  }
+  /** Activates Clear all filters and samples the focus right away, 50 ms later and when the grid is back. */
+  const clearAndSample = async (t, how, unfiltered, label) => {
+    await activate(t.page, clearAll(t), how)
+    await assertFocus(t.page, EXPLORE_HEADING, `${label}: immediately after the activation`)
+    await settle(t.page, 50)
+    await assertFocus(t.page, EXPLORE_HEADING, `${label}: 50 ms later`)
+    await assertReset(t, unfiltered, label)
+    await landed(t, EXPLORE_HEADING, `${label}: the grid has rendered`)
+  }
+  const VISITOR = { signedIn: false, modes: ['http'] }
+  const cases = []
+  for (const how of ['enter', 'pointer']) {
+    cases.push([`${how === 'enter' ? '40.1/40.2' : '40.6'} [FAIL-NOW] ${how}: Clear all filters after a no-match search lands on h1 "Explore" at once, 50 ms later and when the grid is back; all three filters reset`, async (t) => {
+      const unfiltered = await openExplore(t)
+      await noMatch(t)
+      await clearAndSample(t, how, unfiltered, `no-match search (${how})`)
+    }, VISITOR])
+  }
+  cases.push(['40.3 [FAIL-NOW] the same landing from a category plus no-match search', async (t) => {
+    const unfiltered = await openExplore(t)
+    await chip(t, 'Cameras').click()
+    await noMatch(t)
+    assert.equal(await chip(t, 'Cameras').getAttribute('aria-pressed'), 'true')
+    await clearAndSample(t, 'enter', unfiltered, 'category plus search')
+  }, VISITOR])
+  cases.push(['40.3 [FAIL-NOW] the same landing from a date range that has no available unit', async (t) => {
+    const unfiltered = await openExplore(t)
+    const stub = '**/api/v1/assets?*'
+    await t.page.route(stub, async (route) => {
+      const response = await route.fetch()
+      const json = await response.json()
+      await route.fulfill({ response, json: { ...json, items: [] } })
+    })
+    await t.page.locator('#catalogue-startDate').fill(t.day)
+    await t.page.locator('#catalogue-endDate').fill(t.day)
+    await t.page.getByRole('heading', { name: 'No equipment to show.', level: 2 }).waitFor()
+    await t.page.unroute(stub)
+    await clearAndSample(t, 'enter', unfiltered, 'date range')
+  }, VISITOR])
+  cases.push(['40.4 [FAIL-NOW] after the landing a single Tab goes where it goes after "Skip to content"; typing works and the reload does not move focus again', async (t) => {
+    const unfiltered = await openExplore(t)
+    // Reference: where Tab goes from h1#main-content, reached with the skip link.
+    await t.page.reload()
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.locator('a.equipment-card').first().waitFor()
+    await t.page.keyboard.press('Tab')
+    await assertFocus(t.page, { tag: 'A', name: 'Skip to content' }, 'first Tab')
+    await t.page.keyboard.press('Enter')
+    await assertFocus(t.page, EXPLORE_HEADING, 'skip link target')
+    await t.page.keyboard.press('Tab')
+    const expected = await activeInfo(t.page)
+    assert.equal(expected.isBody, false, 'the reference Tab reaches a control')
+    await noMatch(t)
+    await clearAndSample(t, 'enter', unfiltered, 'before Tab')
+    await t.page.keyboard.press('Tab')
+    const actual = await activeInfo(t.page)
+    assert.deepEqual({ tag: actual.tag, id: actual.id, name: actual.name }, { tag: expected.tag, id: expected.id, name: expected.name }, 'a Tab after the landing goes where a Tab after the skip link goes')
+    await t.page.locator('#equipment-search').focus()
+    await t.page.keyboard.type('cam')
+    await settle(t.page, 1000)
+    assert.equal(await t.page.locator('#equipment-search').inputValue(), 'cam', 'typing reached the search field')
+    await assertFocus(t.page, { id: 'equipment-search', tag: 'INPUT' }, 'typing and the reload do not move focus')
+  }, VISITOR])
+  cases.push(['40.5 [FAIL-NOW] Retry equipment: still failing it stays on the new Retry button; after a success focus is h1 "Explore"', async (t) => {
+    const patterns = ['**/api/v1/assets', '**/api/v1/assets?*']
+    for (const pattern of patterns) await inject(t.page, pattern, 'abort', { method: 'GET' })
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    const retry = t.page.getByRole('button', { name: 'Retry equipment', exact: true })
+    await retry.waitFor()
+    await activate(t.page, retry, 'enter')
+    await t.page.getByText('Finding equipment…').waitFor({ state: 'detached' })
+    await landed(t, { tag: 'BUTTON', name: 'Retry equipment' }, 'the retry fails again')
+    for (const pattern of patterns) await t.page.unroute(pattern)
+    await t.page.keyboard.press('Enter')
+    await t.page.locator('a.equipment-card').first().waitFor()
+    await landed(t, EXPLORE_HEADING, 'the retry succeeds')
+  }, VISITOR])
+  cases.push(['40.7 [GUARD] category chips and Clear dates keep focus; the date alert and inline errors are unchanged; the skip link focuses h1', async (t) => {
+    await openExplore(t)
+    await activate(t.page, chip(t, 'Cameras'), 'enter')
+    await landed(t, { tag: 'BUTTON', name: 'Cameras' }, 'category chip')
+    assert.equal(await chip(t, 'Cameras').getAttribute('aria-pressed'), 'true')
+    await t.page.locator('#catalogue-startDate').fill(t.day)
+    await t.page.locator('#catalogue-endDate').fill(t.day)
+    await t.page.locator('a.equipment-card').first().waitFor()
+    await activate(t.page, t.page.getByRole('button', { name: 'Clear dates', exact: true }), 'enter')
+    await landed(t, { tag: 'BUTTON', name: 'Clear dates' }, 'Clear dates')
+    assert.equal(await t.page.locator('#catalogue-startDate').inputValue(), '')
+    await t.page.locator('#catalogue-startDate').fill(addDays(t.day, 5))
+    await t.page.locator('#catalogue-endDate').fill(t.day)
+    await t.page.locator('#catalogue-endDate-error').waitFor()
+    assert.equal(await t.page.getByText('Check your dates.').count() >= 1, true, 'the date alert is shown')
+    await t.page.reload()
+    await t.page.getByRole('heading', { name: 'Explore', level: 1 }).waitFor()
+    await t.page.keyboard.press('Tab')
+    await assertFocus(t.page, { tag: 'A', name: 'Skip to content' }, 'first Tab')
+    await t.page.keyboard.press('Enter')
+    await assertFocus(t.page, EXPLORE_HEADING, 'the skip link target')
+  }, VISITOR])
+  cases.push(['40.8 [GUARD] no horizontal overflow in the empty state and after clearing', async (t) => {
+    const unfiltered = await openExplore(t)
+    await noMatch(t)
+    await assertNoOverflow(t.page, 'empty state')
+    await activate(t.page, clearAll(t), 'enter')
+    await assertReset(t, unfiltered, 'after clearing')
+    await assertNoOverflow(t.page, 'after clearing')
+  }, VISITOR])
+  cases.push(['40.9 [FAIL-NOW][MOCK] mock Explore: Clear all filters lands on h1 "Explore" and resets all three filters', async (t) => {
+    await t.page.locator('a.equipment-card').first().waitFor()
+    const unfiltered = await cardCount(t)
+    await noMatch(t)
+    await clearAndSample(t, 'enter', unfiltered, 'mock no-match search')
+    await chip(t, 'Cameras').click()
+    await noMatch(t)
+    await clearAndSample(t, 'pointer', unfiltered, 'mock category plus search')
+  }, { modes: ['mock'], bare: true }])
+  defineCases(suite, cases)
+}

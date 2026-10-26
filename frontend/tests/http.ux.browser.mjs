@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe } from 'node:test'
 import { api, launchBrowser, outputFolder, startStack, writeJson } from './support/stack.mjs'
 import { TOKEN_KEY, addDays, clubToday, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue33, issue34, issue35, issue36, issue37, issue38, issue39, issue43, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue33, issue34, issue35, issue36, issue37, issue38, issue39, issue40, issue43, selectedIssue } from './support/ux.mjs'
 
 const suite = { mode: 'http', output: outputFolder('http-ux'), records: [] }
 let stack, browser, coordinatorToken, serial = 0
@@ -142,3 +142,4 @@ describe('issue #33 — My reservations: View details and Cancel reservation foc
 describe('issue #34 — Inventory maintenance toggle focus', { skip: !selectedIssue(34), concurrency: false }, () => issue34(suite))
 describe('issue #35 — Coordinator desk: a failed staff action keeps focus', { skip: !selectedIssue(35), concurrency: false }, () => issue35(suite))
 describe('issue #39 — Sign in and Register: a form-level failure keeps focus', { skip: !selectedIssue(39), concurrency: false }, () => issue39(suite))
+describe('issue #40 — Explore: Clear all filters and Retry equipment focus', { skip: !selectedIssue(40), concurrency: false }, () => issue40(suite))
