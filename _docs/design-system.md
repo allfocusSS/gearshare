@@ -89,7 +89,7 @@ Focus is restored once per settled action. It is not reclaimed on later renders 
 
 ### User-entered text wrapping
 
-Names, descriptions, locations, purposes, notes, usernames, inventory codes and borrower names are typed by people and can be one long unbroken string. They wrap at any character inside their container (`overflow-wrap: anywhere`; flex and grid children also need `min-width: 0`) on every screen. Never truncate with an ellipsis, clip, shrink the text or let the page or a card scroll sideways. This extends what the staff tables, account name, specs and reservation details already do. Worst case to hold at 390 px and 1,440 px: the plan.md maximums made of wide unbroken characters (a 100 × `W` name, a 100-character location, a 2,000-character description without spaces).
+Names, descriptions, locations, purposes, notes, usernames, inventory codes and borrower names are typed by people and can be one long unbroken string. They wrap at any character inside their container (`overflow-wrap: anywhere`; flex and grid children also need `min-width: 0`) on every screen. Never truncate with an ellipsis, clip, shrink the text or let the page or a card scroll sideways. This extends what the staff tables, account name, specs and reservation details already do, and it covers the Explore cards: a card's own `overflow: hidden` (it rounds the illustration) must never hide text, so the name, the pickup location and the inventory code wrap inside the card and the card grows taller instead. Worst case to hold at 390 px and 1,440 px: the plan.md maximums made of wide unbroken characters (a 100 × `W` name, a 100-character location, a 2,000-character description without spaces).
 
 ### Minimum size for informational text
 
