@@ -1210,3 +1210,84 @@ Final tree: the #38 candidate commit `9dbd9c6` (its only application-source chan
 
 Limits: Chromium only (no Firefox or Safari); the toolchain deviates from the pinned versions (see above); the row and panel assertions measure boxes and text extents, not readability at every size; the first `test:browser:http:ux` run listed above failed before the harness fix and was rerun, not hidden; the `setMonth(null)` reset in #36's load effect is defensive and no browser case reaches it; backend untouched, not re-run; none of these runs is an independent QA verdict and no issue was closed.
 
+
+## Iteration 5 — #15 part B: bugs #43, #33, #34, #35, #39, #40, #41, #42, #44 (engineer candidate)
+
+Part B of the engineer work for [#15](https://github.com/allfocusSS/gearshare/issues/15): the focus bugs #43, #33, #34, #35, #39, #40, #41, the 12 px text floor #42 and the Explore card wrapping #44, plus their blocks in the shared UX suites. One earlier engineer session wrote and pushed all nine fixes and was interrupted before writing this evidence; this entry was written by a later engineer session that changed **no application source and no existing test**. It re-ran every check on the pushed tree, measured the red-before numbers that the fix commits only described in words, and recorded the results below. Nothing here is an independent QA verdict and no issue was closed by the engineer.
+
+Published fix commits on `main` (each carries `Refs #N` and `Refs #15`; parent of the first is `67f8367`):
+
+| Bug | Commit | Application files changed |
+| --- | --- | --- |
+| #43 Retry detail | `8712b73d8b4d5f670dd3f393d4892300c63fc287` | `src/focus.ts` (new, shared `focusDropped` / `focusIfDropped`), `src/pages/AssetDetailPage.tsx` |
+| #33 My reservations | `674c64d22ed5818f9a23136993bf46cd30edebba` | `src/pages/ReservationsPage.tsx` |
+| #34 Inventory toggle / Retry inventory | `3460f0d723d5a6416b5434806ebd021d71563092` | `src/pages/InventoryPage.tsx` |
+| #35 Failed staff action | `8d32ffe171860e7f07346e3a4b5f89f5de201c8c` | `src/pages/CoordinatorPage.tsx` |
+| #39 Sign in / Register | `41a4aaa47dc55fa804374f66fbc75053041cbc32` | `src/pages/AuthPage.tsx` |
+| #40 Explore Clear all filters / Retry equipment | `a8210597d47168be76a065ef3a8128da1ad86495` | `src/pages/CataloguePage.tsx` |
+| #41 Sign out / Retry session | `504bbf7f3de95ef43699eb4c573f63220449bc35` | `src/App.tsx` |
+| #42 Text floor 12 px | `89adb4676a0e53aacd795bb1b721fcd7c0b3d1ed` | `src/styles.css` (43 declarations) |
+| #44 Explore card wrapping | `37b1eb517b3eee5f637bfbfc84e541ad4aa1f43c` | `src/styles.css` |
+
+Every fix also extends `tests/support/ux.mjs` (one `issueNN(suite)` block per bug), the two entry scripts `tests/http.ux.browser.mjs` and `tests/ux.mock.browser.mjs` and `_docs/testing-guidelines.md`; #42 and #44 add stylesheet checks to `tests/ux.test.mjs`. Behaviour: after an in-place action settles, focus moves once to a deliberate target (the initiating control after a failure, a heading after success or when the control is gone) and never when the user already moved it (#43, #33, #34, #35, #39, #40, #41; the QA case lists are in `_docs/testing-guidelines.md`); every informational font size under 12 px is 12 px with the design system's closed allow-list untouched (#42); the Explore card name, location and code/category line wrap at any character and the card grows instead of clipping (#44).
+
+### Environment (actual, not the pinned toolchain)
+
+Node v22.22.0, npm 10.9.4 (`npm ci` prints `EBADENGINE` for the `>=24 <25` / `>=11 <12` engines), uv 0.11.32, backend Python 3.12.3 (`uv run`), Playwright 1.62.1, Chromium 153.0.8010.0 (`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/tmp/chromium`), Linux 6.18.44, 2 CPUs and 8 GB. README pins Node 24, npm 11 and uv 0.12.23; this sandbox has the versions above, as in part A and in the QA baselines, so the runs are a deviation from the pinned toolchain. The host was shared with concurrent independent-QA sessions (load average 3 to 8 during the runs); QA's suites hold the default UX ports 6241 to 6243 at times, so the red runs below used `UX_HTTP_BACKEND_PORT=6771 UX_HTTP_VITE_PORT=6772 UX_MOCK_PORT=6773`. Checks ran on `main` at `37b1eb5` (clean tree, equal to `origin/main`); a docs-only PM commit (`d490ac8`, `_docs/design-system.md`) was fast-forwarded on top while the runs were in progress and changes no source or test.
+
+### Checks on the pushed tree (`37b1eb5`)
+
+Commands from `frontend/` unless noted. Exit code 0 means the whole command passed.
+
+| Command | Actual result |
+| --- | --- |
+| `npm ci` | exit 0; 33 packages added, 0 vulnerabilities |
+| `npm test` | exit 0; 226 tests, 226 pass, 0 fail |
+| `npm run typecheck` | exit 0 |
+| `npm run build` | exit 0; 309.57 kB JS / 34.95 kB CSS |
+| `npm run test:browser` | exit 0; all 26 scoped browser checks passed |
+| `npm run test:browser:catalogue` | exit 0; all 28 checks passed |
+| `npm run test:browser:bookings` | exit 0; the #4 browser journey passed |
+| `npm run test:browser:staff` | exit 0; all 8 staff groups passed |
+| `npm run test:browser:labels` | exit 0; 448 of 448 checks |
+| `npm run test:browser:resources` | exit 0; 18 icon checks passed (dev and preview, three routes, 390/1440 px) |
+| `npm run test:browser:http` | exit 0; all 19 HTTP checks passed |
+| `npm run test:browser:http:staff` | exit 0; all 21 HTTP staff checks passed |
+| `node tests/qa25.browser.mjs` | exit 0; 4 controlled groups passed |
+| `node tests/qa28.browser.mjs` | exit 0; 635 of 635 checks (commit field `37b1eb5`) |
+| `npm run test:browser:http:ux`, first full run | **exit 1; 501 tests, 497 pass, 4 fail**, 0 todo (19 min) |
+| `npm run test:browser:http:ux`, second full run | exit 0; **501 tests, 501 pass, 0 fail**, 0 todo (14 min) |
+| `UX_ISSUES=34,35 npm run test:browser:http:ux`, two reruns | exit 0 both; 54 of 54 |
+| `npm run test:browser:ux` (mock adapter) | exit 0; 115 tests, 115 pass, 0 fail |
+| `cd backend && uv lock --check` | exit 0 (49 packages resolved) |
+| `cd backend && uv run --locked pytest -q` | exit 0; 1262 passed, 5 warnings, 4 min 28 s |
+
+The four failures of the first full real-stack run were `34.7 [GUARD]` ("Edit saved restores the Edit button (http @1440): focus is on BODY" and "Add saved restores Add equipment (http @390): focus is on BODY") and `35.7 [GUARD]` ("Refresh desk (http @1440 and @390): focus is on BODY, expected h2#staff-booking-title"). They are not hidden: the same full suite then passed 501 of 501, and the two blocks passed in isolation twice. 34.7 is the intermittent Add/Edit-saved focus race that is already filed as [#46](https://github.com/allfocusSS/gearshare/issues/46) (the pre-existing `requestAnimationFrame` restore in `InventoryPage.tsx` can run before React commits); it also failed on the unfixed parent of #34 ("Edit saved restores the Edit button (http @390)", below) and in 4 of 6 further `UX_ISSUES=34,35 UX_CASES=34.7,35.7` runs on the loaded host (3 with, 3 without extra CPU load), so it is independent of the #34 change. 35.7 failed only in that one full run (not in the 9 later isolated, loaded or red-tree runs that include it); the same `requestAnimationFrame` pattern exists in `CoordinatorPage.tsx` `back()`, but this was not reproduced or diagnosed, so it is recorded as a single unexplained sighting under load, not as a defect. The part A harness defect (`suite.fresh` date offset) did not recur.
+
+Per-issue block sizes in the second full run (real stack / mock): #43 30/2, #33 24/2, #34 24/2, #35 30/2, #39 30/2, #40 16/2, #41 24/2, #42 64/28 named cases plus aggregates, #44 64/2; blocks #31 to #38 are unchanged from part A and still pass (28, 22, 16, 76 and 50 real-stack cases for #31, #32, #36, #37 and #38). The 37.9 sweep no longer carries the `todo` Explore clipping cases (0 todo).
+
+### Red before / green after
+
+Method for the seven bugs measured in this session: for each fix commit F a throwaway `git worktree add --detach /tmp/eng-red-N F`, then `frontend/src` replaced by that of `F^` (so the new tests and the unfixed application source), `node_modules` and `backend/.venv` linked to the main checkout; `UX_ISSUES=N npm run test:browser:http:ux`, `UX_ISSUES=N npm run test:browser:ux` and `node --test tests/ux.test.mjs`. The worktrees were removed afterwards. Green is the second full run above (the block's tests all pass). Red exit code was 1 for every real-stack and mock block except #35 mock.
+
+| Bug | Real stack on unfixed source | Mock on unfixed source | Green on `F` |
+| --- | --- | --- | --- |
+| #43 | 30 tests, 8 pass / 22 fail (43.1 to 43.5 red; guards 43.6 to 43.9 pass) | 2 tests, 0 pass / 2 fail | 30 / 30 and 2 / 2 |
+| #33 | 24 tests, 6 pass / 18 fail (33.1 to 33.7 and the 33.8 focus case red; guards 33.8 History tab, 33.9, 33.10 pass) | 0 / 2 | 24 / 24 and 2 / 2 |
+| #34 | 24 tests, 5 pass / 19 fail (18 red cases 34.1 to 34.5, 34.8, 34.9; plus the intermittent guard 34.7 at 390 px, see #46) | 0 / 2 | 24 / 24 and 2 / 2 |
+| #35 | 30 tests, 12 pass / 18 fail (35.1 to 35.4 red; guards 35.5 to 35.8 pass) | 2 tests, 2 pass (35.9 is a GUARD: the mock cannot produce a 409 or a lost connection) | 30 / 30 and 2 / 2 |
+| #39 | 30 tests, 6 pass / 24 fail (39.1 to 39.6 red; guards 39.7, 39.8, 39.10 pass) | 0 / 2 | 30 / 30 and 2 / 2 |
+| #40 | 16 tests, 4 pass / 12 fail (40.1 to 40.6 red; guards 40.7, 40.8 pass) | 0 / 2 | 16 / 16 and 2 / 2 |
+| #41 | 24 tests, 10 pass / 14 fail (41.1, 41.2, 41.4a to c, 41.5, 41.6 red; guards 41.3, 41.7 pass) | 0 / 2 | 24 / 24 and 2 / 2 |
+
+Typical red messages: `focus is on BODY, expected {"tag":"BUTTON","name":"Retry detail"}` (#43), `... expected {"id":"reservation-detail-title","tag":"H2","name":"Reservation details"}` (#33), `... expected {"tag":"BUTTON","name":"Make active for UX-4"}` (#34), `stale 409 (reject) ... expected {"tag":"BUTTON","name":"Confirm reject request"}` (#35), `wrong password ... expected {"tag":"BUTTON","name":"Sign in"}` (#39), `no-match search ... immediately after the activation: focus is on BODY, expected {"id":"main-content","tag":"H1","name":"Explore"}` (#40), `sign out (pointer) ... expected {"id":"main-content","tag":"H1","name":"Explore"}` and `the retry fails again ... expected ... "Retry session"` (#41). `node --test tests/ux.test.mjs` is 6 of 6 on those seven red trees (no stylesheet check applies to the focus fixes).
+
+For #42 and #44 the red/green numbers were **not re-run**; the figures recorded in the fix commit messages (engineer runs before and after the fix, same method) are cited: #42, red on `504bbf7`: real stack 67 tests 12 pass / 55 fail, mock 31 tests 2 pass / 29 fail, unit 42.9 red; green on `89adb46`: 67 of 67 and 31 of 31 for `UX_ISSUES=42`. #44, red on `89adb46`: real stack 64 tests 25 pass / 39 fail (44.1, 44.2, 44.4 to 44.7 at all six widths, 44.3 at 720/768/1100), mock 2 of 2 fail, unit 44.15 red, guards 44.9 to 44.13 pass; green on `37b1eb5`: `UX_ISSUES=37,38,42,44` real stack 257 of 257, mock 43 of 43, `npm test` 226 of 226. This session's second full run confirms the green side on the final tree (501 of 501 real stack, 115 of 115 mock, 226 of 226 unit).
+
+### Documentation
+
+`_docs/testing-guidelines.md` line 7 said `npm test` runs 214 cases; it runs 226 and now says so. README and the rest of the testing guide already describe the part B suites, ports, `UX_ISSUES` and `UX_CASES` correctly and were not changed.
+
+### Limits
+
+Chromium 153 only (no Firefox or Safari); the toolchain deviates from the pinned Node 24 / npm 11 / uv 0.12.23; the host was loaded by concurrent QA sessions, which is the likely reason for the first run's timing failures, so wall times are not benchmarks. Focus is asserted on `document.activeElement` after a 400 ms settle, not on screen-reader output; the focus fixes do not cover the toolbar "Refresh inventory" ([#45](https://github.com/allfocusSS/gearshare/issues/45)) or the Add/Edit-saved race ([#46](https://github.com/allfocusSS/gearshare/issues/46)), which are separate issues; `test:browser:labels` has its own intermittent sign-out timing problem ([#47](https://github.com/allfocusSS/gearshare/issues/47)) and passed here. The #42 scan covers the 21 screen states in the suites, not every possible state, and measures computed font sizes, not legibility. The backend is untouched (lock check and 1262 tests rerun only as a baseline). The red measurements for #42 and #44 come from the commit messages, not from this session. Independent QA of `504bbf7` is separate: it has already recorded PASS for #43, #33, #34, #35, #39, #40 and #41, and #42 and #44 await independent QA.
