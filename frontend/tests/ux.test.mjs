@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { addDays } from './support/browserKit.mjs'
-import { declarationsFor, horizonEnd, monthLabel, monthPlan, monthsBetween, parseCss, selectedIssue, shiftMonth, wrapChain, wrapsAnywhere } from './support/ux.mjs'
+import { ALLOW_LIST, DATA_EYEBROWS, FONT_FLOOR, KICKER_EYEBROW, declarationsFor, fontSizesUnder, horizonEnd, monthLabel, monthPlan, monthsBetween, parseCss, selectedIssue, selectorAllowed, shiftMonth, wrapChain, wrapsAnywhere } from './support/ux.mjs'
 
 describe('support/ux.mjs helpers', () => {
   it('UX_ISSUES filters issue blocks and an empty filter runs every block', () => {
@@ -92,5 +92,48 @@ describe('user-entered text wrapping in styles.css', () => {
     // The side-by-side (601 px and up) and stacked (600 px and below) row layouts stay as they were.
     assert.equal(declarationsFor(styles, '.reservation-row')['flex-direction'] ?? 'row', 'row')
     assert.equal(declarationsFor(styles, '.reservation-row', { media: '@media (max-width: 600px)' })['flex-direction'], 'column')
+  })
+})
+
+// ---- #42: the stylesheet half of the informational-text floor ----------------------------------------------------------------
+// design-system.md "Minimum size for informational text": no `font-size` under 12 px (or 0.75rem) outside the closed allow-list,
+// including inside every @media block. The browser scan in the UX suites measures the real screens; this check covers what a
+// scan can miss (pending-only text, error variants, rules for states that are hard to reach) and never replaces it.
+const designSystem = readFileSync(new URL('../../_docs/design-system.md', import.meta.url), 'utf8')
+
+describe('#42 informational text floor in styles.css', () => {
+  it('42.9 no font-size under 12 px or 0.75rem outside the closed allow-list, in the base rules and in every @media block', () => {
+    const offenders = fontSizesUnder(styles, FONT_FLOOR).filter((found) => !selectorAllowed(found.selector))
+    assert.deepEqual(offenders.map((found) => `${found.media ?? 'base'} :: ${found.selector} { font-size: ${found.size} }`), [])
+  })
+
+  it('the checker sees what it must: base and @media sizes, rem, the font shorthand and pseudo-elements, and honors the allow-list', () => {
+    const rules = parseCss('.a { font-size: 10px } .b::before { font-size: 11px } @media (max-width: 719px) { .c { font-size: .7rem } .d { font: 600 9px/1.2 sans-serif } .e { font-size: 12px } .f { font-size: 0.75rem } }')
+    assert.deepEqual(fontSizesUnder(rules).map((found) => `${found.media ?? 'base'} ${found.selector}`), ['base .a', 'base .b::before', '@media (max-width: 719px) .c', '@media (max-width: 719px) .d'])
+    assert.equal(selectorAllowed('.page-footer'), true)
+    assert.equal(selectorAllowed('.brand small'), true)
+    assert.equal(selectorAllowed('.auth-story .eyebrow'), true, 'a kicker eyebrow')
+    assert.equal(selectorAllowed('.credential-row code'), true, 'the mock harness')
+    for (const selector of DATA_EYEBROWS) assert.equal(selectorAllowed(selector), false, `${selector} shows data and is not exempt`)
+    for (const selector of ['.account-name', '.account-name small', '.field-hint', '.staff-table td::before', '.calendar-week', '.day-unavailable-icon']) assert.equal(selectorAllowed(selector), false, `${selector} is checked`)
+  })
+
+  it('the allow-list array is the list in design-system.md, so the stylesheet check and the browser scan cannot drift from it', () => {
+    const section = designSystem.slice(designSystem.indexOf('### Minimum size for informational text'))
+    const listed = section.slice(section.indexOf('everything else is checked:'), section.indexOf('An eyebrow that shows')).match(/`[^`]+`/g).map((token) => token.slice(1, -1))
+    assert.deepEqual(listed, [...ALLOW_LIST, KICKER_EYEBROW])
+    for (const selector of DATA_EYEBROWS.filter((entry) => entry.startsWith('.asset-heading'))) assert.ok(section.includes(`\`${selector}\``), `${selector} is named as not exempt`)
+    assert.ok(section.includes('descendants of `.demo-banner`') && section.includes('`.credentials`'), 'the mock harness exemption is the one in the rule')
+  })
+
+  it('the harness-only classes are rendered only inside the harness', () => {
+    const demo = readFileSync(new URL('../src/components/DemoControls.tsx', import.meta.url), 'utf8')
+    assert.match(demo, /className="demo-banner"/, 'DemoControls renders inside .demo-banner')
+    for (const root of ['demo-badge', 'demo-controls', 'club-date']) {
+      const users = ['App.tsx', 'pages/AuthPage.tsx', 'pages/AssetDetailPage.tsx', 'pages/CataloguePage.tsx', 'pages/CoordinatorPage.tsx', 'pages/InventoryPage.tsx', 'pages/ReservationsPage.tsx'].filter((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8').includes(root))
+      assert.deepEqual(users, [], `${root} is used outside DemoControls.tsx: ${users.join(', ')}`)
+    }
+    const auth = readFileSync(new URL('../src/pages/AuthPage.tsx', import.meta.url), 'utf8')
+    assert.ok(auth.indexOf('credential-row') > auth.indexOf('className="credentials"'), '.credential-row is inside the .credentials block')
   })
 })

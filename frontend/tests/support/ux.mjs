@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
 import { join } from 'node:path'
-import { addDays, assertNoUnexpected, createHelpers, newSink, newStudent, snap, watch } from './browserKit.mjs'
+import { TOKEN_KEY, addDays, assertNoUnexpected, clubToday, createHelpers, newSink, newStudent, snap, watch } from './browserKit.mjs'
 import { formatCalendarDate } from '../../src/services/dates.ts'
 
 /** `UX_ISSUES=31,32` runs only those issue blocks; unset or empty runs every block. */
@@ -410,8 +410,7 @@ export function wrapChain(rules, chain, { media = null } = {}) {
   return { ok: false, selector: null }
 }
 
-// EXTENSION POINT #42: add `fontSizesUnder(rules, floor)` here (every `font-size` below 12px, including inside @media rules,
-// outside the closed allow-list in design-system.md). parseCss already returns the media text for each rule.
+// `fontSizesUnder(rules, floor)` (the #42 stylesheet check) lives with the #42 section at the end of this file.
 
 // ---- browser readers (Playwright `page`/`locator` objects are passed in) -------------------------------------------------
 
@@ -2415,4 +2414,573 @@ export function issue41(suite) {
     }
   }, { modes: ['mock'], bare: true }])
   defineCases(suite, cases)
+}
+
+// ====================================================================================================================
+// #42: informational text is at least 12 px (design-system.md "Minimum size for informational text")
+// ====================================================================================================================
+
+/** Floor in CSS px. */
+export const FONT_FLOOR = 12
+
+/**
+ * The closed allow-list of decorative or brand micro-copy that may stay below the floor, exactly as the design system lists
+ * it. The browser scan prints the entries it skipped, the stylesheet check (`selectorAllowed`) uses the same array, and
+ * `ux.test.mjs` compares it with the list in design-system.md, so the three cannot drift.
+ */
+export const ALLOW_LIST = ['.art-tag', '.brand small', '.sidebar-note .eyebrow', '.sidebar-foot', '.topbar-context', '.page-footer', '.catalogue-stamp']
+/** A kicker `.eyebrow` that holds no data value is allowed too; one that shows a code, category or borrower is not. */
+export const KICKER_EYEBROW = '.eyebrow'
+export const DATA_EYEBROWS = ['.asset-heading .eyebrow', '.staff-detail .eyebrow', '.staff-detail-heading .eyebrow', '.inventory-editor .eyebrow']
+/** Mock-only demo harness (descendants are exempt): the demo banner with its controls and club date, and the credentials block. */
+export const HARNESS = ['.demo-banner', '.credentials']
+/** Classes that exist only inside the harness, so a stylesheet rule for them is the harness's. */
+export const HARNESS_STYLE_ROOTS = ['.demo-banner', '.demo-badge', '.demo-controls', '.club-date', '.credentials', '.credential-row']
+
+const under = (selector, root) => selector === root || selector.startsWith(`${root} `) || selector.startsWith(`${root}>`) || selector.startsWith(`${root}:`)
+
+/** Whether a stylesheet selector belongs to the allow-list or the mock harness (so it may set a font size under the floor). */
+export function selectorAllowed(selector) {
+  const plain = selector.replace(/::?(before|after)$/, '').trim()
+  if (ALLOW_LIST.some((root) => under(plain, root))) return true
+  if (HARNESS_STYLE_ROOTS.some((root) => under(plain, root))) return true
+  return new RegExp(`(^|[\\s>])\\${KICKER_EYEBROW}$`).test(plain) && !DATA_EYEBROWS.includes(plain)
+}
+
+const KEYWORD_PX = { 'xx-small': 9, 'x-small': 10, small: 13, smaller: 11, medium: 16 }
+/** A CSS font size as px when it is a plain length or size keyword, else null (inherit, clamp(), var(), calc() are not checked). */
+function toPx(value) {
+  const text = value.trim().toLowerCase()
+  if (text in KEYWORD_PX) return KEYWORD_PX[text]
+  const match = text.match(/^(-?\d*\.?\d+)(px|rem|em|pt|%)$/)
+  if (!match) return null
+  const amount = Number(match[1])
+  return match[2] === 'px' ? amount : match[2] === 'pt' ? amount * 4 / 3 : match[2] === '%' ? amount * 0.16 : amount * 16
+}
+
+/**
+ * Every `font-size` (and a size inside the `font` shorthand) below `floor` px in the parsed rules, including inside @media
+ * blocks and `::before` / `::after` rules: [{ media, selector, size, px }] with one entry per selector of a rule.
+ */
+export function fontSizesUnder(rules, floor = FONT_FLOOR) {
+  const found = []
+  for (const rule of rules) {
+    const declared = []
+    if (rule.declarations['font-size']) declared.push(rule.declarations['font-size'])
+    const shorthand = rule.declarations.font?.match(/(?:^|\s)(-?\d*\.?\d+(?:px|rem|em|pt)|xx-small|x-small|small|smaller)(?=\/|\s|$)/i)
+    if (shorthand) declared.push(shorthand[1])
+    for (const size of declared) {
+      const px = toPx(size)
+      if (px !== null && px < floor) for (const selector of rule.selectors) found.push({ media: rule.media, selector, size, px })
+    }
+  }
+  return found
+}
+
+/**
+ * The scan, run inside the page: every visible text node (non-empty, its element has client rects and is not
+ * `visibility: hidden`), `aria-hidden` ones included, and the generated text of every `::before` / `::after` with a non-empty
+ * `content`, each with its computed font size. Allow-listed elements and the mock harness are skipped and counted by selector.
+ * Also reads the layout facts of criterion 5 (overflow, boxes outside the viewport, 44 px primary buttons, clipped text).
+ */
+function pageScan(config) {
+  const { floor, allowList, kicker, dataEyebrows, harness } = config
+  const describe = (element) => {
+    const classes = [...element.classList].slice(0, 3).map((name) => `.${name}`).join('')
+    const parent = element.parentElement
+    const parentClasses = parent ? [...parent.classList].slice(0, 2).map((name) => `.${name}`).join('') : ''
+    return `${parent ? `${parent.tagName.toLowerCase()}${parentClasses} > ` : ''}${element.tagName.toLowerCase()}${classes}`
+  }
+  const visible = (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden'
+  const skippedBy = (element) => {
+    if (harness.some((selector) => element.closest(selector))) return 'mock harness'
+    for (const selector of allowList) if (element.closest(selector)) return selector
+    if (element.closest(kicker) && !dataEyebrows.some((selector) => element.closest(selector))) return `${kicker} (kicker, no data)`
+    return null
+  }
+  const result = { nodes: 0, generated: 0, offenders: [], skipped: {}, sizes: {} }
+  const note = (element, text, size, kind) => {
+    const skip = skippedBy(element)
+    if (skip) { result.skipped[skip] = (result.skipped[skip] ?? 0) + 1; return }
+    if (kind === 'text') result.nodes += 1; else result.generated += 1
+    if (size < floor - 0.001) result.offenders.push({ element: describe(element), kind, text: text.replace(/\s+/g, ' ').slice(0, 40), size })
+  }
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  while (walker.nextNode()) {
+    const node = walker.currentNode
+    const text = node.textContent.trim()
+    const element = node.parentElement
+    if (!text || !element || element.closest('script,style,noscript,template') || !visible(element)) continue
+    note(element, text, parseFloat(getComputedStyle(element).fontSize), 'text')
+  }
+  for (const element of document.body.querySelectorAll('*')) {
+    if (!visible(element)) continue
+    for (const pseudo of ['::before', '::after']) {
+      const style = getComputedStyle(element, pseudo)
+      const content = style.content
+      if (!content || content === 'none' || content === 'normal' || style.display === 'none') continue
+      const text = content.replace(/^["']|["']$/g, '').trim()
+      if (!text) continue
+      note(element, `${pseudo} ${text}`, parseFloat(style.fontSize), 'generated')
+    }
+  }
+  // Named selectors of the QA table: every visible match and its computed size.
+  for (const selector of config.named) {
+    const sizes = [...document.querySelectorAll(selector)].filter(visible).map((element) => parseFloat(getComputedStyle(element).fontSize))
+    if (sizes.length) result.sizes[selector] = sizes
+  }
+  const layout = { scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, outside: [], smallButtons: [], clipped: [] }
+  const width = document.documentElement.clientWidth
+  for (const element of document.body.querySelectorAll('*')) {
+    if (!visible(element) || element.closest('.skip-link')) continue
+    const rect = element.getBoundingClientRect()
+    if (rect.width <= 1 && rect.height <= 1) continue
+    let clippedByAncestor = false
+    for (let ancestor = element.parentElement; ancestor && ancestor !== document.documentElement; ancestor = ancestor.parentElement) {
+      if (/(hidden|clip|auto|scroll)/.test(getComputedStyle(ancestor).overflowX) && ancestor.getBoundingClientRect().right <= width + 0.5) { clippedByAncestor = true; break }
+    }
+    if (!clippedByAncestor && (rect.right > width + 0.5 || rect.left < -0.5)) layout.outside.push(`${describe(element)} ${Math.round(rect.left)}-${Math.round(rect.right)}`)
+    if (element.matches('.button.primary') && !element.disabled) {
+      if (rect.height < 43.5 || rect.left < -0.5 || rect.right > width + 0.5) layout.smallButtons.push(`${describe(element)} ${Math.round(rect.height)}px high, ${Math.round(rect.left)}-${Math.round(rect.right)}`)
+    }
+    const style = getComputedStyle(element)
+    if (/(hidden|clip)/.test(style.overflowX) && element.scrollWidth > element.clientWidth + 1 && element.textContent.trim() && element.clientWidth > 0) layout.clipped.push(`${describe(element)} ${element.scrollWidth}>${element.clientWidth}`)
+  }
+  result.layout = layout
+  return result
+}
+
+/** Selectors of the QA table (42.2) and of the identity text (42.3): every visible match must compute to the floor. */
+const NAMED = [
+  '.equipment-card-meta', '.calendar-legend', '.account-name', '.account-name small', '.date-hint', '.availability-badge', '.asset-heading .eyebrow',
+  '.calendar-help', '.field-hint', '.staff-date', '.staff-table th', '.staff-detail-heading .eyebrow', '.desk-counts dt', '.pending-text',
+  '.catalogue-results-label > span', '.schedule-note', '.legend-occupied', '.field-error', '.auth-switch', '.auth-switch a', '.staff-tabs button span',
+  '.staff-table small', '.status-pill', '.custody-warning', '.staff-facts dt', '.staff-facts small', '.booking-history time', '.booking-history small',
+  '.service-notice .button', '.account-area .button', '.category-filter button', '.calendar-week', '.day-unavailable-icon', '.form-alert',
+]
+
+export function issue42(suite) {
+  const http = suite.mode === 'http'
+  const WIDTHS_42 = [1440, 390]
+  const scanConfig = { floor: FONT_FLOOR, allowList: ALLOW_LIST, kicker: KICKER_EYEBROW, dataEyebrows: DATA_EYEBROWS, harness: HARNESS, named: NAMED }
+  suite.scans ??= []
+  /** Installs the scan in the page (once per document) and runs it. */
+  const scan = async (t, label, { record = true } = {}) => {
+    await settle(t.page, 250)
+    const result = await t.page.evaluate(`(${pageScan.toString()})(${JSON.stringify(scanConfig)})`)
+    if (record) suite.scans.push({ mode: suite.mode, width: t.width, state: label, nodes: result.nodes, generated: result.generated, offenders: result.offenders.length, skipped: result.skipped, sizes: result.sizes })
+    return result
+  }
+  const listOffenders = (result) => {
+    const grouped = new Map()
+    for (const offender of result.offenders) {
+      const key = `${offender.element} [${offender.kind}] ${offender.size}px`
+      grouped.set(key, [...(grouped.get(key) ?? []), offender.text])
+    }
+    return [...grouped].slice(0, 30).map(([key, texts]) => `${key} x${texts.length} e.g. "${texts[0]}"`).join('\n  ')
+  }
+  /** One scan snapshot of a state: zero offenders and clean layout. */
+  const check = async (t, label, { text = true, clip = true } = {}) => {
+    const result = await scan(t, label)
+    const where = `${label} (${suite.mode} @${t.width})`
+    // UX_SHOTS=<folder> keeps a full-page screenshot of every scanned state (the layout review of criterion 5).
+    if (process.env.UX_SHOTS) await snap(t.page, join(process.env.UX_SHOTS, `${suite.mode}-${label.replace(/[^A-Za-z0-9]+/g, '-')}-${t.width}.png`))
+    if (text) assert.equal(result.offenders.length, 0, `${where}: ${result.offenders.length} text nodes under ${FONT_FLOOR}px outside the allow-list:\n  ${listOffenders(result)}`)
+    assert.equal(result.layout.scrollWidth, result.layout.clientWidth, `${where}: horizontal overflow ${JSON.stringify(result.layout)}`)
+    assert.deepEqual(result.layout.outside, [], `${where}: element boxes outside the viewport`)
+    assert.deepEqual(result.layout.smallButtons, [], `${where}: primary buttons under 44 px or outside the viewport`)
+    // `clip: false` only for Explore: the shared database holds the 100 x W units of #37/#38/#44, whose cards clip long text until #44 is fixed (#44 owns that check).
+    if (clip) assert.deepEqual(result.layout.clipped, [], `${where}: clipped text`)
+    return result
+  }
+  const goto = async (t, route, heading, level = 1) => {
+    await t.page.evaluate((target) => { location.hash = target }, route)
+    if (heading) await t.page.getByRole('heading', { name: heading, level }).waitFor()
+    await settle(t.page, 300)
+  }
+  const fillPurpose = (t, value) => t.page.locator('#booking-purpose').fill(value)
+  /** Approves the case reservation (pending requests do not block a day) and reloads, so its day shows the occupied marker. */
+  const occupy = async (t) => {
+    const done = await suite.staff(`/api/v1/staff/bookings/${t.booking.id}/approve`, { expectedVersion: t.booking.version })
+    assert.equal(done.status, 200, JSON.stringify(done.json))
+    await t.page.reload()
+    await t.page.getByRole('heading', { name: 'Check availability', level: 2 }).waitFor()
+    await t.h.showMonthOf(t.day)
+  }
+  const desk = async (t, queue) => {
+    await goto(t, '/desk', null)
+    await t.page.locator('#desk-views').waitFor()
+    if (queue !== 'Pending requests') await t.page.getByRole('button', { name: new RegExp(`^${queue}`) }).click()
+    await t.page.locator('.staff-table tbody tr').first().waitFor()
+  }
+  /** The coordinator's data for the desk states: a pending request, an approved pickup, an active loan and a returned loan. */
+  const deskData = async (t) => {
+    const ids = await suite.seedDesk(t)
+    const unit = await suite.newUnit()
+    const loan = await suite.book(t, unit.id, 0, 'Sweep: active loan with a normal purpose')
+    for (const [action, version, note] of [['approve', 1], ['checkout', 2, 'Kit complete and in good condition']]) {
+      const done = await suite.staff(`/api/v1/staff/bookings/${loan.id}/${action}`, { expectedVersion: version, ...(note ? { note } : {}) })
+      assert.equal(done.status, 200, `${action}: ${JSON.stringify(done.json)}`)
+    }
+    return { ...ids, loan: loan.id }
+  }
+
+  // The 21 screen states of the scan plus the pending states, each a function that puts the page in the state and checks it.
+  const STUDENT = { modes: ['http'], reserve: true }
+  const VISITOR = { modes: ['http'], signedIn: false, reserve: true }
+  // No `reserve` for the coordinator states: deskData seeds its own bookings on the case unit (days 30, 31, 40, 41 ahead), which the case reservation could collide with.
+  const COORDINATOR = { modes: ['http'], as: 'coordinator' }
+  const cases = []
+  const state = (name, options, run, extra = {}) => cases.push([`${name}`, run, { ...options, ...extra }])
+
+  state('42.1 S01 Explore', { modes: ['http'], signedIn: false }, async (t) => { await goto(t, '/explore', 'Explore'); await t.page.locator('a.equipment-card').first().waitFor(); await check(t, 'S01 Explore', { clip: false }) })
+  state('42.1 S02 asset detail as a visitor', VISITOR, async (t) => { await occupy(t); await check(t, 'S02 detail visitor') })
+  state('42.1 S03 asset detail as a signed-in student with the request form', STUDENT, async (t) => {
+    await occupy(t)
+    await t.page.locator('#detail-startDate').fill(addDays(t.day, 1))
+    await t.page.locator('#detail-endDate').fill(addDays(t.day, 2))
+    await fillPurpose(t, 'A perfectly fine purpose text')
+    await check(t, 'S03 detail student form')
+  })
+  state('42.1 S04 asset detail booking error state (field error, then a service alert)', STUDENT, async (t) => {
+    await occupy(t)
+    await t.page.locator('#detail-startDate').fill(addDays(t.day, 1))
+    await t.page.locator('#detail-endDate').fill(addDays(t.day, 2))
+    await fillPurpose(t, 'ab')
+    await t.button().click()
+    await t.page.locator('#purpose-error').waitFor()
+    await check(t, 'S04a detail field error')
+    await fillPurpose(t, 'A perfectly fine purpose text')
+    await inject(t.page, '**/api/v1/bookings', '500', { method: 'POST' })
+    await t.button().click()
+    await t.page.getByRole('alert').first().waitFor()
+    await check(t, 'S04b detail service alert')
+  })
+  state('42.1 S05 Sign in', { modes: ['http'], signedIn: false }, async (t) => { await goto(t, '/signin', 'Sign in', 1); await check(t, 'S05 Sign in') })
+  state('42.1 S06 Sign in with an error (field errors, then a form alert)', { modes: ['http'], signedIn: false }, async (t) => {
+    await goto(t, '/signin', 'Sign in', 1)
+    await t.page.locator('#password').focus()
+    await t.page.keyboard.press('Enter')
+    await t.page.locator('.field-error').first().waitFor()
+    await check(t, 'S06a Sign in field errors')
+    await t.page.locator('#username').fill(t.student.username)
+    await t.page.locator('#password').fill('wrong-password-xyz')
+    await t.page.keyboard.press('Enter')
+    await t.page.locator('.form-alert').waitFor()
+    await check(t, 'S06b Sign in form alert')
+  })
+  state('42.1 S07 Register', { modes: ['http'], signedIn: false }, async (t) => { await goto(t, '/register', 'Create an account', 1); await check(t, 'S07 Register') })
+  state('42.1 S08 My reservations signed out', { modes: ['http'], signedIn: false }, async (t) => { await goto(t, '/reservations', 'My reservations'); await check(t, 'S08 reservations signed out') })
+  state('42.1 S09 My reservations, Upcoming', STUDENT, async (t) => { await goto(t, '/reservations', 'My reservations'); await t.page.locator('.reservation-row').first().waitFor(); await check(t, 'S09 Upcoming') })
+  state('42.1 S10 a reservation\'s details', STUDENT, async (t) => {
+    await goto(t, '/reservations', 'My reservations')
+    await t.page.getByRole('button', { name: `View details for ${t.unit.name}`, exact: true }).click()
+    await t.page.getByRole('heading', { name: 'Reservation details', level: 2 }).waitFor()
+    await check(t, 'S10 reservation details')
+  })
+  state('42.1 S11 My reservations, History', { ...STUDENT, reserve: 'cancelled' }, async (t) => {
+    await goto(t, '/reservations', 'My reservations')
+    await t.page.getByRole('button', { name: 'History', exact: true }).click()
+    await t.page.locator('.reservation-row').first().waitFor()
+    await check(t, 'S11 History')
+  })
+  state('42.1 S12 coordinator desk restricted for a student', STUDENT, async (t) => { await goto(t, '/desk', 'Coordinator desk'); await check(t, 'S12 desk restricted') })
+  for (const [id, queue] of [['S13', 'Pending requests'], ['S14', 'Pickups'], ['S15', 'Active loans'], ['S16', 'History']]) {
+    state(`42.1 ${id} coordinator desk, ${queue}`, COORDINATOR, async (t) => { await deskData(t); await desk(t, queue); await check(t, `${id} desk ${queue}`) })
+  }
+  state('42.1 S17 a booking\'s detail on the desk', COORDINATOR, async (t) => {
+    const ids = await deskData(t)
+    await desk(t, 'Pending requests')
+    await t.page.locator(`#review-${ids.pending}`).click()
+    await t.page.getByRole('heading', { name: 'Manage reservation', level: 2 }).waitFor()
+    await check(t, 'S17 booking detail')
+  })
+  state('42.1 S18 the reject form with a validation error', COORDINATOR, async (t) => {
+    const ids = await deskData(t)
+    await desk(t, 'Pending requests')
+    await t.page.locator(`#review-${ids.pending}`).click()
+    await t.page.getByRole('button', { name: 'Reject request', exact: true }).click()
+    await t.page.locator('#staff-note').fill('ab')
+    await t.page.locator('.staff-action-form button[type="submit"]').click()
+    await t.page.locator('#staff-note-error').waitFor()
+    await check(t, 'S18 reject form error')
+  })
+  state('42.1 S19 Inventory list', COORDINATOR, async (t) => { await goto(t, '/inventory', 'Inventory'); await t.page.locator('table.inventory-table').waitFor(); await check(t, 'S19 Inventory') })
+  state('42.1 S20 Add equipment', COORDINATOR, async (t) => {
+    await goto(t, '/inventory', 'Inventory'); await t.page.locator('#add-equipment').click()
+    await t.page.getByRole('heading', { name: 'Add physical equipment', level: 2 }).waitFor()
+    await check(t, 'S20 Add equipment')
+  })
+  state('42.1 S21 Add equipment with an error', COORDINATOR, async (t) => {
+    await goto(t, '/inventory', 'Inventory'); await t.page.locator('#add-equipment').click()
+    await t.page.getByRole('button', { name: 'Add physical unit', exact: true }).click()
+    await t.page.locator('#inventory-name-error').waitFor()
+    await check(t, 'S21 Add equipment error')
+  })
+  state('42.1 S22 Sign in while the login is pending', { modes: ['http'], signedIn: false }, async (t) => {
+    await goto(t, '/signin', 'Sign in', 1)
+    await t.page.locator('#username').fill(t.student.username)
+    await t.page.locator('#password').fill(t.student.password)
+    await inject(t.page, '**/api/v1/auth/login', 'pass', { method: 'POST', delay: 1500 })
+    await t.page.keyboard.press('Enter')
+    await t.page.locator('.pending-text', { hasText: 'Waiting for the' }).waitFor()
+    await check(t, 'S22 Sign in pending')
+  })
+  state('42.1 S23 a coordinator action form while "Saving…" is shown', COORDINATOR, async (t) => {
+    const ids = await deskData(t)
+    await desk(t, 'Pending requests')
+    await t.page.locator(`#review-${ids.pending}`).click()
+    await t.page.getByRole('button', { name: 'Approve request', exact: true }).click()
+    await inject(t.page, '**/api/v1/staff/bookings/*/approve', 'pass', { method: 'POST', delay: 1500 })
+    await t.page.locator('.staff-action-form button[type="submit"]').click()
+    await t.page.locator('.staff-action-form .pending-text', { hasText: 'Saving' }).waitFor()
+    await check(t, 'S23 Saving')
+  })
+  state('42.1 S24 the inventory form while "Saving this physical unit…" is shown', COORDINATOR, async (t) => {
+    await goto(t, '/inventory', 'Inventory'); await t.page.locator('#add-equipment').click()
+    await t.page.locator('#inventory-name').fill('Scan unit')
+    await t.page.locator('#inventory-inventoryCode').fill(`SCN-${Date.now().toString(36).toUpperCase().slice(-6)}`)
+    await t.page.locator('#inventory-location').fill('Club desk')
+    await t.page.locator('#inventory-description').fill('Unit added by the scan')
+    await inject(t.page, '**/api/v1/staff/assets', 'pass', { method: 'POST', delay: 1500 })
+    await t.page.getByRole('button', { name: 'Add physical unit', exact: true }).click()
+    await t.page.locator('.pending-text', { hasText: 'Saving' }).waitFor()
+    await check(t, 'S24 inventory Saving')
+  })
+
+  // ---- the mock adapter: the same scan on the equivalent screens (the demo harness is exempt and listed as skipped) ----------
+  const mockState = (name, run, extra = {}) => cases.push([name, run, { modes: ['mock'], bare: true, ...extra }])
+  const MAYA = ['maya_student', 'StudentDemo42!'], ALEX = ['alex_coordinator', 'CoordinatorDemo42!']
+  const mockOpen = async (t, [username, password], route) => { await t.h.signIn(username, password, route); await settle(t.page, 400) }
+  const mockDesk = async (t, queue = 'Pending requests') => {
+    await mockOpen(t, ALEX, 'desk')
+    await t.page.locator('#desk-views').waitFor()
+    if (queue !== 'Pending requests') await t.page.getByRole('button', { name: new RegExp(`^${queue}`) }).click()
+    await t.page.locator('.staff-table tbody tr').first().waitFor()
+  }
+  mockState('42.7 M01 Explore', async (t) => { await t.page.locator('a.equipment-card').first().waitFor(); await check(t, 'M01 Explore') })
+  mockState('42.7 M02 asset detail as a visitor', async (t) => { await goto(t, '/assets/camera-01', 'Equipment detail'); await check(t, 'M02 detail visitor') })
+  mockState('42.7 M03 asset detail as a student with the request form, field error and conflict', async (t) => {
+    await mockOpen(t, MAYA, 'assets/camera-01')
+    await t.page.getByRole('button', { name: 'Request equipment', exact: true }).waitFor()
+    await check(t, 'M03a detail student form')
+    await t.page.locator('#detail-startDate').fill(addDays(clubToday(), 30))
+    await t.page.locator('#detail-endDate').fill(addDays(clubToday(), 31))
+    await fillPurpose(t, 'ab')
+    await t.page.getByRole('button', { name: 'Request equipment', exact: true }).click()
+    await t.page.locator('#purpose-error').waitFor()
+    await check(t, 'M03b detail field error')
+  })
+  mockState('42.7 M04 Sign in, Sign in with an error, Register', async (t) => {
+    await goto(t, '/signin', 'Sign in', 1)
+    await check(t, 'M04a Sign in')
+    await t.page.locator('#password').focus()
+    await t.page.keyboard.press('Enter')
+    await t.page.locator('.field-error').first().waitFor()
+    await check(t, 'M04b Sign in field errors')
+    await t.page.locator('#username').fill('maya_student')
+    await t.page.locator('#password').fill('wrong-password-xyz')
+    await t.page.keyboard.press('Enter')
+    await t.page.locator('.form-alert').waitFor()
+    await check(t, 'M04c Sign in form alert')
+    await goto(t, '/register', 'Create an account', 1)
+    await check(t, 'M04d Register')
+  })
+  mockState('42.7 M05 Sign in while the demo login is pending', async (t) => {
+    await goto(t, '/signin', 'Sign in', 1)
+    await t.page.locator('#username').fill('maya_student')
+    await t.page.locator('#password').fill('StudentDemo42!')
+    // The demo service answers after 250 ms; scan inside the same page task, 60 ms after the submit.
+    await t.page.evaluate(`window.__scan42 = ${pageScan.toString()}`)
+    const result = await t.page.evaluate(async (config) => {
+      document.querySelector('form').requestSubmit()
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      return { pending: document.querySelector('.pending-text')?.textContent ?? '', scan: window.__scan42(config) }
+    }, scanConfig)
+    assert.match(result.pending, /Waiting for the demo service/, 'the pending text is visible')
+    suite.scans.push({ mode: suite.mode, width: t.width, state: 'M05 Sign in pending', nodes: result.scan.nodes, generated: result.scan.generated, offenders: result.scan.offenders.length, skipped: result.scan.skipped, sizes: result.scan.sizes })
+    assert.equal(result.scan.offenders.length, 0, `M05 Sign in pending (mock @${t.width}): ${result.scan.offenders.length} text nodes under ${FONT_FLOOR}px:\n  ${listOffenders(result.scan)}`)
+  })
+  mockState('42.7 M06 My reservations signed out', async (t) => { await goto(t, '/reservations', 'My reservations'); await check(t, 'M06 reservations signed out') })
+  mockState('42.7 M07 My reservations Upcoming, a reservation\'s details, History', async (t) => {
+    await mockOpen(t, MAYA, 'reservations')
+    await t.page.locator('.reservation-row').first().waitFor()
+    await check(t, 'M07a Upcoming')
+    await t.page.getByRole('button', { name: /^View details for/ }).first().click()
+    await t.page.getByRole('heading', { name: 'Reservation details', level: 2 }).waitFor()
+    await check(t, 'M07b reservation details')
+    await t.page.getByRole('button', { name: /^← Back|^Back to/ }).first().click().catch(() => {})
+    await t.page.getByRole('button', { name: 'History', exact: true }).click()
+    await t.page.locator('.reservation-row').first().waitFor()
+    await check(t, 'M07c History')
+  })
+  mockState('42.7 M08 coordinator desk restricted for a student', async (t) => { await mockOpen(t, MAYA, 'explore'); await goto(t, '/desk', 'Coordinator desk'); await check(t, 'M08 desk restricted') })
+  for (const [id, queue] of [['M09', 'Pending requests'], ['M10', 'Pickups'], ['M11', 'Active loans'], ['M12', 'History']]) {
+    mockState(`42.7 ${id} coordinator desk, ${queue}`, async (t) => { await mockDesk(t, queue); await check(t, `${id} desk ${queue}`) })
+  }
+  mockState('42.7 M13 a booking\'s detail and the reject form with a validation error', async (t) => {
+    await mockDesk(t)
+    await t.page.locator('#review-fixture-pending').click()
+    await t.page.getByRole('heading', { name: 'Manage reservation', level: 2 }).waitFor()
+    await check(t, 'M13a booking detail')
+    await t.page.getByRole('button', { name: 'Reject request', exact: true }).click()
+    await t.page.locator('#staff-note').fill('ab')
+    await t.page.locator('.staff-action-form button[type="submit"]').click()
+    await t.page.locator('#staff-note-error').waitFor()
+    await check(t, 'M13b reject form error')
+  })
+  mockState('42.7 M14 Inventory list, Add equipment, Add equipment with an error', async (t) => {
+    await mockOpen(t, ALEX, 'inventory')
+    await t.page.locator('table.inventory-table').waitFor()
+    await check(t, 'M14a Inventory')
+    await t.page.locator('#add-equipment').click()
+    await t.page.getByRole('heading', { name: 'Add physical equipment', level: 2 }).waitFor()
+    await check(t, 'M14b Add equipment')
+    await t.page.getByRole('button', { name: 'Add physical unit', exact: true }).click()
+    await t.page.locator('#inventory-name-error').waitFor()
+    await check(t, 'M14c Add equipment error')
+  })
+
+  // ---- 42.4: the allow-list stays closed (negative controls) -----------------------------------------------------------------
+  cases.push(['42.4 [GUARD] negative control: a 10 px span in main and a data-bearing asset eyebrow forced to 10 px are reported, a kicker eyebrow forced to 8 px is skipped', async (t) => {
+    await t.page.evaluate(() => {
+      const span = document.createElement('span'); span.textContent = 'negative control text'; span.style.fontSize = '10px'
+      document.querySelector('main').append(span)
+    })
+    await t.page.addStyleTag({ content: '.asset-heading .eyebrow { font-size: 10px !important } .availability-panel > .eyebrow { font-size: 8px !important }' })
+    const dirty = await scan(t, 'negative control: seeded', { record: false })
+    const texts = dirty.offenders.map((offender) => `${offender.element} "${offender.text}"`)
+    assert.ok(dirty.offenders.some((offender) => offender.text === 'negative control text'), `the 10 px span is reported (got ${JSON.stringify(texts.slice(0, 8))})`)
+    assert.ok(dirty.offenders.some((offender) => offender.element.includes('.eyebrow') && offender.text.includes(t.unit.inventoryCode)), `the data-bearing .asset-heading .eyebrow is reported, not skipped (got ${JSON.stringify(texts.slice(0, 8))})`)
+    assert.ok((dirty.skipped['.eyebrow (kicker, no data)'] ?? 0) >= 1, `the data-free kicker eyebrow is skipped and counted (got ${JSON.stringify(dirty.skipped)})`)
+    assert.equal(dirty.offenders.some((offender) => offender.text === 'Plan your next project'), false, 'the kicker eyebrow is not reported')
+  }, { modes: ['http'], reserve: true }])
+  cases.push(['42.4 [GUARD] negative control on the coordinator booking detail: its code and borrower eyebrow cannot be skipped', async (t) => {
+    await goto(t, '/desk', null)
+    await t.page.locator('#desk-views').waitFor()
+    await t.page.locator(`#review-${t.booking.id}`).click()
+    await t.page.getByRole('heading', { name: 'Manage reservation', level: 2 }).waitFor()
+    await t.page.addStyleTag({ content: '.staff-detail-heading .eyebrow { font-size: 10px !important }' })
+    const dirty = await scan(t, 'negative control: desk eyebrow', { record: false })
+    assert.ok(dirty.offenders.some((offender) => offender.element.includes('.eyebrow')), `the booking detail eyebrow is reported (got ${JSON.stringify(dirty.offenders.map((offender) => offender.element))})`)
+  }, { modes: ['http'], as: 'coordinator', reserve: true }])
+
+  // ---- 42.5: the 390 px topbar with a 30-character username ---------------------------------------------------------------
+  cases.push(['42.5 [GUARD] the topbar (brand area, heading, account name and role, Sign out) does not overflow or overlap with a 30-character username', async (t) => {
+    const username = `lg${Math.random().toString(36).slice(2)}${'x'.repeat(30)}`.slice(0, 30)
+    const password = `Pw-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`
+    const made = await suite.as(undefined, '/api/v1/auth/register', { username, password })
+    assert.equal(made.status, 201, JSON.stringify(made.json))
+    // The case context stores its own token on every load; a later init script wins and signs the page in as the long-named user.
+    await t.context.addInitScript(({ key, token }) => sessionStorage.setItem(key, token), { key: TOKEN_KEY, token: made.json.token })
+    await t.page.reload()
+    await t.page.getByRole('button', { name: 'Sign out', exact: true }).waitFor()
+    await settle(t.page, 300)
+    const boxes = await t.page.evaluate(() => {
+      const rect = (selector) => { const element = document.querySelector(selector); if (!element) return null; const box = element.getBoundingClientRect(); return { left: box.left, right: box.right, top: box.top, bottom: box.bottom } }
+      return { h1: rect('.topbar h1'), area: rect('.account-area'), name: rect('.account-area .account-name'), role: rect('.account-area .account-name small'), button: rect('.account-area .button'), width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }
+    })
+    assert.equal(boxes.scrollWidth, boxes.width, 'no horizontal overflow')
+    for (const [key, box] of Object.entries(boxes)) if (box && typeof box === 'object') assert.ok(box.left >= -0.5 && box.right <= boxes.width + 0.5, `${key} ${Math.round(box.left)}-${Math.round(box.right)} is inside the ${boxes.width}px viewport`)
+    assert.equal(intersects(boxes.h1, boxes.area), false, 'the heading and the account area do not overlap')
+    assert.equal(intersects(boxes.name, boxes.button), false, 'the account name and the Sign out button do not overlap')
+    assert.equal(await t.page.locator('.account-area .account-name').evaluate((element) => element.firstChild.textContent), username, 'the page is signed in as the 30-character user')
+    await check(t, 'topbar with a long username', { text: false })
+  }, { modes: ['http'] }])
+
+  // ---- 42.6: what must not change --------------------------------------------------------------------------------------------
+  cases.push(['42.6 [GUARD] unchanged: body and heading scale, no zoom or transform, field labels, buttons and inputs, focus ring', async (t) => {
+    await t.h.showMonthOf(t.day)
+    const facts = await t.page.evaluate(() => {
+      const size = (selector) => { const element = document.querySelector(selector); return element ? getComputedStyle(element).fontSize : null }
+      return {
+        html: size('html'), body: size('body'), zoom: getComputedStyle(document.documentElement).zoom, shell: getComputedStyle(document.querySelector('.app-shell')).transform,
+        h1: size('h1'), assetH2: size('.asset-heading h2'), panelH2: size('.availability-panel h2'), calendarH3: size('.calendar-header h3'), description: size('.asset-description'),
+        label: size('.field label'), button: size('.booking-form .button'), input: size('.field input'),
+      }
+    })
+    const narrow = t.width < 720
+    assert.deepEqual(facts, {
+      html: '16px', body: '16px', zoom: '1', shell: 'none', h1: narrow ? '15px' : '17px', assetH2: narrow ? '28px' : '30px', panelH2: '24px', calendarH3: '15px', description: '15px',
+      label: '12px', button: '14px', input: narrow ? '12px' : '14px',
+    })
+    await t.page.keyboard.press('Tab')
+    await t.button().focus()
+    await t.page.keyboard.press('Shift+Tab')
+    await t.page.keyboard.press('Tab')
+    const ring = await t.page.evaluate(() => { const style = getComputedStyle(document.activeElement); return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor, offset: style.outlineOffset } })
+    assert.deepEqual(ring, { style: 'solid', width: '2px', color: 'rgb(36, 70, 216)', offset: '4px' })
+  }, { modes: ['http'], reserve: true }])
+
+  // ---- 42.10: the × marker of occupied calendar days -------------------------------------------------------------------------
+  cases.push(['42.10 [FAIL-NOW size, GUARD geometry] the × marker and the weekday letters are at least 12 px; the marker stays in its day cell, at most 2 px above it, clear of the day number', async (t) => {
+    await occupy(t)
+    const cell = t.page.getByRole('button', { name: new RegExp(`^${t.day}: `) })
+    const measure = await cell.evaluate((button) => {
+      const box = (element) => { const rect = element.getBoundingClientRect(); return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } }
+      const marker = button.querySelector('.day-unavailable-icon'), number = button.querySelector('span:not(.day-unavailable-icon)')
+      return { cell: box(button), marker: marker && box(marker), number: number && box(number), markerSize: marker && parseFloat(getComputedStyle(marker).fontSize), weekSize: parseFloat(getComputedStyle(document.querySelector('.calendar-week span')).fontSize) }
+    })
+    assert.ok(measure.marker, 'the booked day shows the × marker')
+    assert.ok(measure.markerSize >= FONT_FLOOR, `.day-unavailable-icon is ${measure.markerSize}px`)
+    assert.ok(measure.weekSize >= FONT_FLOOR, `.calendar-week is ${measure.weekSize}px`)
+    assert.ok(measure.marker.left >= measure.cell.left - 0.5 && measure.marker.right <= measure.cell.right + 0.5, `the marker ${JSON.stringify(measure.marker)} is horizontally inside the cell ${JSON.stringify(measure.cell)}`)
+    assert.ok(measure.marker.top >= measure.cell.top - 2.5, `the marker is at most 2 px above the cell (${measure.cell.top - measure.marker.top}px)`)
+    assert.equal(intersects(measure.marker, measure.number), false, 'the marker does not overlap the day number')
+  }, { modes: ['http'], reserve: true }])
+
+  // ---- 42.11: stacked-card labels ------------------------------------------------------------------------------------------
+  for (const [screen, prepare] of [['desk', async (t) => { await deskData(t); await desk(t, 'Pending requests') }], ['inventory', async (t) => { await goto(t, '/inventory', 'Inventory'); await t.page.locator('table.inventory-table').waitFor() }]]) {
+    cases.push([`42.11 [FAIL-NOW size, GUARD layout] the ${screen} stacked-card labels are at least 12 px at 390 and 719, absent at 720, and nothing overflows`, async (t) => {
+      await prepare(t)
+      const labels = await t.page.evaluate(() => [...document.querySelectorAll('tbody td')].filter((cell) => cell.getClientRects().length).map((cell) => {
+        const style = getComputedStyle(cell, '::before')
+        return { content: style.content, size: parseFloat(style.fontSize), overflow: cell.scrollWidth - cell.clientWidth }
+      }))
+      assert.ok(labels.length > 0, 'the table has cells')
+      if (t.width <= 719) {
+        assert.ok(labels.every((label) => label.content !== 'none' && label.size >= FONT_FLOOR), `stacked labels at ${t.width}px: ${JSON.stringify([...new Set(labels.map((label) => `${label.content} ${label.size}px`))])}`)
+      } else assert.ok(labels.every((label) => label.content === 'none'), `no generated labels at ${t.width}px`)
+      assert.ok(labels.every((label) => label.overflow <= 1), `no cell content is clipped: ${JSON.stringify(labels.filter((label) => label.overflow > 1))}`)
+      await assertNoOverflow(t.page, `${screen} at ${t.width}px`)
+    }, { modes: ['http'], as: 'coordinator', widths: [390, 719, 720] }])
+  }
+  defineCases(suite, cases, { widths: WIDTHS_42 })
+  // Aggregates over every scan of this run (they need the scan cases to have run first, so they are registered last).
+  const measured = () => {
+    const table = new Map()
+    for (const entry of suite.scans) for (const [selector, sizes] of Object.entries(entry.sizes)) for (const size of sizes) {
+      const row = table.get(selector) ?? { min: Infinity, widths: new Set(), states: new Set() }
+      row.min = Math.min(row.min, size); row.widths.add(entry.width); row.states.add(entry.state); table.set(selector, row)
+    }
+    return table
+  }
+  it(`42.2 [FAIL-NOW] every selector of the QA table (${suite.mode}) computes to at least ${FONT_FLOOR} px wherever the scan found it`, () => {
+    if (!suite.scans.length || process.env.UX_CASES) return // aggregates need the whole scan, not a UX_CASES subset
+    const table = measured()
+    const failing = [...table].filter(([, row]) => row.min < FONT_FLOOR).map(([selector, row]) => `${selector} ${row.min}px (widths ${[...row.widths].join('/')}; e.g. ${[...row.states][0]})`)
+    const never = NAMED.filter((selector) => !table.has(selector))
+    suite.records.push({ issue: 42, mode: suite.mode, namedSelectorsMeasured: [...table].map(([selector, row]) => ({ selector, min: row.min, widths: [...row.widths] })), namedSelectorsNeverFound: never })
+    assert.deepEqual(failing, [], `selectors under ${FONT_FLOOR}px:\n  ${failing.join('\n  ')}`)
+    const optional = new Set(['.staff-table th', '.custody-warning', '.calendar-help', '.field-error', '.booking-history time', '.booking-history small', '.staff-facts small', '.service-notice .button'])
+    assert.deepEqual(never.filter((selector) => !optional.has(selector)), [], 'every named selector appeared in at least one scanned state')
+  })
+  it(`42.3 [FAIL-NOW] identity text (${suite.mode}): the booking detail eyebrow, Explore card code and category, header account name and role, reservation status badge and status pills are at least ${FONT_FLOOR} px`, () => {
+    if (!suite.scans.length || process.env.UX_CASES) return // aggregates need the whole scan, not a UX_CASES subset
+    const table = measured()
+    const identity = ['.staff-detail-heading .eyebrow', '.equipment-card-meta', '.account-name', '.account-name small', '.availability-badge', '.status-pill']
+    assert.deepEqual(identity.filter((selector) => !table.has(selector)), [], 'every identity selector was measured')
+    assert.deepEqual(identity.filter((selector) => table.get(selector).min < FONT_FLOOR).map((selector) => `${selector} ${table.get(selector).min}px`), [])
+  })
+  it(`42.1 [GUARD] the allow-list report (${suite.mode}): only the design system's closed list, the data-free kicker eyebrow and the mock harness were skipped`, () => {
+    if (!suite.scans.length || process.env.UX_CASES) return // aggregates need the whole scan, not a UX_CASES subset
+    const skipped = new Map()
+    for (const entry of suite.scans) for (const [selector, count] of Object.entries(entry.skipped)) skipped.set(selector, (skipped.get(selector) ?? 0) + count)
+    const report = Object.fromEntries([...skipped].sort())
+    console.log(`#42 ${suite.mode} allow-list elements skipped by the scan: ${JSON.stringify(report)}`)
+    suite.records.push({ issue: 42, mode: suite.mode, skipped: report, states: suite.scans.length, nodes: suite.scans.reduce((total, entry) => total + entry.nodes, 0), generated: suite.scans.reduce((total, entry) => total + entry.generated, 0) })
+    const permitted = new Set([...ALLOW_LIST, '.eyebrow (kicker, no data)', ...(suite.mode === 'mock' ? ['mock harness'] : [])])
+    assert.deepEqual([...skipped.keys()].filter((selector) => !permitted.has(selector)), [], 'nothing outside the closed allow-list was skipped')
+    if (suite.mode === 'http') assert.equal(skipped.has('mock harness'), false, 'the HTTP adapter renders no demo harness')
+  })
 }
