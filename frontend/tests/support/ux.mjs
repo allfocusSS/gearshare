@@ -1016,13 +1016,13 @@ export function issue37(suite) {
     const failures = await sweep(t, suite)
     assert.deepEqual(failures, [], `screens that overflow or clip at ${t.width}px:\n${failures.join('\n')}`)
   }, { unit: () => ({ name: 'W'.repeat(100), description: LONG.manualUrl470() }), widths: [390, 768, 1100, 1440], as: 'coordinator', modes: ['http'] }])
-  // Found by the sweep and filed as #44: the Explore card clips a long unbroken name and location. Reported, not hidden.
-  cases.push(['37.9 [TODO #44] the Explore card shows a 100 x W name and location without clipping', async t => {
+  // Found by the sweep and filed as #44 (fixed there): the Explore card shows a long unbroken name and location without clipping.
+  cases.push(['37.9 [GUARD, was TODO #44] the Explore card shows a 100 x W name and location without clipping', async t => {
     await t.page.evaluate(() => { location.hash = '/explore' })
     await t.page.locator('a.equipment-card').first().waitFor()
     await settle(t.page, 250)
     assert.deepEqual([...new Set(await clippedLongText(t.page, 'WWWWWWWWWWWWWWWWWWWW'))], [], 'Explore card text is clipped by the card')
-  }, { unit: () => ({ name: 'W'.repeat(100), location: 'W'.repeat(100) }), widths: [390, 1440], modes: ['http'], todo: '#44 the Explore card clips long unbroken names and locations' }])
+  }, { unit: () => ({ name: 'W'.repeat(100), location: 'W'.repeat(100) }), widths: [390, 1440], modes: ['http'] }])
   defineCases(suite, cases)
 }
 
@@ -1071,8 +1071,7 @@ async function sweep(t, suite) {
   const seeded = await suite.seedDesk(t)
   const go = hash => page.evaluate(next => { location.hash = next }, hash)
   const view = name => page.locator('#desk-views').getByRole('button', { name: new RegExp(`^${name}`) })
-  // Explore's card clips long names and locations (#44); the clipping has its own todo case, the page overflow stays here.
-  await check('Explore', async () => { await go('/explore'); await page.locator('a.equipment-card').first().waitFor() }, { clipping: false })
+  await check('Explore', async () => { await go('/explore'); await page.locator('a.equipment-card').first().waitFor() })
   await check('Desk queue (Pending requests)', async () => { await go('/desk'); await page.locator(`#review-${seeded.pending}`).waitFor() })
   await check('Pickups', async () => { await view('Pickups').click(); await page.locator(`#review-${seeded.approved}`).waitFor() })
   await check('Check-out form', async () => {
@@ -2580,7 +2579,7 @@ export function issue42(suite) {
     return [...grouped].slice(0, 30).map(([key, texts]) => `${key} x${texts.length} e.g. "${texts[0]}"`).join('\n  ')
   }
   /** One scan snapshot of a state: zero offenders and clean layout. */
-  const check = async (t, label, { text = true, clip = true } = {}) => {
+  const check = async (t, label, { text = true } = {}) => {
     const result = await scan(t, label)
     const where = `${label} (${suite.mode} @${t.width})`
     // UX_SHOTS=<folder> keeps a full-page screenshot of every scanned state (the layout review of criterion 5).
@@ -2589,8 +2588,7 @@ export function issue42(suite) {
     assert.equal(result.layout.scrollWidth, result.layout.clientWidth, `${where}: horizontal overflow ${JSON.stringify(result.layout)}`)
     assert.deepEqual(result.layout.outside, [], `${where}: element boxes outside the viewport`)
     assert.deepEqual(result.layout.smallButtons, [], `${where}: primary buttons under 44 px or outside the viewport`)
-    // `clip: false` only for Explore: the shared database holds the 100 x W units of #37/#38/#44, whose cards clip long text until #44 is fixed (#44 owns that check).
-    if (clip) assert.deepEqual(result.layout.clipped, [], `${where}: clipped text`)
+    assert.deepEqual(result.layout.clipped, [], `${where}: clipped text`)
     return result
   }
   const goto = async (t, route, heading, level = 1) => {
@@ -2633,7 +2631,7 @@ export function issue42(suite) {
   const cases = []
   const state = (name, options, run, extra = {}) => cases.push([`${name}`, run, { ...options, ...extra }])
 
-  state('42.1 S01 Explore', { modes: ['http'], signedIn: false }, async (t) => { await goto(t, '/explore', 'Explore'); await t.page.locator('a.equipment-card').first().waitFor(); await check(t, 'S01 Explore', { clip: false }) })
+  state('42.1 S01 Explore', { modes: ['http'], signedIn: false }, async (t) => { await goto(t, '/explore', 'Explore'); await t.page.locator('a.equipment-card').first().waitFor(); await check(t, 'S01 Explore') })
   state('42.1 S02 asset detail as a visitor', VISITOR, async (t) => { await occupy(t); await check(t, 'S02 detail visitor') })
   state('42.1 S03 asset detail as a signed-in student with the request form', STUDENT, async (t) => {
     await occupy(t)
@@ -2983,4 +2981,389 @@ export function issue42(suite) {
     assert.deepEqual([...skipped.keys()].filter((selector) => !permitted.has(selector)), [], 'nothing outside the closed allow-list was skipped')
     if (suite.mode === 'http') assert.equal(skipped.has('mock harness'), false, 'the HTTP adapter renders no demo harness')
   })
+}
+
+// ====================================================================================================================
+// #44: the Explore card wraps long unbroken names, locations and codes (QA 44.1-44.15)
+// ====================================================================================================================
+
+/** The six Explore column layouts QA measured: 1 column at 390, 2 at 720/768/1099, 3 at 1100/1440. */
+export const CARD_WIDTHS = [390, 720, 768, 1099, 1100, 1440]
+let cardCodeSerial = 0
+/** A unique 30-character inventory code (20 x W and ten digits): the tightest line of the card once #42 raised it to 12 px. */
+const longCode = () => `${'W'.repeat(20)}${String(Date.now() * 10 + (cardCodeSerial++ % 10)).slice(-10)}`
+/** U1: 100 x W name and location with a 30-character code. U2: 40 x a name and location. U3: 100 characters of ordinary words. */
+const U1 = () => ({ name: 'W'.repeat(100), location: 'W'.repeat(100), inventoryCode: longCode() })
+const U2 = () => ({ name: 'a'.repeat(40), location: 'a'.repeat(40) })
+const U3 = () => ({
+  name: 'Wide angle lens kit with spare batteries and a padded carry case for outdoor shoots across campus'.slice(0, 100),
+  location: 'Second floor media room, behind the sliding glass door next to the printers and the lending counter'.slice(0, 100),
+})
+/** Numbers measured on the parent commit (89adb46) for the cards the defect must not change (QA 44.9); `UX_PROBE44=1 UX_ISSUES=44 UX_CASES=44.9` prints them again. */
+const BASELINE_44 = {
+  390: { seeded: { width: 350, bodyHeight: 185 }, control: { width: 350, bodyHeight: 256.2 }, search: { width: 316, height: 46 }, label: { height: 44.4 } },
+  720: { seeded: { width: 210, bodyHeight: 207.4 }, control: { width: 210, bodyHeight: 335.7 }, search: { width: 390, height: 46 }, label: { height: 38.4 } },
+  768: { seeded: { width: 234, bodyHeight: 189.4 }, control: { width: 234, bodyHeight: 298.5 }, search: { width: 438, height: 46 }, label: { height: 38.4 } },
+  1099: { seeded: { width: 399.5, bodyHeight: 189.4 }, control: { width: 399.5, bodyHeight: 234.5 }, search: { width: 769, height: 46 }, label: { height: 19.2 } },
+  1100: { seeded: { width: 260, bodyHeight: 189.4 }, control: { width: 260, bodyHeight: 276.1 }, search: { width: 770, height: 46 }, label: { height: 19.2 } },
+  1440: { seeded: { width: 365.3, bodyHeight: 189.4 }, control: { width: 365.3, bodyHeight: 234.5 }, search: { width: 1086, height: 46 }, label: { height: 19.2 } },
+}
+
+/** Text of one element inside the unit's own card: the line boxes against the card and the body's content edge, the clipping ancestors. */
+function measureCardText(page, id, selector) {
+  return page.evaluate(({ id, selector }) => {
+    const card = document.querySelector(`a.equipment-card[href="#/assets/${id}"]`)
+    const element = card?.querySelector(selector)
+    if (!element) return { missing: true }
+    const box = card.getBoundingClientRect()
+    const body = card.querySelector('.equipment-card-body')
+    const bodyBox = body.getBoundingClientRect()
+    const inner = bodyBox.right - parseFloat(getComputedStyle(body).paddingRight)
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const rects = [...range.getClientRects()].filter((rect) => rect.width > 0)
+    const style = getComputedStyle(element)
+    const clippedBy = []
+    for (let ancestor = element.parentElement; ancestor && ancestor !== document.documentElement; ancestor = ancestor.parentElement) {
+      const ancestorStyle = getComputedStyle(ancestor)
+      if (!/(hidden|clip|auto|scroll)/.test(`${ancestorStyle.overflowX} ${ancestorStyle.overflowY}`)) continue
+      const clip = ancestor.getBoundingClientRect()
+      if (rects.some((rect) => rect.left < clip.left - 0.5 || rect.right > clip.right + 0.5 || rect.top < clip.top - 0.5 || rect.bottom > clip.bottom + 0.5)) clippedBy.push(`${ancestor.tagName.toLowerCase()}.${ancestor.className || '-'}`)
+    }
+    return {
+      text: element.textContent, lines: new Set(rects.map((rect) => Math.round(rect.top))).size, right: Math.max(...rects.map((rect) => rect.right)),
+      cardRight: box.right, inner, cardWidth: box.width, scrollWidth: element.scrollWidth, clientWidth: element.clientWidth, fontSize: style.fontSize,
+      textOverflow: style.textOverflow, lineClamp: style.webkitLineClamp, whiteSpace: style.whiteSpace, clippedBy,
+    }
+  }, { id, selector })
+}
+
+/** QA 44.1/44.2: the text is complete and on screen: inside the card and the body content, no scrolling or ellipsis, no clipping ancestor. */
+function assertTextInCard(m, expected, label) {
+  assert.equal(m.missing, undefined, `${label}: element not found in the card`)
+  assert.equal(m.text, expected, `${label}: text content`)
+  assert.ok(m.right <= m.cardRight + 0.5 && m.right <= m.inner + 0.5, `${label}: the text runs to ${Math.round(m.right)} but the card ends at ${Math.round(m.cardRight)} (content edge ${Math.round(m.inner)}, card ${Math.round(m.cardWidth)} px wide)`)
+  assert.ok(m.scrollWidth <= m.clientWidth, `${label}: scrollWidth ${m.scrollWidth} exceeds clientWidth ${m.clientWidth} (card ${Math.round(m.cardWidth)} px wide)`)
+  assert.notEqual(m.textOverflow, 'ellipsis', `${label}: text-overflow is ellipsis`)
+  assert.deepEqual(m.clippedBy, [], `${label}: line boxes are cut by an ancestor with a clipping overflow`)
+}
+
+/** The meta line of a card (code and category spans): text, scroll sizes, line boxes against the content edge, and whether the two spans overlap. */
+function measureMeta(page, id) {
+  return page.evaluate((id) => {
+    const card = document.querySelector(`a.equipment-card[href="#/assets/${id}"]`)
+    const meta = card?.querySelector('.equipment-card-meta')
+    if (!meta) return { missing: true }
+    const body = card.querySelector('.equipment-card-body')
+    const inner = body.getBoundingClientRect().right - parseFloat(getComputedStyle(body).paddingRight)
+    const spans = [...meta.children].map((span) => {
+      const range = document.createRange()
+      range.selectNodeContents(span)
+      const rects = [...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }))
+      return { text: span.textContent, rects, right: Math.max(...rects.map((rect) => rect.right)), scrollWidth: span.scrollWidth, clientWidth: span.clientWidth }
+    })
+    const overlap = spans[0].rects.some((a) => spans[1].rects.some((b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5))
+    return { spans, inner, cardRight: card.getBoundingClientRect().right, cardWidth: card.getBoundingClientRect().width, overlap }
+  }, id)
+}
+
+/** QA 44.3: code and category are whole, inside the content edge, not scrolled and not on top of each other (wrapping onto two lines is allowed). */
+function assertMeta(m, unit, label) {
+  assert.equal(m.missing, undefined, `${label}: meta line not found`)
+  assert.equal(m.spans.length, 2, `${label}: code and category spans`)
+  assert.equal(m.spans[0].text, unit.inventoryCode, `${label}: code text`)
+  assert.equal(m.spans[1].text, 'Cameras', `${label}: category text`)
+  m.spans.forEach((span, index) => {
+    const which = index === 0 ? 'code' : 'category'
+    assert.ok(span.right <= m.inner + 0.5 && span.right <= m.cardRight + 0.5, `${label}: the ${which} runs to ${Math.round(span.right)} but the content edge is ${Math.round(m.inner)} (card ${Math.round(m.cardWidth)} px wide)`)
+    assert.ok(span.scrollWidth <= span.clientWidth, `${label}: the ${which} scrollWidth ${span.scrollWidth} exceeds clientWidth ${span.clientWidth}`)
+  })
+  assert.equal(m.overlap, false, `${label}: the code and the category overlap`)
+}
+
+/** Containment of the unit's own card, plus every card on the page (QA 44.4): nothing scrolls inside a card, nothing spills out of it. */
+function measureCards(page, id) {
+  return page.evaluate((id) => {
+    const read = (card) => {
+      const body = card.querySelector('.equipment-card-body')
+      return { href: card.getAttribute('href'), scrollWidth: card.scrollWidth, clientWidth: card.clientWidth, scrollHeight: card.scrollHeight, clientHeight: card.clientHeight, width: card.getBoundingClientRect().width, height: card.getBoundingClientRect().height, bodyHeight: body.getBoundingClientRect().height }
+    }
+    const own = document.querySelector(`a.equipment-card[href="#/assets/${id}"]`)
+    const seeded = [...document.querySelectorAll('a.equipment-card')].find((card) => card.getAttribute('aria-label')?.includes('CAM-001'))
+    return {
+      own: own ? read(own) : null, seeded: seeded ? read(seeded) : null,
+      all: [...document.querySelectorAll('a.equipment-card')].map(read).filter((card) => card.scrollWidth > card.clientWidth + 1 || card.scrollHeight > card.clientHeight + 1),
+      count: document.querySelectorAll('a.equipment-card').length,
+    }
+  }, id)
+}
+
+/** The badge and the arrow icon of the unit's card are inside the card box. */
+function measureCardBottom(page, id) {
+  return page.evaluate((id) => {
+    const card = document.querySelector(`a.equipment-card[href="#/assets/${id}"]`)
+    const box = card.getBoundingClientRect()
+    const read = (element) => { const rect = element.getBoundingClientRect(); return { text: element.textContent.trim(), inside: rect.left >= box.left - 0.5 && rect.right <= box.right + 0.5 && rect.top >= box.top - 0.5 && rect.bottom <= box.bottom + 0.5, width: Math.round(rect.width), height: Math.round(rect.height) } }
+    return { badge: read(card.querySelector('.availability-badge')), arrow: read(card.querySelector('.equipment-card-bottom > .icon')) }
+  }, id)
+}
+
+export function issue44(suite) {
+  const http = suite.mode === 'http'
+  const cardSelector = (id) => `a.equipment-card[href="#/assets/${id}"]`
+  const openExplore = async (t, ...ids) => {
+    await t.page.evaluate(() => { location.hash = '/explore' })
+    for (const id of ids) await t.page.locator(cardSelector(id)).waitFor()
+    await settle(t.page, 250)
+  }
+  /** QA 44.4: the unit's own card contains its content and grew past the seeded card; no card of the page scrolls inside itself. */
+  const assertContained = async (t, id, label, { longer = true } = {}) => {
+    const cards = await measureCards(t.page, id)
+    assert.ok(cards.own, `${label}: card not found`)
+    assert.ok(cards.own.scrollWidth <= cards.own.clientWidth + 1, `${label}: card scrollWidth ${cards.own.scrollWidth} exceeds clientWidth ${cards.own.clientWidth}`)
+    assert.ok(cards.own.scrollHeight <= cards.own.clientHeight + 1, `${label}: card scrollHeight ${cards.own.scrollHeight} exceeds clientHeight ${cards.own.clientHeight}`)
+    if (longer && cards.seeded) assert.ok(cards.own.bodyHeight > cards.seeded.bodyHeight + 1, `${label}: the card body is ${Math.round(cards.own.bodyHeight)} px high, the seeded card body ${Math.round(cards.seeded.bodyHeight)} px: it did not grow`)
+    return cards
+  }
+  const assertAllCardsContained = async (t, id, label) => {
+    const cards = await measureCards(t.page, id)
+    assert.deepEqual(cards.all.map((card) => `${card.href} ${card.scrollWidth}x${card.scrollHeight} in ${card.clientWidth}x${card.clientHeight}`), [], `${label}: cards that scroll inside themselves`)
+  }
+  const checkText = async (t, unit, label, { location = true } = {}) => {
+    assertTextInCard(await measureCardText(t.page, unit.id ?? t.assetId, 'h3'), unit.name, `${label} name (${suite.mode} @${t.width})`)
+    if (location) assertTextInCard(await measureCardText(t.page, unit.id ?? t.assetId, 'p.pickup-location'), unit.location, `${label} location (${suite.mode} @${t.width})`)
+  }
+  const extra = (make) => suite.newUnit(make())
+  const cases = []
+
+  // 44.1 / 44.2: the name and the location are whole and inside the card, for U1 (100 x W) and U2 (40 x a).
+  cases.push(['44.1 [FAIL-NOW] the name is complete, inside the card and not clipped (U1 100 x W, U2 40 x a)', async (t) => {
+    const u2 = await extra(U2)
+    await openExplore(t, t.assetId, u2.id)
+    assertTextInCard(await measureCardText(t.page, t.assetId, 'h3'), t.unit.name, `44.1 U1 name (@${t.width})`)
+    assertTextInCard(await measureCardText(t.page, u2.id, 'h3'), u2.name, `44.1 U2 name (@${t.width})`)
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  cases.push(['44.2 [FAIL-NOW] the pickup location is complete, inside the card and not clipped (U1 100 x W, U2 40 x a)', async (t) => {
+    const u2 = await extra(U2)
+    await openExplore(t, t.assetId, u2.id)
+    assertTextInCard(await measureCardText(t.page, t.assetId, 'p.pickup-location'), t.unit.location, `44.2 U1 location (@${t.width})`)
+    assertTextInCard(await measureCardText(t.page, u2.id, 'p.pickup-location'), u2.location, `44.2 U2 location (@${t.width})`)
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.3: the code and category line of U1 (clips only the category today at 720 and 768; once #42 is in, the 12 px code is the tightest line).
+  cases.push(['44.3 [FAIL-NOW at 720, 768 and 1100, GUARD at 390, 1099 and 1440] the code and category line is whole, inside the card and not overlapping (U1, 30-character code)', async (t) => {
+    await openExplore(t, t.assetId)
+    assertMeta(await measureMeta(t.page, t.assetId), t.unit, `44.3 (@${t.width})`)
+    if (process.env.UX_SHOTS) await t.page.locator(cardSelector(t.assetId)).screenshot({ path: join(process.env.UX_SHOTS, `44-meta-card-${t.width}.png`) })
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.4: the card contains its content, for U1, U2, U3 and U4 (maintenance), and no card of the page scrolls inside itself.
+  cases.push(['44.4 [FAIL-NOW] the card contains its content: U1, U2, U3 and U4 (maintenance) grow instead of scrolling, and no card on the page scrolls inside itself', async (t) => {
+    const u2 = await extra(U2)
+    const u3 = await extra(U3)
+    const u4 = await extra(U1)
+    const done = await suite.staff(`/api/v1/staff/assets/${u4.id}/state`, { state: 'maintenance' }, 'PUT')
+    assert.equal(done.status, 200, JSON.stringify(done.json))
+    await openExplore(t, t.assetId, u2.id, u3.id, u4.id)
+    await assertContained(t, t.assetId, `44.4 U1 (@${t.width})`)
+    await assertContained(t, u2.id, `44.4 U2 (@${t.width})`, { longer: false })
+    await assertContained(t, u3.id, `44.4 U3 (@${t.width})`, { longer: false })
+    await assertContained(t, u4.id, `44.4 U4 maintenance (@${t.width})`)
+    await assertAllCardsContained(t, t.assetId, `44.4 every card (@${t.width})`)
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.5: wrapped, not shrunk or truncated.
+  cases.push(['44.5 [FAIL-NOW line count, GUARD size] U1 name and location wrap onto several lines at the baseline font size, with no ellipsis, line clamp or nowrap', async (t) => {
+    await openExplore(t, t.assetId)
+    const small = t.width <= 719
+    for (const [selector, floor, label] of [['h3', small ? 18 : 16, 'name'], ['p.pickup-location', small ? 13 : 12, 'location']]) {
+      const m = await measureCardText(t.page, t.assetId, selector)
+      assert.ok(m.lines > 1, `44.5 ${label} (@${t.width}): ${m.lines} line box(es), the 100 characters must wrap onto several lines`)
+      assert.ok(parseFloat(m.fontSize) >= floor, `44.5 ${label} (@${t.width}): font-size ${m.fontSize} is under the baseline ${floor}px`)
+      assert.notEqual(m.textOverflow, 'ellipsis', `44.5 ${label}: text-overflow`)
+      assert.equal(m.lineClamp, 'none', `44.5 ${label}: -webkit-line-clamp`)
+      assert.notEqual(m.whiteSpace, 'nowrap', `44.5 ${label}: white-space`)
+    }
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.6: a maintenance unit: the text checks 44.1 to 44.4 hold and the badge and the arrow stay inside the card.
+  cases.push(['44.6 [FAIL-NOW text, GUARD badge] a maintenance unit (U4) keeps its whole name, location and code, and the "× Maintenance · unavailable" badge and the arrow stay inside the card', async (t) => {
+    const done = await suite.staff(`/api/v1/staff/assets/${t.assetId}/state`, { state: 'maintenance' }, 'PUT')
+    assert.equal(done.status, 200, JSON.stringify(done.json))
+    await openExplore(t, t.assetId)
+    await checkText(t, t.unit, '44.6')
+    assertMeta(await measureMeta(t.page, t.assetId), t.unit, `44.6 (@${t.width})`)
+    await assertContained(t, t.assetId, `44.6 (@${t.width})`)
+    const bottom = await measureCardBottom(t.page, t.assetId)
+    assert.equal(bottom.badge.text, '× Maintenance · unavailable', '44.6 badge text')
+    assert.ok(bottom.badge.inside, `44.6 (@${t.width}): the badge ${JSON.stringify(bottom.badge)} is outside the card`)
+    assert.ok(bottom.arrow.inside, `44.6 (@${t.width}): the arrow ${JSON.stringify(bottom.arrow)} is outside the card`)
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.7: with a valid date range every available card shows "Available for selected dates"; the text checks hold for U1 and U2 and the badge and arrow stay inside.
+  cases.push(['44.7 [FAIL-NOW text, GUARD badge] with a valid date range, U1 and U2 keep their whole text and the "Available for selected dates" badge and arrow stay inside the card', async (t) => {
+    const u2 = await extra(U2)
+    await openExplore(t, t.assetId, u2.id)
+    await t.page.locator('#catalogue-startDate').fill(addDays(t.today, 30))
+    await t.page.locator('#catalogue-endDate').fill(addDays(t.today, 31))
+    await t.page.getByText('available for your dates').waitFor()
+    await t.page.locator(cardSelector(t.assetId)).waitFor()
+    await t.page.locator(cardSelector(u2.id)).waitFor()
+    await settle(t.page, 250)
+    for (const unit of [{ ...t.unit, id: t.assetId }, u2]) {
+      await checkText(t, unit, `44.7 ${unit.id === t.assetId ? 'U1' : 'U2'}`)
+      await assertContained(t, unit.id, `44.7 ${unit.id === t.assetId ? 'U1' : 'U2'} (@${t.width})`, { longer: unit.id === t.assetId })
+      const bottom = await measureCardBottom(t.page, unit.id)
+      assert.equal(bottom.badge.text, 'Available for selected dates', '44.7 badge text')
+      assert.ok(bottom.badge.inside, `44.7 (@${t.width}): the badge ${JSON.stringify(bottom.badge)} is outside the card`)
+      assert.ok(bottom.arrow.inside, `44.7 (@${t.width}): the arrow ${JSON.stringify(bottom.arrow)} is outside the card`)
+    }
+    assertMeta(await measureMeta(t.page, t.assetId), t.unit, `44.7 U1 (@${t.width})`)
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.8 [MOCK]: a unit added through the Inventory form, then Explore, in the same page session.
+  cases.push(['44.8 [FAIL-NOW][MOCK] a unit added through the Inventory form (100 x W name and location, 30-character code) shows whole on its Explore card', async (t) => {
+    await openExplore(t, t.assetId)
+    await checkText(t, { ...t.unit, id: t.assetId }, '44.8')
+    assertMeta(await measureMeta(t.page, t.assetId), t.unit, `44.8 (@${t.width})`)
+    await assertContained(t, t.assetId, `44.8 (@${t.width})`)
+  }, { unit: U1, widths: [390, 1440], modes: ['mock'] }])
+
+  // ---- guards (pass on the parent commit and must keep passing) --------------------------------------------------------------
+  const chip = (t, name) => t.page.getByRole('button', { name, exact: true })
+  const cardCount = (t) => t.page.locator('a.equipment-card').count()
+  const labelCount = (t) => t.page.locator('.catalogue-results-label strong').first().textContent().then(Number)
+  const countsMatch = async (t, label) => {
+    await until(async () => (await cardCount(t)) === (await labelCount(t)), `${label}: the results label counts the cards on the page`)
+  }
+  // 44.9: what must not change: seeded card, ordinary-words card, filter row and illustration, against the numbers measured on the parent commit.
+  cases.push(['44.9 [GUARD] controls do not change: seeded card, ordinary-words card (U3), filter row, illustration box and radius', async (t) => {
+    const u3 = await extra(U3)
+    await openExplore(t, t.assetId, u3.id)
+    const read = await t.page.evaluate((u3id) => {
+      const seeded = [...document.querySelectorAll('a.equipment-card')].find((card) => card.getAttribute('aria-label')?.includes('CAM-001'))
+      const size = (element) => { const box = element.getBoundingClientRect(); return { width: Math.round(box.width * 10) / 10, height: Math.round(box.height * 10) / 10 } }
+      const card = (element) => ({ width: size(element).width, bodyHeight: size(element.querySelector('.equipment-card-body')).height, art: size(element.querySelector('.equipment-illustration')), radius: getComputedStyle(element).borderTopLeftRadius })
+      const control = document.querySelector(`a.equipment-card[href="#/assets/${u3id}"]`)
+      return { seeded: card(seeded), control: card(control), search: size(document.querySelector('#equipment-search')), label: size(document.querySelector('.catalogue-results-label')) }
+    }, u3.id)
+    if (process.env.UX_PROBE44) { console.log(`PROBE44 ${t.width} ${JSON.stringify(read)}`); return }
+    const expected = BASELINE_44[t.width]
+    const near = (actual, wanted, what) => assert.ok(Math.abs(actual - wanted) <= 1, `44.9 @${t.width}: ${what} is ${actual}, the baseline is ${wanted}`)
+    near(read.seeded.width, expected.seeded.width, 'seeded card width'); near(read.seeded.bodyHeight, expected.seeded.bodyHeight, 'seeded card body height')
+    near(read.control.width, expected.control.width, 'U3 card width'); near(read.control.bodyHeight, expected.control.bodyHeight, 'U3 card body height')
+    near(read.search.width, expected.search.width, 'search field width'); near(read.search.height, expected.search.height, 'search field height')
+    near(read.label.height, expected.label.height, 'results label height')
+    for (const [which, card] of [['seeded', read.seeded], ['U3', read.control]]) {
+      near(card.art.height, t.width <= 719 ? 180 : 170, `${which} illustration height`)
+      near(card.art.width, card.width - 2, `${which} illustration width (the card's inner width)`)
+      assert.equal(card.radius, '12px', `44.9 ${which} card radius`)
+    }
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.10: the long card is one link with its full name, reachable by Tab with the usual focus ring, and Enter opens the unit.
+  cases.push(['44.10 [GUARD] the long card is one link with its full name; Tab reaches it with the focus ring inside the viewport and Enter opens it', async (t) => {
+    await openExplore(t, t.assetId)
+    const link = t.page.getByRole('link', { name: `View ${t.unit.name}, ${t.unit.inventoryCode}`, exact: true })
+    assert.equal(await link.count(), 1, 'one link named with the full, untruncated name and code')
+    assert.equal(await link.getAttribute('href'), `#/assets/${t.assetId}`)
+    // Narrow the list to this card (its unique code), then Tab from the search field.
+    await t.page.locator('#equipment-search').fill(t.unit.inventoryCode)
+    await until(async () => (await cardCount(t)) === 1, 'the list narrowed to the long card')
+    await settle(t.page, 250)
+    await t.page.locator('#equipment-search').focus()
+    let reached = false
+    for (let press = 0; press < 30 && !reached; press++) {
+      await t.page.keyboard.press('Tab')
+      reached = await t.page.evaluate((id) => document.activeElement?.getAttribute('href') === `#/assets/${id}`, t.assetId)
+    }
+    assert.ok(reached, 'Tab from the filter row reaches the card')
+    const ring = await t.page.evaluate(() => {
+      const card = document.activeElement
+      const style = getComputedStyle(card)
+      const box = card.getBoundingClientRect()
+      const grow = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset)
+      const ringBox = { left: box.left - grow, right: box.right + grow, top: box.top - grow, bottom: box.bottom + grow }
+      const cutBy = []
+      for (let ancestor = card.parentElement; ancestor && ancestor !== document.documentElement; ancestor = ancestor.parentElement) {
+        const ancestorStyle = getComputedStyle(ancestor)
+        if (!/(hidden|clip|auto|scroll)/.test(`${ancestorStyle.overflowX} ${ancestorStyle.overflowY}`)) continue
+        const clip = ancestor.getBoundingClientRect()
+        if (ringBox.left < clip.left - 0.5 || ringBox.right > clip.right + 0.5 || ringBox.top < clip.top - 0.5 || ringBox.bottom > clip.bottom + 0.5) cutBy.push(`${ancestor.tagName.toLowerCase()}.${ancestor.className || '-'}`)
+      }
+      return { visible: card.matches(':focus-visible'), style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor, offset: style.outlineOffset, ringBox, innerWidth, cutBy }
+    })
+    assert.equal(ring.visible, true, ':focus-visible on the card')
+    assert.deepEqual([ring.style, ring.width, ring.color, ring.offset], ['solid', '2px', 'rgb(36, 70, 216)', '4px'], 'focus outline')
+    assert.ok(ring.ringBox.left >= -0.5 && ring.ringBox.right <= ring.innerWidth + 0.5, `the focus ring box ${Math.round(ring.ringBox.left)} to ${Math.round(ring.ringBox.right)} is inside the ${ring.innerWidth} px viewport`)
+    assert.deepEqual(ring.cutBy, [], 'no ancestor with a clipping overflow cuts the focus ring')
+    await t.page.keyboard.press('Enter')
+    await t.page.getByRole('heading', { name: 'Check availability', level: 2 }).waitFor()
+    assert.equal(await t.page.evaluate(() => location.hash), `#/assets/${t.assetId}`, 'Enter opens the unit')
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.11: no page or grid overflow, every card inside its grid column, no two cards overlap, the count matches the results label.
+  cases.push(['44.11 [GUARD] no page or grid overflow, every card inside the grid, no two cards overlap, the card count matches the results label', async (t) => {
+    const u2 = await extra(U2)
+    await openExplore(t, t.assetId, u2.id)
+    await assertNoOverflow(t.page, `44.11 Explore (@${t.width})`)
+    const grid = await t.page.evaluate(() => {
+      const element = document.querySelector('.equipment-grid')
+      const box = element.getBoundingClientRect()
+      const cards = [...element.querySelectorAll('a.equipment-card')].map((card) => { const rect = card.getBoundingClientRect(); return { href: card.getAttribute('href'), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } })
+      const outside = cards.filter((card) => card.left < box.left - 0.5 || card.right > box.right + 0.5).map((card) => card.href)
+      const overlapping = []
+      for (let a = 0; a < cards.length; a++) for (let b = a + 1; b < cards.length; b++) if (cards[a].left < cards[b].right - 0.5 && cards[b].left < cards[a].right - 0.5 && cards[a].top < cards[b].bottom - 0.5 && cards[b].top < cards[a].bottom - 0.5) overlapping.push(`${cards[a].href} ${cards[b].href}`)
+      return { scrollWidth: element.scrollWidth, clientWidth: element.clientWidth, overflowX: getComputedStyle(element).overflowX, outside, overlapping, count: cards.length }
+    })
+    assert.equal(grid.scrollWidth, grid.clientWidth, `44.11 @${t.width}: .equipment-grid scrolls sideways`)
+    assert.deepEqual(grid.outside, [], '44.11 cards outside the grid')
+    assert.deepEqual(grid.overlapping, [], '44.11 overlapping cards')
+    assert.equal(grid.count, await labelCount(t), '44.11 the results label counts the cards')
+  }, { unit: U1, signedIn: false, widths: CARD_WIDTHS, modes: ['http'] }])
+  // 44.12: the catalogue interactions around the long card still work: search, category chip, no-match empty state, date range and Clear dates.
+  cases.push(['44.12 [GUARD] search, category chip, the empty state and the date range still act on the long cards, and the results label counts them', async (t) => {
+    const u2 = await extra(U2)
+    await openExplore(t, t.assetId, u2.id)
+    await t.page.locator('#equipment-search').fill('WWWWWWWWWW')
+    await t.page.locator(cardSelector(t.assetId)).waitFor()
+    await until(async () => (await t.page.locator(cardSelector(u2.id)).count()) === 0, 'U2 filtered out by the search')
+    await countsMatch(t, '44.12 search')
+    await t.page.locator('#equipment-search').fill('')
+    await t.page.locator(cardSelector(u2.id)).waitFor()
+    await chip(t, 'Cameras').click()
+    assert.equal(await chip(t, 'Cameras').getAttribute('aria-pressed'), 'true')
+    await t.page.locator(cardSelector(t.assetId)).waitFor()
+    await countsMatch(t, '44.12 category')
+    await chip(t, 'All equipment').click()
+    assert.equal(await chip(t, 'All equipment').getAttribute('aria-pressed'), 'true')
+    await t.page.locator('#equipment-search').fill('zzzz-no-match')
+    await t.page.getByRole('heading', { name: 'No equipment to show.', level: 2 }).waitFor()
+    await t.page.getByRole('button', { name: 'Clear all filters', exact: true }).click()
+    await t.page.locator(cardSelector(t.assetId)).waitFor()
+    await t.page.locator('#catalogue-startDate').fill(addDays(t.today, 30))
+    await t.page.locator('#catalogue-endDate').fill(addDays(t.today, 31))
+    await t.page.getByText('available for your dates').waitFor()
+    await t.page.locator(cardSelector(t.assetId)).waitFor()
+    await countsMatch(t, '44.12 dates')
+    await t.page.getByRole('button', { name: 'Clear dates', exact: true }).click()
+    await t.page.getByText('to explore').waitFor()
+    await countsMatch(t, '44.12 cleared dates')
+  }, { unit: U1, signedIn: false, widths: [390, 1440], modes: ['http'] }])
+  // 44.13: the illustration keeps its rounded top corners and size: the card still clips it (or the illustration rounds itself).
+  cases.push(['44.13 [GUARD] the illustration keeps its rounded top corners and its size on the long card and on a seeded card', async (t) => {
+    await openExplore(t, t.assetId)
+    const read = await t.page.evaluate((id) => {
+      const seeded = [...document.querySelectorAll('a.equipment-card')].find((card) => card.getAttribute('aria-label')?.includes('CAM-001'))
+      const describe = (card) => {
+        const style = getComputedStyle(card)
+        const art = getComputedStyle(card.querySelector('.equipment-illustration'))
+        const clipsCorners = /(hidden|clip)/.test(style.overflowX) && /(hidden|clip)/.test(style.overflowY)
+        const artRounded = Number.parseFloat(art.borderTopLeftRadius) >= 11 && Number.parseFloat(art.borderTopRightRadius) >= 11
+        return { radius: style.borderTopLeftRadius, clipsCorners, artRounded }
+      }
+      return { long: describe(document.querySelector(`a.equipment-card[href="#/assets/${id}"]`)), seeded: describe(seeded) }
+    }, t.assetId)
+    for (const [which, card] of Object.entries(read)) {
+      assert.equal(card.radius, '12px', `44.13 ${which} card radius`)
+      assert.ok(card.clipsCorners || card.artRounded, `44.13 ${which}: neither the card clips the illustration nor the illustration rounds its own corners`)
+    }
+    if (process.env.UX_SHOTS) {
+      await t.page.locator(cardSelector(t.assetId)).scrollIntoViewIfNeeded()
+      await t.page.locator(cardSelector(t.assetId)).screenshot({ path: join(process.env.UX_SHOTS, `44-long-card-${t.width}.png`) })
+    }
+  }, { unit: U1, signedIn: false, widths: [390, 1440], modes: ['http'] }])
+  defineCases(suite, cases)
 }

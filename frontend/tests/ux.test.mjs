@@ -137,3 +137,31 @@ describe('#42 informational text floor in styles.css', () => {
     assert.ok(auth.indexOf('credential-row') > auth.indexOf('className="credentials"'), '.credential-row is inside the .credentials block')
   })
 })
+
+// ---- #44: the stylesheet half of the Explore card wrapping ------------------------------------------------------------------
+// design-system.md "User-entered text wrapping" (extended to Explore cards): the card's own `overflow: hidden` must not hide the
+// name, location or code. The browser cases 44.1 to 44.8 measure the real card; this advisory check (QA 44.15) fails fast when a rule
+// that carries the text truncates it or when a flex child cannot shrink below its text.
+describe('#44 Explore card text rules in styles.css', () => {
+  const CARD_TEXT = ['.equipment-card h3', '.pickup-location', '.equipment-card-meta', '.equipment-card-meta > span', '.equipment-card-body']
+  const MEDIA = [null, ...new Set(styles.filter((rule) => rule.media).map((rule) => rule.media))]
+
+  it('44.15 no rule of the card text truncates it: no ellipsis, no line clamp, no nowrap, at any width', () => {
+    for (const media of MEDIA) for (const selector of CARD_TEXT) {
+      const declarations = declarationsFor(styles, selector, { media })
+      assert.notEqual(declarations['text-overflow'], 'ellipsis', `${media ?? 'base'} ${selector}: text-overflow`)
+      assert.equal(declarations['-webkit-line-clamp'], undefined, `${media ?? 'base'} ${selector}: -webkit-line-clamp`)
+      assert.equal(declarations['line-clamp'], undefined, `${media ?? 'base'} ${selector}: line-clamp`)
+      assert.notEqual(declarations['white-space'], 'nowrap', `${media ?? 'base'} ${selector}: white-space`)
+    }
+  })
+
+  it('44.15 the name, the location and the code and category wrap at any character, and the flex children of the meta line can shrink', () => {
+    for (const [what, chain] of [['name', ['.equipment-card h3', '.equipment-card-body', '.equipment-card']], ['location', ['.pickup-location', '.equipment-card-body', '.equipment-card']], ['code and category', ['.equipment-card-meta > span', '.equipment-card-meta', '.equipment-card-body', '.equipment-card']]]) {
+      const found = wrapChain(styles, chain)
+      assert.equal(found.ok, true, `the ${what} wraps at any character (rule chain ${chain.join(' < ')}; decided by ${found.selector ?? 'nothing'})`)
+    }
+    assert.equal(declarationsFor(styles, '.equipment-card-meta > span')['min-width'], '0', 'a meta span may shrink below its text (min-width: 0)')
+    assert.equal(declarationsFor(styles, '.equipment-card-body')['min-width'], '0', 'the card body may shrink below its text (min-width: 0)')
+  })
+})

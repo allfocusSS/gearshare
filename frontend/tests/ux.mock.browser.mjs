@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { after, before, describe } from 'node:test'
 import { frontendDir, launchBrowser, outputFolder, writeJson } from './support/stack.mjs'
 import { addDays, clubToday, createHelpers, newStudent } from './support/browserKit.mjs'
-import { issue31, issue32, issue33, issue34, issue35, issue36, issue37, issue38, issue39, issue40, issue41, issue42, issue43, selectedIssue } from './support/ux.mjs'
+import { issue31, issue32, issue33, issue34, issue35, issue36, issue37, issue38, issue39, issue40, issue41, issue42, issue43, issue44, selectedIssue } from './support/ux.mjs'
 const mockPort = Number(process.env.UX_MOCK_PORT ?? 6243)
 const suite = { mode: 'mock', base: `http://127.0.0.1:${mockPort}`, output: outputFolder('mock-ux'), records: [] }
 let server, browser, serial = 0
@@ -94,3 +94,4 @@ describe('issue #39 — mock Sign in: a wrong password keeps focus (39.9)', { sk
 describe('issue #40 — mock Explore: Clear all filters focus (40.9)', { skip: !selectedIssue(40), concurrency: false }, () => issue40(suite))
 describe('issue #41 — mock Sign out focus (41.8)', { skip: !selectedIssue(41), concurrency: false }, () => issue41(suite))
 describe('issue #42 — mock informational text is at least 12 px (42.7)', { skip: !selectedIssue(42), concurrency: false }, () => issue42(suite))
+describe('issue #44 — mock Explore card wraps long unbroken text (44.8)', { skip: !selectedIssue(44), concurrency: false }, () => issue44(suite))

@@ -244,11 +244,12 @@ h1 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .art-audio { background: #f3eae0; color: #8b6436; }
 .art-presentation { background: #e6eee8; color: #436b55; }
 .art-accessories { background: #eee6ee; color: #805576; }
-.equipment-card-body { padding: 18px; }
-.equipment-card-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); letter-spacing: .03em; }
+.equipment-card-body { padding: 18px; min-width: 0; }
+.equipment-card-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; font-size: 12px; color: var(--muted); letter-spacing: .03em; }
+.equipment-card-meta > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .equipment-card-meta > span:first-child { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-.equipment-card h3 { font-size: 16px; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; margin: 12px 0 9px; }
-.pickup-location { color: var(--muted); font-size: 12px; min-height: 38px; }
+.equipment-card h3 { font-size: 16px; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; margin: 12px 0 9px; overflow-wrap: anywhere; }
+.pickup-location { color: var(--muted); font-size: 12px; min-height: 38px; overflow-wrap: anywhere; }
 .equipment-card-bottom { display: flex; align-items: center; gap: 8px; justify-content: space-between; border-top: 1px solid #edf0f2; padding-top: 14px; margin-top: 14px; }
 .equipment-card-bottom > .icon { width: 17px; height: 17px; color: #6c7884; }
 .availability-badge { display: inline-block; font-size: 12px; font-weight: 550; line-height: 1.5; padding: 5px 8px; border-radius: 5px; }
